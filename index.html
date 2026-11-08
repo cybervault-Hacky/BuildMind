@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BuildMind — Turn your ideas into games</title>
+  <meta name="description" content="BuildMind is an AI game development workspace. Describe a game, build it, test it and play it.">
+  <meta name="theme-color" content="#060608">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BuildMind">
+  <meta property="og:title" content="BuildMind — Turn your ideas into games">
+  <meta property="og:description" content="Describe a game. BuildMind plans it, builds it and tests it.">
+  <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;560;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <script>document.documentElement.classList.add("js");</script>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient__grid"></div>
+    <div class="ambient__glow ambient__glow--top"></div>
+    <div class="ambient__glow ambient__glow--left"></div>
+    <div class="ambient__cursor"></div>
+    <div class="ambient__noise"></div>
+  </div>
+
+  <div class="page">
+    <!-- ================= Header ================= -->
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="index.html" aria-label="BuildMind home">
+          <span class="brand__mark" data-brand-mark></span>
+          <span class="brand__word">Build<span>Mind</span></span>
+        </a>
+
+        <nav class="nav" aria-label="Primary">
+          <a class="nav__link" href="index.html">Home</a>
+          <a class="nav__link" href="build.html">Build</a>
+          <a class="nav__link" href="projects.html">Projects</a>
+          <a class="nav__link" href="settings.html">Settings</a>
+        </nav>
+
+        <div class="site-header__actions">
+          <a class="btn btn--primary btn--sm btn--header-cta" href="build.html">
+            Build a Game
+          </a>
+          <button class="menu-toggle" type="button" aria-expanded="false"
+                  aria-controls="mobile-nav" aria-label="Open menu">
+            <span class="menu-toggle__bars" aria-hidden="true"><span></span><span></span><span></span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile">
+      <ul class="mobile-nav__list">
+        <li><a class="mobile-nav__link" href="index.html">Home <span aria-hidden="true">→</span></a></li>
+        <li><a class="mobile-nav__link" href="build.html">Build <span aria-hidden="true">→</span></a></li>
+        <li><a class="mobile-nav__link" href="projects.html">Projects <span aria-hidden="true">→</span></a></li>
+        <li><a class="mobile-nav__link" href="settings.html">Settings <span aria-hidden="true">→</span></a></li>
+      </ul>
+      <div class="mobile-nav__footer">
+        <a class="btn btn--primary btn--block" href="build.html">Build a Game</a>
+      </div>
+    </nav>
+
+    <!-- ================= Main ================= -->
+    <main id="main">
+      <section class="shell">
+        <div class="hero">
+          <div class="hero__copy">
+            <span class="hero__badge" data-reveal>
+              <span class="status__dot" aria-hidden="true"></span>
+              Phase 1 — workspace preview
+            </span>
+
+            <h1 class="hero__title" data-reveal data-reveal-delay="60" tabindex="-1">
+              Turn your ideas<br>into games.
+            </h1>
+
+            <p class="hero__lede" data-reveal data-reveal-delay="140">
+              Describe what you want to play. BuildMind plans it,
+              builds it and tests it with you.
+            </p>
+
+            <div class="hero__actions" data-reveal data-reveal-delay="220">
+              <a class="btn btn--primary btn--lg" href="build.html">
+                Build a Game
+              </a>
+              <a class="btn btn--ghost btn--lg" href="settings.html#roblox">
+                Connect Roblox
+              </a>
+            </div>
+
+            <div class="hero__meta" data-stagger>
+              <div class="hero__meta-item">
+                <span class="hero__meta-label">Target</span>
+                <span class="hero__meta-value">Roblox</span>
+              </div>
+              <div class="hero__meta-item">
+                <span class="hero__meta-label">Runs</span>
+                <span class="hero__meta-value">In your browser</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero__visual" data-reveal="scale" data-reveal-delay="180">
+            <div class="worldviz" data-world id="hero-world"></div>
+            <span class="worldviz__caption" aria-hidden="true">world · assembling</span>
+          </div>
+        </div>
+
+        <!-- Idea → Build → Test → Play -->
+        <div class="pipeline" data-reveal="fade">
+          <div class="pipeline__steps" role="list" aria-label="How a build runs">
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">1</span> Idea
+            </div>
+            <span class="pipeline__arrow" aria-hidden="true"></span>
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">2</span> Build
+            </div>
+            <span class="pipeline__arrow" aria-hidden="true"></span>
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">3</span> Test
+            </div>
+            <span class="pipeline__arrow" aria-hidden="true"></span>
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">4</span> Play
+            </div>
+          </div>
+          <a class="link-arrow pipeline__link" href="projects.html">
+            View projects
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3.2 8h9.6M9 4.2 12.8 8 9 11.8"/>
+            </svg>
+          </a>
+        </div>
+
+        <!-- Three quiet entry points -->
+        <div class="start-row" data-stagger>
+          <a class="start-card" href="build.html">
+            <span class="start-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 2.5 13.5 5.5v5L8 13.5 2.5 10.5v-5L8 2.5Z"/>
+                <path d="M8 8v5.5M8 8l3.2-1.8M8 8 4.8 6.2"/>
+              </svg>
+            </span>
+            <span>
+              <span class="start-card__title">Start a build</span>
+              <span class="start-card__note">Describe a game and watch it assemble</span>
+            </span>
+          </a>
+
+          <a class="start-card" href="settings.html#roblox">
+            <span class="start-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5.6 2.5v3M10.4 2.5v3M3.6 5.5h8.8v1.6a4.4 4.4 0 0 1-8.8 0V5.5ZM8 11.5v2"/>
+              </svg>
+            </span>
+            <span>
+              <span class="start-card__title">Connect Roblox</span>
+              <span class="start-card__note">Account and Studio bridge</span>
+            </span>
+          </a>
+
+          <a class="start-card" href="settings.html#ai">
+            <span class="start-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="5.4" cy="9.6" r="2.6"/>
+                <path d="M7.3 7.7 12.6 2.4M10.4 4.6l1.6 1.6"/>
+              </svg>
+            </span>
+            <span>
+              <span class="start-card__title">Choose your model</span>
+              <span class="start-card__note">Bring your own API key</span>
+            </span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= Footer ================= -->
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <span class="site-footer__brand">
+          <span data-brand-mark="sm" aria-hidden="true"></span>
+          BuildMind
+        </span>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="build.html">Build</a>
+          <a href="projects.html">Projects</a>
+          <a href="settings.html">Settings</a>
+        </nav>
+        <span class="site-footer__tag">Phase 1 · frontend</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/home.js"></script>
+</body>
+</html>

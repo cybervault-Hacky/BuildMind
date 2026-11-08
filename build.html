@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Build a Game — BuildMind</title>
+  <meta name="description" content="Describe the game you want to build and let BuildMind plan, build and test it.">
+  <meta name="theme-color" content="#060608">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BuildMind">
+  <meta property="og:title" content="Build a Game — BuildMind">
+  <meta property="og:description" content="Describe the game you want to build and let BuildMind plan, build and test it.">
+  <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;560;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <script>document.documentElement.classList.add("js");</script>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <noscript>
+    <style>
+      /* Without JavaScript the workspace is a static preview: no dead actions. */
+      #build-button, #connect-roblox, #connect-studio, #prompt-idea, #prompt-clear { display: none !important; }
+    </style>
+  </noscript>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient__grid"></div>
+    <div class="ambient__glow ambient__glow--top"></div>
+    <div class="ambient__glow ambient__glow--left"></div>
+    <div class="ambient__cursor"></div>
+    <div class="ambient__noise"></div>
+  </div>
+
+  <div class="page">
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="index.html" aria-label="BuildMind home">
+          <span class="brand__mark" data-brand-mark></span>
+          <span class="brand__word">Build<span>Mind</span></span>
+        </a>
+        <nav class="nav" aria-label="Primary">
+          <a class="nav__link" href="index.html">Home</a>
+          <a class="nav__link" href="build.html">Build</a>
+          <a class="nav__link" href="projects.html">Projects</a>
+          <a class="nav__link" href="settings.html">Settings</a>
+        </nav>
+        <div class="site-header__actions">
+          <a class="btn btn--ghost btn--sm btn--header-cta" href="projects.html">Projects</a>
+          <button class="menu-toggle" type="button" aria-expanded="false"
+                  aria-controls="mobile-nav" aria-label="Open menu">
+            <span class="menu-toggle__bars" aria-hidden="true"><span></span><span></span><span></span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile">
+      <ul class="mobile-nav__list">
+        <li><a class="mobile-nav__link" href="index.html">Home <span aria-hidden="true">→</span></a></li>
+        <li><a class="mobile-nav__link" href="build.html">Build <span aria-hidden="true">→</span></a></li>
+        <li><a class="mobile-nav__link" href="projects.html">Projects <span aria-hidden="true">→</span></a></li>
+        <li><a class="mobile-nav__link" href="settings.html">Settings <span aria-hidden="true">→</span></a></li>
+      </ul>
+      <div class="mobile-nav__footer">
+        <a class="btn btn--primary btn--block" href="settings.html#ai">Set up AI provider</a>
+      </div>
+    </nav>
+
+    <main id="main">
+      <div class="shell">
+        <div class="page-head">
+          <div>
+            <h1 class="page-head__title" data-reveal>Build a Game</h1>
+            <p class="page-head__sub" data-reveal data-reveal-delay="50">
+              Describe the game, choose a model, then build.
+            </p>
+          </div>
+          <div class="page-head__actions" data-reveal="fade" data-reveal-delay="100">
+            <span class="status status--idle" id="workspace-status">
+              <span class="status__dot" aria-hidden="true"></span>
+              <span class="status__text">Ready</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="workspace">
+          <!-- ============ Composer ============ -->
+          <div class="composer">
+            <!-- Prompt -->
+            <section aria-labelledby="prompt-label" data-reveal>
+              <h2 class="group-label" id="prompt-label">Game idea</h2>
+
+              <div class="prompt-block">
+                <label class="sr-only" for="game-prompt">Describe the game you want to build</label>
+                <textarea class="prompt-block__textarea" id="game-prompt" name="prompt"
+                          maxlength="600" spellcheck="true"
+                          placeholder="Describe the game you want to build..."></textarea>
+
+                <div class="prompt-block__bar">
+                  <div class="prompt-block__bar-left">
+                    <span class="prompt-block__count"><span id="prompt-count">0</span> / 600</span>
+                  </div>
+                  <div class="prompt-block__bar-right">
+                    <button class="btn btn--quiet btn--sm" type="button" id="prompt-clear" hidden>Clear</button>
+                    <button class="btn btn--ghost btn--sm" type="button" id="prompt-idea">
+                      Use an example
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="chips chips--spaced" role="group" aria-label="Example game ideas">
+                <button class="chip" type="button" data-idea="Create a multiplayer survival game on a floating island.">Floating island survival</button>
+                <button class="chip" type="button" data-idea="Make an obby with moving platforms, checkpoints and a timer.">Obby with checkpoints</button>
+                <button class="chip" type="button" data-idea="Build a tycoon where players buy droppers and expand a base.">Dropper tycoon</button>
+                <button class="chip" type="button" data-idea="Create a round-based arena with classes and a scoreboard.">Round-based arena</button>
+              </div>
+            </section>
+
+            <!-- AI configuration -->
+            <section aria-labelledby="ai-label" data-reveal data-reveal-delay="60">
+              <h2 class="group-label" id="ai-label">AI configuration</h2>
+
+              <div class="config-grid">
+                <div class="field">
+                  <label class="field__label" for="provider">
+                    Provider
+                  </label>
+                  <select class="select" id="provider" name="provider">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="google">Google</option>
+                    <option value="xai">xAI</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label class="field__label" for="model">Model</label>
+                  <select class="select" id="model" name="model"></select>
+                </div>
+
+                <div class="field config-grid__span">
+                  <label class="field__label" for="api-key">
+                    API key
+                    <span class="field__hint" id="api-key-hint">Stored locally in this browser</span>
+                  </label>
+                  <div class="input-group">
+                    <input class="input" id="api-key" name="api-key" type="password"
+                           autocomplete="off" spellcheck="false" placeholder="sk-..." aria-describedby="api-key-hint">
+                    <button class="input-group__action" type="button" id="api-key-toggle"
+                            aria-label="Show API key" aria-pressed="false">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M1.8 8S4.1 3.9 8 3.9 14.2 8 14.2 8s-2.3 4.1-6.2 4.1S1.8 8 1.8 8Z"/>
+                        <circle cx="8" cy="8" r="1.7"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Connections -->
+            <section aria-labelledby="conn-label" data-reveal data-reveal-delay="120">
+              <h2 class="group-label" id="conn-label">Connections</h2>
+
+              <div class="panel">
+                <div class="panel__body panel__body--flush">
+                  <div class="connection">
+                    <span class="connection__icon" aria-hidden="true">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5.6 2.5v3M10.4 2.5v3M3.6 5.5h8.8v1.6a4.4 4.4 0 0 1-8.8 0V5.5ZM8 11.5v2"/>
+                      </svg>
+                    </span>
+                    <div class="connection__body">
+                      <span class="connection__title">Roblox</span>
+                      <span class="connection__sub" id="roblox-sub">Account not connected</span>
+                    </div>
+                    <div class="connection__actions">
+                      <span class="status status--idle" id="roblox-status">
+                        <span class="status__dot" aria-hidden="true"></span>
+                        <span class="status__text">Not connected</span>
+                      </span>
+                      <button class="btn btn--ghost btn--sm" type="button" id="connect-roblox">Connect</button>
+                    </div>
+                  </div>
+
+                  <div class="connection">
+                    <span class="connection__icon" aria-hidden="true">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="12" height="8" rx="1.4"/>
+                        <path d="M5.6 13.4h4.8M8 11v2.4"/>
+                      </svg>
+                    </span>
+                    <div class="connection__body">
+                      <span class="connection__title">Roblox Studio</span>
+                      <span class="connection__sub" id="studio-sub">Bridge not detected</span>
+                    </div>
+                    <div class="connection__actions">
+                      <span class="status status--idle" id="studio-status">
+                        <span class="status__dot" aria-hidden="true"></span>
+                        <span class="status__text">Not connected</span>
+                      </span>
+                      <button class="btn btn--ghost btn--sm" type="button" id="connect-studio">Connect Studio</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Build action -->
+            <div class="build-action" data-reveal data-reveal-delay="160">
+              <div class="build-action__note">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="8" cy="8" r="5.6"/><path d="M8 7.2v3.4M8 5.2v.6"/>
+                </svg>
+                <span id="build-note">Phase 1 runs a simulated build in your browser.</span>
+              </div>
+              <!-- Hidden until build.js wires it up: no dead primary action. -->
+              <button class="btn btn--primary btn--lg" type="button" id="build-button" hidden>
+                Build Game
+              </button>
+            </div>
+          </div>
+
+          <!-- ============ Activity column ============ -->
+          <aside class="activity-col" aria-label="Build activity">
+            <div class="panel panel--raised" data-reveal="scale" data-reveal-delay="80">
+              <div class="panel__head">
+                <span class="panel__title">Activity</span>
+                <span class="status status--idle" id="build-status">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Ready</span>
+                </span>
+              </div>
+              <div class="panel__body">
+                <div class="worldviz worldviz--panel" data-world id="build-world"></div>
+
+                <ol class="timeline" id="build-timeline">
+                  <li class="timeline__step is-pending" data-stage="0">
+                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
+                    <span class="timeline__label">Understanding idea</span>
+                    <span class="timeline__meta" data-meta></span>
+                  </li>
+                  <li class="timeline__step is-pending" data-stage="1">
+                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
+                    <span class="timeline__label">Planning</span>
+                    <span class="timeline__meta" data-meta></span>
+                  </li>
+                  <li class="timeline__step is-pending" data-stage="2">
+                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
+                    <span class="timeline__label">Building</span>
+                    <span class="timeline__meta" data-meta></span>
+                  </li>
+                  <li class="timeline__step is-pending" data-stage="3">
+                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
+                    <span class="timeline__label">Testing</span>
+                    <span class="timeline__meta" data-meta></span>
+                  </li>
+                  <li class="timeline__step is-pending" data-stage="4">
+                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
+                    <span class="timeline__label">Fixing</span>
+                    <span class="timeline__meta" data-meta></span>
+                  </li>
+                  <li class="timeline__step is-pending" data-stage="5">
+                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
+                    <span class="timeline__label">Validating</span>
+                    <span class="timeline__meta" data-meta></span>
+                  </li>
+                  <li class="timeline__step is-pending" data-stage="6">
+                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
+                    <span class="timeline__label">Complete</span>
+                    <span class="timeline__meta" data-meta></span>
+                  </li>
+                </ol>
+              </div>
+            </div>
+
+            <div class="panel" data-reveal="fade" data-reveal-delay="140">
+              <div class="panel__body">
+                <div class="progress" id="build-progress" role="group" aria-label="Build progress">
+                  <div class="progress__head">
+                    <span class="progress__label">Progress</span>
+                    <span class="progress__value" id="progress-value">0%</span>
+                  </div>
+                  <div class="progress__track" role="progressbar" id="progress-bar"
+                       aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                       aria-labelledby="progress-state">
+                    <div class="progress__fill" id="progress-fill"></div>
+                  </div>
+                  <div class="progress__foot">
+                    <span id="progress-state">Ready</span>
+                    <span id="progress-time">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <span class="site-footer__brand">
+          <span data-brand-mark="sm" aria-hidden="true"></span>
+          BuildMind
+        </span>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="projects.html">Projects</a>
+          <a href="settings.html">Settings</a>
+        </nav>
+        <span class="site-footer__tag">Phase 1 · simulated build</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/build.js"></script>
+</body>
+</html>

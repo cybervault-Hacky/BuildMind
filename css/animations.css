@@ -1,0 +1,453 @@
+/* ==========================================================================
+   BuildMind — animations.css
+   Keyframes, entrance choreography, page-transition layer and the
+   reduced-motion contract. Everything animates via opacity/transform.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Keyframes
+   -------------------------------------------------------------------------- */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sheen {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 3.5px transparent;
+    opacity: 0.82;
+  }
+}
+
+@keyframes pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(139, 147, 255, 0.16);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(139, 147, 255, 0.05);
+  }
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes glow-drift {
+  0% {
+    transform: translate3d(-2%, 0, 0) scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(3%, 4%, 0) scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* SVG world construction motion */
+@keyframes wv-dash {
+  to {
+    stroke-dashoffset: -64;
+  }
+}
+
+@keyframes wv-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes wv-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes wv-scan {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(260px);
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   2. Page transition overlay
+   -------------------------------------------------------------------------- */
+.page-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--bg);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-3) var(--ease-out);
+  will-change: opacity;
+}
+
+.page-veil.is-active {
+  opacity: 0.92;
+}
+
+body.is-leaving main,
+body.is-leaving .site-header {
+  transition: opacity var(--dur-2) var(--ease-soft), transform var(--dur-2) var(--ease-soft);
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* Entrance for whole-document load */
+body.is-entering main,
+body.is-entering .site-header {
+  animation: fade-in var(--dur-4) var(--ease-out) both;
+}
+
+/* --------------------------------------------------------------------------
+   3. Choreographed entrances
+   Elements marked [data-reveal] start hidden and animate in when mounted
+   or when scrolled into view (app.js toggles .is-revealed).
+   -------------------------------------------------------------------------- */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+[data-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+[data-reveal="fade"] {
+  transform: none;
+}
+
+[data-reveal="scale"] {
+  transform: scale(0.975);
+}
+
+[data-reveal="scale"].is-revealed {
+  transform: none;
+}
+
+/* Staggered children */
+[data-stagger] > * {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out);
+}
+
+[data-stagger].is-revealed > * {
+  opacity: 1;
+  transform: none;
+}
+
+[data-stagger].is-revealed > *:nth-child(1) {
+  transition-delay: 0ms;
+}
+[data-stagger].is-revealed > *:nth-child(2) {
+  transition-delay: 55ms;
+}
+[data-stagger].is-revealed > *:nth-child(3) {
+  transition-delay: 110ms;
+}
+[data-stagger].is-revealed > *:nth-child(4) {
+  transition-delay: 165ms;
+}
+[data-stagger].is-revealed > *:nth-child(5) {
+  transition-delay: 220ms;
+}
+[data-stagger].is-revealed > *:nth-child(6) {
+  transition-delay: 275ms;
+}
+[data-stagger].is-revealed > *:nth-child(7) {
+  transition-delay: 330ms;
+}
+[data-stagger].is-revealed > *:nth-child(8) {
+  transition-delay: 385ms;
+}
+[data-stagger].is-revealed > *:nth-child(9) {
+  transition-delay: 440ms;
+}
+
+/* --------------------------------------------------------------------------
+   4. Component-level animation hooks
+   -------------------------------------------------------------------------- */
+
+/* Mobile nav open */
+.mobile-nav.is-open {
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+
+.mobile-nav.is-open .mobile-nav__link {
+  animation: rise-in var(--dur-3) var(--ease-out) both;
+}
+
+.mobile-nav.is-open .mobile-nav__link:nth-child(1) {
+  animation-delay: 30ms;
+}
+.mobile-nav.is-open .mobile-nav__link:nth-child(2) {
+  animation-delay: 60ms;
+}
+.mobile-nav.is-open .mobile-nav__link:nth-child(3) {
+  animation-delay: 90ms;
+}
+.mobile-nav.is-open .mobile-nav__link:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+/* Timeline step states animate their internals */
+.timeline__step {
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+
+.timeline__step.is-pending {
+  opacity: 0.82;
+}
+
+/* Progress fill glow while running */
+.progress.is-running .progress__fill {
+  box-shadow: 0 0 18px -3px rgba(139, 147, 255, 0.45);
+}
+
+/* World visualizer motion */
+.worldviz__orbit {
+  transform-origin: center;
+  animation: wv-orbit 44s linear infinite;
+}
+
+.worldviz__orbit--slow {
+  animation-duration: 76s;
+  animation-direction: reverse;
+}
+
+.wv-edge--flow {
+  animation: wv-dash 3.2s linear infinite;
+}
+
+.worldviz__float {
+  animation: wv-float 7s var(--ease-in-out) infinite;
+}
+
+.worldviz__scan {
+  animation: wv-scan 6.5s var(--ease-in-out) infinite;
+}
+
+/* Build page: states on the worldviz */
+.worldviz[data-state="idle"] .worldviz__orbit,
+.worldviz[data-state="idle"] .worldviz__float {
+  animation-play-state: running;
+}
+
+.worldviz[data-state="building"] .wv-cell {
+  animation: fade-in var(--dur-4) var(--ease-out) both;
+}
+
+/* Hero chip cycling */
+.hero__badge-text {
+  display: inline-block;
+}
+
+/* Project card entrance */
+.project-card {
+  animation: scale-in var(--dur-4) var(--ease-out) both;
+}
+
+.projects-grid .project-card:nth-child(1) {
+  animation-delay: 40ms;
+}
+.projects-grid .project-card:nth-child(2) {
+  animation-delay: 90ms;
+}
+.projects-grid .project-card:nth-child(3) {
+  animation-delay: 140ms;
+}
+.projects-grid .project-card:nth-child(4) {
+  animation-delay: 190ms;
+}
+.projects-grid .project-card:nth-child(5) {
+  animation-delay: 240ms;
+}
+.projects-grid .project-card:nth-child(6) {
+  animation-delay: 290ms;
+}
+.projects-grid .project-card:nth-child(7) {
+  animation-delay: 340ms;
+}
+.projects-grid .project-card:nth-child(8) {
+  animation-delay: 390ms;
+}
+
+/* Status change flash — a calm tint, never a flash */
+.status.is-changing {
+  animation: scale-in var(--dur-3) var(--ease-out);
+}
+
+/* Saving pulse for settings rows */
+.setting-row.is-saving .setting-row__title {
+  color: var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+   5. Reduced motion contract
+  Reveals are only hidden once JS confirms it will animate them, so the page
+  is fully readable with JavaScript disabled.
+   -------------------------------------------------------------------------- */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.js [data-stagger] > * {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.js [data-reveal].is-revealed,
+.js [data-stagger].is-revealed > * {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-reveal],
+  [data-stagger] > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .ambient__glow,
+  .ambient__cursor,
+  .worldviz__orbit,
+  .worldviz__float,
+  .worldviz__scan,
+  .wv-edge--flow,
+  .progress__fill::after {
+    animation: none !important;
+  }
+
+  .btn:hover {
+    transform: none;
+  }
+
+  .project-card:hover {
+    transform: none;
+  }
+
+  .project-card {
+    animation: none !important;
+  }
+}
+
+/* Users who prefer reduced data / no motion on the settings page */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+html[data-motion="reduced"] [data-reveal],
+html[data-motion="reduced"] [data-stagger] > * {
+  opacity: 1 !important;
+  transform: none !important;
+}

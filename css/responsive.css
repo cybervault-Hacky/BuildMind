@@ -1,0 +1,531 @@
+/* ==========================================================================
+   BuildMind — responsive.css
+   Tablet and mobile recomposition. Mobile is laid out on purpose,
+   never just a shrunken desktop.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Large desktop refinements
+   -------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  :root {
+    --page-max: 1180px;
+  }
+
+  .hero {
+    min-height: min(74vh, 660px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Small desktop / large tablet
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 40px;
+    min-height: 0;
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .hero__visual {
+    min-height: 320px;
+  }
+
+  .worldviz {
+    max-width: 380px;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.88fr);
+    gap: 28px;
+  }
+
+  .nav__link {
+    padding-inline: 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tablet — collapse header nav into the sheet
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  :root {
+    --header-h: 62px;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .site-header__actions .btn--header-cta {
+    display: none;
+  }
+
+  .menu-toggle {
+    display: grid;
+  }
+
+  .mobile-nav {
+    display: block;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out),
+      visibility var(--dur-3);
+  }
+
+  .mobile-nav.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .site-header__inner {
+    grid-template-columns: 1fr auto;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+    padding: 44px 0 40px;
+  }
+
+  .hero__copy {
+    max-width: 100%;
+  }
+
+  .hero__title {
+    font-size: clamp(32px, 7vw, 44px);
+  }
+
+  .hero__visual {
+    order: 2;
+    min-height: 300px;
+  }
+
+  .worldviz {
+    max-width: 340px;
+  }
+
+  .pipeline {
+    padding-bottom: 48px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .start-row {
+    grid-template-columns: 1fr;
+  }
+
+  .start-card + .start-card {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .start-card {
+    padding: 20px var(--s-2);
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    padding-bottom: 72px;
+  }
+
+  .activity-col {
+    position: static;
+  }
+
+  .page-head {
+    padding: 44px 0 24px;
+  }
+
+  .settings {
+    max-width: 100%;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile
+   -------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  :root {
+    --header-h: 58px;
+    --gutter: 18px;
+    --s-10: 44px;
+    --s-11: 64px;
+  }
+
+  body {
+    font-size: 14.5px;
+  }
+
+  .brand__mark {
+    width: 24px;
+    height: 24px;
+  }
+
+  .brand__word {
+    font-size: 14.5px;
+  }
+
+  /* Hero */
+  .hero {
+    gap: 36px;
+    padding: 30px 0 32px;
+  }
+
+  .hero__title {
+    font-size: clamp(29px, 8.6vw, 38px);
+    letter-spacing: -0.032em;
+  }
+
+  .hero__lede {
+    margin-top: 14px;
+    font-size: 14.5px;
+    max-width: 34ch;
+  }
+
+  .hero__badge {
+    margin-bottom: 18px;
+  }
+
+  .hero__actions {
+    margin-top: 24px;
+    gap: 10px;
+  }
+
+  .hero__actions .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .hero__actions .btn--primary {
+    flex: 1 1 100%;
+    height: 48px;
+  }
+
+  /* Beat the .btn--lg rule that may outrank on specificity */
+  .hero__actions .btn--lg {
+    height: 48px;
+    padding-inline: 18px;
+    font-size: 14px;
+  }
+
+  .hero__meta {
+    margin-top: 24px;
+    padding-top: 20px;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .hero__visual {
+    min-height: 250px;
+  }
+
+  .worldviz {
+    max-width: 280px;
+  }
+
+  .worldviz__caption {
+    font-size: 10px;
+    bottom: -2px;
+  }
+
+  /* Pipeline becomes a quiet 2x2 grid */
+  .pipeline {
+    padding: 20px 0 40px;
+    gap: 16px;
+  }
+
+  .pipeline__steps {
+    width: 100%;
+    gap: 8px 14px;
+  }
+
+  .pipeline__arrow {
+    display: none;
+  }
+
+  .pipeline__link {
+    font-size: 12px;
+  }
+
+  /* Page heads */
+  .page-head {
+    padding: 32px 0 20px;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .page-head__title {
+    font-size: 26px;
+  }
+
+  .page-head__sub {
+    font-size: 13.5px;
+    margin-top: 6px;
+  }
+
+  .page-head__actions {
+    width: 100%;
+  }
+
+  .page-head__actions .btn {
+    flex: 1 1 auto;
+  }
+
+  /* Composer */
+  .composer {
+    gap: 24px;
+  }
+
+  .prompt-block__textarea {
+    min-height: 124px;
+    padding: 16px 16px 6px;
+    font-size: 15px; /* avoid iOS zoom */
+  }
+
+  .prompt-block__bar {
+    padding: 10px 10px 10px 16px;
+    gap: 8px;
+  }
+
+  .prompt-block__bar .btn {
+    height: 34px;
+    padding-inline: 12px;
+  }
+
+  .chips {
+    gap: 6px;
+  }
+
+  .chip {
+    height: 30px;
+    font-size: 11.5px;
+  }
+
+  .config-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .input,
+  .select {
+    height: 46px;
+    font-size: 15px; /* avoid iOS zoom */
+  }
+
+  .textarea {
+    font-size: 15px;
+  }
+
+  .build-action {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .build-action .btn {
+    width: 100%;
+    height: 50px;
+    font-size: 15px;
+  }
+
+  .build-action__note {
+    order: 2;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Panels */
+  .panel__head {
+    padding: 15px 16px;
+  }
+
+  .panel__body {
+    padding: 16px;
+  }
+
+  /* Connections stack their action under the label */
+  .connection {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 0;
+  }
+
+  .connection__actions {
+    width: 100%;
+    justify-content: space-between;
+    padding-left: 46px;
+  }
+
+  .connection__actions .btn {
+    height: 36px;
+  }
+
+  /* Timeline */
+  .timeline__step {
+    padding: 10px 0;
+    min-height: 44px;
+  }
+
+  .timeline__label {
+    font-size: 13.5px;
+  }
+
+  /* Projects */
+  .projects-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding-bottom: 56px;
+  }
+
+  .project-new {
+    min-height: 132px;
+  }
+
+  .filter-row {
+    gap: 6px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .filter-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .segmented__option {
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+
+  .empty {
+    padding: 48px 20px;
+  }
+
+  /* Settings */
+  .settings {
+    gap: 20px;
+    padding-bottom: 56px;
+  }
+
+  .setting-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 0;
+  }
+
+  .setting-row__control {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .setting-row__control .select,
+  .setting-row__control .input-group {
+    width: 100%;
+  }
+
+  .segmented {
+    width: 100%;
+  }
+
+  .segmented__option {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  /* Footer */
+  .site-footer {
+    padding: 24px 0;
+  }
+
+  .site-footer__inner {
+    gap: 14px;
+  }
+
+  .site-footer__links {
+    gap: 16px;
+    font-size: 12px;
+  }
+
+  .site-footer__tag {
+    display: none;
+  }
+
+  /* Toast clears the safe area */
+  .toast {
+    bottom: 18px;
+    left: 18px;
+    right: 18px;
+    transform: translateY(16px);
+    justify-content: center;
+  }
+
+  .toast.is-visible {
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Very small phones
+   -------------------------------------------------------------------------- */
+@media (max-width: 380px) {
+  .hero__title {
+    font-size: 27px;
+  }
+
+  .worldviz {
+    max-width: 240px;
+  }
+
+  .pipeline__steps {
+    gap: 6px 10px;
+  }
+
+  .pipeline__step {
+    font-size: 11.5px;
+  }
+
+  .btn--lg {
+    padding-inline: 16px;
+    font-size: 13.5px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Landscape phones — keep the hero breathable
+   -------------------------------------------------------------------------- */
+@media (max-height: 520px) and (orientation: landscape) {
+  .hero {
+    padding-block: 28px;
+  }
+
+  .hero__visual {
+    min-height: 220px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Print — nothing fancy is needed
+   -------------------------------------------------------------------------- */
+@media print {
+  .ambient,
+  .site-header,
+  .site-footer,
+  .mobile-nav {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
