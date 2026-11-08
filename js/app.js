@@ -602,10 +602,10 @@
         <circle cx="${WORLD.cx}" cy="${WORLD.cy - 6}" r="150" fill="url(#wv-glow)"/>
 
         <!-- orbital rings -->
-        <g class="worldviz__orbit">
+        <g class="worldviz__orbit" style="transform-origin: ${WORLD.cx}px ${WORLD.cy - 14}px">
           <ellipse class="wv-ring" cx="${WORLD.cx}" cy="${WORLD.cy - 14}" rx="164" ry="58"/>
         </g>
-        <g class="worldviz__orbit worldviz__orbit--slow">
+        <g class="worldviz__orbit worldviz__orbit--slow" style="transform-origin: ${WORLD.cx}px ${WORLD.cy - 14}px">
           <ellipse class="wv-ring" cx="${WORLD.cx}" cy="${WORLD.cy - 14}" rx="128" ry="44"/>
         </g>
 
@@ -647,6 +647,10 @@
 
     const cells = el.querySelectorAll(".wv-cell");
     const total = cells.length;
+
+    // When the run stops, drop the scan band so it does not sit on screen
+    const scan = el.querySelector(".worldviz__scan");
+    if (scan) scan.style.display = state === "idle" || state === "complete" ? "none" : "";
 
     // idle shows a light preview ring of cells, never a "built" claim
     if (state === "idle") {

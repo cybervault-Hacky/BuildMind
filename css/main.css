@@ -1297,8 +1297,11 @@ pre {
 .hero__visual {
   position: relative;
   min-height: 380px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
 }
 
 /* --------------------------------------------------------------------------
@@ -1912,9 +1915,7 @@ pre {
 }
 
 .worldviz__caption {
-  position: absolute;
-  left: 0;
-  bottom: -6px;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
