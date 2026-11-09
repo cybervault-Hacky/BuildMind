@@ -664,6 +664,36 @@
   /* ------------------------------------------------------------------------
      Init
      ------------------------------------------------------------------------ */
+  /**
+   * Restore the composer. A deep link wins; otherwise the draft comes back
+   * through settingsService — this file never reads storage itself.
+   */
+  function restorePrompt() {
+    if (!el.prompt) return;
+
+    const preset = new URLSearchParams(window.location.search).get("prompt");
+    if (preset) {
+      el.prompt.value = preset;
+      setPromptDraft(preset);
+      syncPromptChrome();
+      return;
+    }
+
+    if (getState().build.prompt) {
+      el.prompt.value = getState().build.prompt;
+      syncPromptChrome();
+      return;
+    }
+
+    BM.settingsService.loadPromptDraft().then((result) => {
+      if (!BM.isOk(result) || !result.data.prompt) return;
+      if (el.prompt.value) return; // the user already started typing
+      el.prompt.value = result.data.prompt;
+      setPromptDraft(result.data.prompt);
+      syncPromptChrome();
+    });
+  }
+
   function init() {
     cacheElements();
 
@@ -671,16 +701,7 @@
     renderTimeline();
     renderStageMarks();
     syncPromptChrome();
-
-    // Deep link from the projects page: build.html?prompt=…
-    const preset = new URLSearchParams(window.location.search).get("prompt");
-    if (preset && el.prompt) {
-      el.prompt.value = preset;
-      setPromptDraft(preset);
-    } else if (el.prompt && getState().build.prompt) {
-      el.prompt.value = getState().build.prompt;
-    }
-    syncPromptChrome();
+    restorePrompt();
 
     bindEvents();
     subscribe(render);
