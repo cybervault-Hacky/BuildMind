@@ -287,10 +287,15 @@
 
     const prefs = readStore(KEYS.preferences, { motion: "full" });
     state.motion = prefs.motion === "reduced" ? "reduced" : "full";
+    BM.applyMotionPreference?.(state.motion);
 
     const conns = readStore(KEYS.connections, {});
     state.connections.roblox.status = conns.roblox ? "connected" : "disconnected";
     state.connections.studio.status = conns.studio ? "connected" : "disconnected";
+
+    // The last prompt is restored so leaving the page mid-thought is not destructive.
+    const draft = readStore("buildmind.draft.v1", { prompt: "" });
+    state.build.prompt = typeof draft.prompt === "string" ? draft.prompt : "";
 
     // Projects: an existing list is respected as-is, even when it is empty.
     // Samples only seed a first-time visitor.
@@ -376,6 +381,14 @@
    * The key itself is never stored — only whether one is present.
    * @param {boolean} present
    */
+  /** Keep the composer draft so navigation does not lose the user's idea. */
+  function setPromptDraft(prompt) {
+    const text = String(prompt || "");
+    if (text === state.build.prompt) return;
+    state.build.prompt = text;
+    writeStore("buildmind.draft.v1", { prompt: text.slice(0, 600) });
+  }
+
   function setApiKeyPresent(present) {
     const next = Boolean(present);
     if (next === state.apiKeyPresent) return;
@@ -787,6 +800,7 @@
     setMotion,
     resetSettings,
     setApiKeyPresent,
+    setPromptDraft,
 
     // connections
     connectRoblox,

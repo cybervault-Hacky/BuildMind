@@ -33,6 +33,7 @@
     setProvider,
     setModel,
     setApiKeyPresent,
+    setPromptDraft,
     connectRoblox,
     disconnectRoblox,
     connectStudio,
@@ -449,6 +450,7 @@
     el.prompt.focus();
     el.prompt.setSelectionRange(text.length, text.length);
     syncPromptChrome();
+    setPromptDraft(text);
     setFieldError("prompt", "");
   }
 
@@ -588,6 +590,7 @@
     // prompt
     el.prompt?.addEventListener("input", () => {
       syncPromptChrome();
+      setPromptDraft(el.prompt.value);
       if (el.prompt.value.trim()) setFieldError("prompt", "");
     });
 
@@ -654,8 +657,11 @@
     const preset = new URLSearchParams(window.location.search).get("prompt");
     if (preset && el.prompt) {
       el.prompt.value = preset;
-      syncPromptChrome();
+      setPromptDraft(preset);
+    } else if (el.prompt && getState().build.prompt) {
+      el.prompt.value = getState().build.prompt;
     }
+    syncPromptChrome();
 
     bindEvents();
     subscribe(render);

@@ -358,6 +358,13 @@
     font-size: 15px; /* avoid iOS zoom */
   }
 
+  /* Inline field errors stay readable and never push the layout sideways */
+  .field__error {
+    font-size: 11.5px;
+    margin-top: 6px;
+    max-width: 46ch;
+  }
+
   /* One column on phones: activity timeline, then progress */
   .activity-col {
     grid-template-columns: minmax(0, 1fr);

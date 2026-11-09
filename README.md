@@ -47,12 +47,13 @@ buildmind/
 │   ├── animations.css    keyframes, entrance choreography, reduced motion
 │   └── responsive.css    tablet and mobile composition
 ├── js/
-│   ├── app.js            shared state, brand/visual system, helpers
+│   ├── app.js            shell: ambient, header, reveals, transitions, helpers
+│   ├── state.js          the single state store, build machine, simulations
 │   ├── navigation.js     active page + sliding nav indicator
 │   ├── home.js           hero visual and pipeline highlight
-│   ├── build.js          composer, connections, simulated build pipeline
-│   ├── projects.js       project list, filters, generated previews
-│   └── settings.js       provider/model, connections, preferences
+│   ├── build.js          renderer for the Build workspace
+│   ├── projects.js       renderer for the project list and filters
+│   └── settings.js       renderer for settings and connections
 ├── README.md
 └── .gitignore
 ```
@@ -88,6 +89,45 @@ invented locally.
 - **Radius** `--r-xs` … `--r-pill`
 - **Motion** `--ease-out`, `--ease-in-out`, `--ease-soft`, `--dur-1` … `--dur-5`
 - **Type** Inter with a system fallback stack, JetBrains Mono for numbers
+
+## State architecture
+
+`js/state.js` owns everything the UI shows. Pages never keep their own copies:
+they subscribe, then render.
+
+```
+settings   provider, model, autoFix, hints        (localStorage)
+motion     full | reduced                         (localStorage)
+connections roblox, studio: disconnected | connecting | connected  (localStorage)
+build      status, stage, progress, prompt, runId, startedAt, endedAt, error
+projects   list + active filter                   (localStorage, list only)
+apiKeyPresent  in memory for the session, never persisted
+```
+
+```js
+BuildMind.getState()                    // immutable snapshot
+BuildMind.subscribe((state, changed) => {})   // changed = slice names
+```
+
+### Build state machine
+
+`ready → building → testing → fixing → validating → complete`
+
+with `stopped` and `error` reachable from any running state, and `ready` /
+`building` reachable again from `complete`, `stopped` and `error`. Transitions
+are checked against a table, so the UI cannot show two contradictory states.
+A run is identified by `runId`, which is bumped on stop/fail so stale
+`await` continuations cannot repaint a dead run.
+
+`BUILD_STAGES` is defined once and drives the timeline, the progress stage
+markers, the progress values and the runner.
+
+### Simulation boundaries
+
+- Builds, connections and the project created on completion are simulations.
+- The API key is only ever checked for presence; the field is cleared when the
+  run starts, the value is never stored, logged, sent or put in a URL.
+- No endpoints, no frameworks, no dependencies.
 
 ## Frontend behaviour
 
@@ -125,15 +165,23 @@ BuildMind.saveSettings(patch)
 BuildMind.onStateChange(fn)    // subscribe to connection/build state
 ```
 
-`js/build.js` exposes the build seams:
+`js/state.js` exposes the seams that a real implementation will replace:
 
 ```js
-BuildMind.startBuild(prompt, config)   // replace with the agent call
-BuildMind.updateBuildStatus(text)
-BuildMind.updateBuildProgress(percent, label)
+BuildMind.startBuild(prompt)        // replace the runner with the agent call
+BuildMind.stopBuild()
+BuildMind.retryBuild()
+BuildMind.validateBuildConfig({ prompt, apiKey })
+BuildMind.connectRoblox()           // replace with OAuth hand-off
+BuildMind.connectStudio()           // replace with Studio bridge discovery
+BuildMind.loadProjects()            // replace with a real project read
+BuildMind.addProjectFromBuild(prompt)
+BuildMind.setProvider(id) / setModel(id) / setMotion(mode)
 ```
 
-`js/projects.js` exposes `BuildMind.loadProjects()` for real project reads.
+The renderers (`build.js`, `projects.js`, `settings.js`) only read state and
+call these functions, so a real backend can be attached without touching the
+UI markup.
 
 ## Notes
 
