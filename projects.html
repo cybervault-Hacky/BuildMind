@@ -80,12 +80,37 @@
           </div>
         </div>
 
-        <div class="filter-row" data-reveal="fade">
-          <!-- Filters are rendered from the project statuses that exist. -->
-          <div class="segmented" role="group" aria-label="Filter projects" id="project-filters"></div>
+        <!-- Filter + search. Both are views over the list; neither mutates it. -->
+        <div class="project-toolbar" data-reveal="fade" id="project-toolbar">
+          <div class="filter-row">
+            <!-- Filters are rendered from the project statuses that exist. -->
+            <div class="segmented" role="group" aria-label="Filter projects" id="project-filters"></div>
+          </div>
+          <div class="project-search">
+            <label class="sr-only" for="projects-search">Search projects</label>
+            <span class="project-search__icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="7.2" cy="7.2" r="4.2"/>
+                <path d="M10.4 10.4 13.4 13.4"/>
+              </svg>
+            </span>
+            <input class="input project-search__input" id="projects-search" type="search"
+                   name="projects-search" autocomplete="off" spellcheck="false"
+                   placeholder="Search projects" aria-describedby="projects-search-hint">
+            <button class="project-search__clear" type="button" id="projects-search-clear"
+                    aria-label="Clear search" hidden>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>
+              </svg>
+            </button>
+            <p class="sr-only" id="projects-search-hint">Searches project names and descriptions.</p>
+          </div>
         </div>
 
-        <div class="projects-grid" id="projects-grid" aria-live="polite"></div>
+        <h2 class="sr-only" id="projects-list-title">Your projects</h2>
+        <div class="projects-grid" id="projects-grid" aria-labelledby="projects-list-title"></div>
 
         <div class="empty" id="projects-empty" hidden>
           <span class="empty__mark" aria-hidden="true">
@@ -96,17 +121,54 @@
             </svg>
           </span>
           <p class="empty__title">No projects yet</p>
+          <p class="empty__note">Build a game and it is saved here, on this device.</p>
           <a class="btn btn--primary empty__action" href="build.html">Build a Game</a>
         </div>
 
         <div class="empty" id="projects-no-match" hidden>
-          <p class="empty__title">No projects in this filter</p>
-          <button class="btn btn--ghost empty__action" type="button" id="projects-reset-filter">
-            Show all
+          <p class="empty__title" id="projects-no-match-title">No projects in this filter</p>
+          <p class="empty__note" id="projects-no-match-note">Nothing has that state right now.</p>
+          <div class="empty__actions">
+            <button class="btn btn--ghost empty__action" type="button" id="projects-reset-filter">
+              Show all projects
+            </button>
+            <button class="btn btn--quiet empty__action" type="button" id="projects-no-match-clear" hidden>
+              Clear search
+            </button>
+          </div>
+        </div>
+
+        <div class="empty" id="projects-no-results" hidden>
+          <p class="empty__title" id="projects-no-results-title">No matching projects</p>
+          <p class="empty__note">Search checks project names and descriptions.</p>
+          <button class="btn btn--ghost empty__action" type="button" id="projects-reset-search">
+            Clear search
           </button>
         </div>
 
         <p class="sr-only" id="projects-live" role="status" aria-live="polite"></p>
+
+        <!-- Destructive confirmation. Native <dialog>: focus is trapped and
+             restored by the browser, Escape closes it, and the consequence is
+             stated in plain words. -->
+        <dialog class="confirm" id="project-delete-dialog" aria-labelledby="project-delete-title"
+                aria-describedby="project-delete-note">
+          <div class="confirm__body">
+            <h2 class="confirm__title" id="project-delete-title">Delete this project?</h2>
+            <p class="confirm__note" id="project-delete-note">
+              <span class="confirm__name" id="project-delete-name"></span>
+              is removed from this device for good. This cannot be undone.
+            </p>
+            <div class="confirm__actions">
+              <button class="btn btn--ghost btn--sm" type="button" id="project-delete-cancel">
+                Keep project
+              </button>
+              <button class="btn btn--danger btn--sm" type="button" id="project-delete-confirm">
+                Delete project
+              </button>
+            </div>
+          </div>
+        </dialog>
       </div>
     </main>
 
@@ -121,7 +183,7 @@
           <a href="build.html">Build</a>
           <a href="settings.html">Settings</a>
         </nav>
-        <span class="site-footer__tag">Sample projects</span>
+        <span class="site-footer__tag">Simulated builds</span>
       </div>
     </footer>
   </div>
@@ -135,6 +197,7 @@
   <script src="js/services/ai/mockAIService.js"></script>
   <script src="js/services/connections/mockRobloxService.js"></script>
   <script src="js/services/connections/mockStudioService.js"></script>
+  <script src="js/services/projects/projectModel.js"></script>
   <script src="js/services/projects/localProjectService.js"></script>
   <script src="js/services/settings/localSettingsService.js"></script>
   <script src="js/controllers/buildController.js"></script>

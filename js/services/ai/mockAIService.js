@@ -66,8 +66,18 @@
   /** Active runs, keyed by runId. Runtime bookkeeping only — not UI state. */
   const runs = new Map();
   const listeners = new Set();
+  /**
+   * Run ids are minted from the clock and a page-lifetime counter, not from a
+   * bare counter: a counter restarts at 1 on every page load, which would let
+   * a new run reuse the id of a run already recorded against a project.
+   */
   let runCounter = 0;
   let initialized = false;
+
+  function nextRunId() {
+    runCounter += 1;
+    return `run-${Date.now().toString(36)}-${runCounter}`;
+  }
 
   function emit(event) {
     listeners.forEach((listener) => {
@@ -217,10 +227,9 @@
       return fail(ERROR_TYPES.CONFIGURATION, "Choose a model for this provider.");
     }
 
-    runCounter += 1;
     const plan = planFor(input.prompt);
     const run = {
-      runId: `run-${runCounter}`,
+      runId: nextRunId(),
       prompt: input.prompt,
       provider: provider.id,
       model,

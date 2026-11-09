@@ -50,6 +50,9 @@
     feedCount: 0,
     feedIds: [],
     stageKey: "",
+    contextKey: "",
+    deepLinked: "",
+    restoring: false,
   };
 
   const LAST_INDEX = BUILD_STAGES.length - 1;
@@ -118,6 +121,10 @@
     el.resultCreated = $("#result-created");
     el.resultOpen = $("#result-open");
     el.resultAgain = $("#result-again");
+    el.context = $("#project-context");
+    el.contextTitle = $("#project-context-title");
+    el.contextMeta = $("#project-context-meta");
+    el.contextClose = $("#project-context-close");
   }
 
   /* ------------------------------------------------------------------------
@@ -364,8 +371,9 @@
     }
     if (el.resultCreated) el.resultCreated.textContent = "Just now";
     if (el.resultOpen) {
+      // "Open project" belongs in Projects, where the record lives.
       el.resultOpen.href = result.projectId
-        ? `build.html?project=${encodeURIComponent(result.projectId)}`
+        ? `projects.html?project=${encodeURIComponent(result.projectId)}`
         : "projects.html";
     }
   }
@@ -804,6 +812,20 @@
       paintModelOptions();
     }
 
+    if (
+      changed.includes("projects") ||
+      changed.includes("activeProjectId") ||
+      changed.length === 0
+    ) {
+      paintContext(view);
+    }
+
+    // Keeping the open project's status in step with the live machine is what
+    // stops Projects claiming "Complete" while Build says "Building".
+    if (changed.includes("build") || changed.includes("activeProjectId") || changed.length === 0) {
+      mirrorProjectStatus(view);
+    }
+
     if (changed.includes("connections") || changed.length === 0) {
       paintConnections();
     }
@@ -831,6 +853,28 @@
         local.lastStatus = build.status;
       }
     }
+  }
+
+  /* ------------------------------------------------------------------------
+     Live status mirror — the open project follows the run that is happening
+     in front of the user. This renderer never edits project data; it hands
+     the new status to the controller, which owns the write.
+     ------------------------------------------------------------------------ */
+  const MIRRORED = ["building", "testing", "fixing", "validating"];
+
+  function mirrorProjectStatus(view) {
+    const id = view.activeProjectId;
+    if (!id) return;
+
+    const project = view.projects.find((item) => item.id === id);
+    if (!project) return;
+
+    // Only a live run may move a project; terminal states are recorded by the
+    // controller when the run actually ends.
+    if (!MIRRORED.includes(view.build.status)) return;
+    if (project.status === view.build.status) return;
+
+    BM.projectController?.update?.(id, { status: view.build.status });
   }
 
   /* ------------------------------------------------------------------------
@@ -897,6 +941,14 @@
 
     // result actions: exactly two, both obvious
     el.resultAgain?.addEventListener("click", () => requestBuild());
+    el.contextClose?.addEventListener("click", () => {
+      BM.projectController.close();
+      local.deepLinked = "";
+      local.contextKey = "";
+      paintContext(getState());
+      announce("Project context cleared");
+    });
+
     el.resultOpen?.addEventListener("click", () => {
       // Deep link wins over the stored draft when opening a finished project.
       if (!el.resultOpen.getAttribute("href")) el.resultOpen.href = "projects.html";
@@ -907,33 +959,112 @@
      Init
      ------------------------------------------------------------------------ */
   /**
-   * Restore the composer. A deep link wins; otherwise the draft comes back
-   * through settingsService — this file never reads storage itself.
+   * Restore the composer.
+   *
+   * Order of precedence: a deep link (?project= / ?prompt=) wins, then the
+   * draft that comes back through settingsService — this file never reads
+   * storage itself. A project deep link goes through the project controller,
+   * so the active project, the editable prompt and the Build Again identity
+   * all come from one place.
    */
   function restorePrompt() {
-    if (!el.prompt) return;
+    if (!el.prompt) return Promise.resolve();
 
-    const preset = new URLSearchParams(window.location.search).get("prompt");
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get("project");
+    const preset = params.get("prompt");
+
+    if (projectId) {
+      local.deepLinked = projectId;
+      return BM.projectController.open(projectId).then((result) => {
+        if (!BM.isOk(result)) {
+          toast("That project could not be opened.");
+          return restoreDraft();
+        }
+        applyProjectContext(result.data.project, true);
+        announce("Project loaded. The prompt is editable.");
+        return result;
+      });
+    }
+
     if (preset) {
       el.prompt.value = preset;
       setPromptDraft(preset);
       syncPromptChrome();
-      return;
+      return Promise.resolve();
     }
+
+    return restoreDraft();
+  }
+
+  function restoreDraft() {
+    if (!el.prompt) return Promise.resolve();
 
     if (getState().build.prompt) {
       el.prompt.value = getState().build.prompt;
       syncPromptChrome();
-      return;
+      return Promise.resolve();
     }
 
-    BM.settingsService.loadPromptDraft().then((result) => {
+    return BM.settingsService.loadPromptDraft().then((result) => {
       if (!BM.isOk(result) || !result.data.prompt) return;
       if (el.prompt.value) return; // the user already started typing
       el.prompt.value = result.data.prompt;
       setPromptDraft(result.data.prompt);
       syncPromptChrome();
     });
+  }
+
+  /**
+   * Put an opened project's context in the composer. Only the prompt and the
+   * identity are applied: the provider/model stay whatever the user has
+   * configured now, and no key is restored — nothing here can.
+   */
+  function applyProjectContext(project, fillPrompt) {
+    if (!project) return;
+
+    // A deep link wins over the stored draft: the project's own prompt is what
+    // the user asked to reopen.
+    if (fillPrompt && el.prompt) {
+      const prompt = project.prompt || "";
+      if (prompt) {
+        el.prompt.value = prompt;
+        setPromptDraft(prompt);
+        syncPromptChrome();
+      }
+    }
+
+    local.deepLinked = project.id;
+    local.contextKey = "";
+    BM.setActiveProject(project.id);
+    paintContext(getState());
+  }
+
+  /** The one place the "Building from project" banner is painted. */
+  function paintContext(view) {
+    if (!el.context) return;
+
+    const project = view.projects.find((item) => item.id === view.activeProjectId) || null;
+    const key = project ? `${project.id}:${project.status}:${project.lastBuildAt}:${project.name}` : "";
+
+    el.context.hidden = !project;
+    if (!project) {
+      local.contextKey = "";
+      return;
+    }
+    if (key === local.contextKey) return;
+    local.contextKey = key;
+
+    const meta = BM.projectModel;
+    const status = meta.statusMeta(project.status);
+    const build = meta.lastBuildLabel(project, Date.now());
+
+    if (el.contextTitle && el.contextTitle.textContent !== project.name) {
+      el.contextTitle.textContent = project.name;
+    }
+    if (el.contextMeta) {
+      el.contextMeta.textContent = `${status.label} · ${build}`;
+    }
   }
 
   function init() {
@@ -948,6 +1079,8 @@
     bindEvents();
     subscribe(render);
     render(getState(), []);
+    paintContext(getState());
+    mirrorProjectStatus(getState());
 
     // A ticking clock is the only thing that needs its own timer while running.
     window.setInterval(() => {

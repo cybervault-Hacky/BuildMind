@@ -147,11 +147,14 @@
     }
 
     const runId = activeRunId;
+    const hadProject = Boolean(BM.getState().activeProjectId);
     detach();
     activeRunId = null;
     // The service is told first so it stops emitting, then the machine settles.
     // `endRun` bumps the run id, which makes any straggling event stale.
     const done = BM.endRun("stopped");
+    // A stopped run is an event on the project it belonged to — never a build.
+    if (done && hadProject) BM.projectController?.markRun?.("stopped", runId);
 
     return BM.aiService.stopBuild(runId).then(() =>
       BM.serviceOk({ stopped: done, runId })
@@ -180,10 +183,14 @@
       return Promise.resolve(BM.serviceFail(ERROR_TYPES.OPERATION, "No build is running.", { noop: true }));
     }
     const runId = activeRunId;
+    const hadProject = Boolean(BM.getState().activeProjectId);
     detach();
     activeRunId = null;
 
-    const settle = () => BM.endRun("error", reason || "Build could not be completed");
+    const settle = () => {
+      BM.endRun("error", reason || "Build could not be completed");
+      if (hadProject) BM.projectController?.markRun?.("error", runId);
+    };
     const service = BM.aiService;
     if (service && typeof service.failBuild === "function" && runId) {
       return service.failBuild(runId).then(() => {
@@ -259,10 +266,13 @@
   }
 
   function onError() {
+    const runId = activeRunId;
+    const hadProject = Boolean(BM.getState().activeProjectId);
     detach();
     activeRunId = null;
     // User-facing copy only; the service's internal detail never surfaces.
     BM.endRun("error", "Build could not be completed");
+    if (hadProject) BM.projectController?.markRun?.("error", runId);
   }
 
   /**
@@ -283,8 +293,8 @@
    * Called by the store as the last step of completion. The project is created
    * or updated through projectService — never by editing the array by hand.
    */
-  function recordCompletion(prompt) {
-    return BM.projectController.recordBuild(prompt).then((result) => {
+  function recordCompletion(prompt, runId) {
+    return BM.projectController.recordBuild({ prompt, runId }).then((result) => {
       if (!BM.isOk(result)) return result;
 
       const project = result.data.project;

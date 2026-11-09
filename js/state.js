@@ -83,13 +83,38 @@
     error: "error",
   };
 
-  /** Project status vocabulary shared by cards and filters. */
+  /**
+   * Project status vocabulary shared by cards and filters.
+   *
+   * These are the same nine states the build machine uses, plus `draft` for a
+   * project that exists but has no prompt yet. No project state exists that
+   * the frontend cannot actually reach: transient states are only ever set by
+   * a live run, and every one of them is a real value in `BUILD`.
+   */
   const PROJECT_STATUS = {
+    draft: { label: "Draft", tone: "idle" },
     ready: { label: "Ready", tone: "ready" },
     building: { label: "Building", tone: "active" },
+    testing: { label: "Testing", tone: "active" },
+    fixing: { label: "Fixing", tone: "warn" },
+    validating: { label: "Validating", tone: "active" },
     complete: { label: "Complete", tone: "ready" },
-    draft: { label: "Draft", tone: "idle" },
+    stopped: { label: "Stopped", tone: "idle" },
+    error: { label: "Failed", tone: "error" },
   };
+
+  /** Lifecycle order used by the filter row — a build reads naturally. */
+  const PROJECT_STATUS_ORDER = [
+    "draft",
+    "ready",
+    "building",
+    "testing",
+    "fixing",
+    "validating",
+    "complete",
+    "stopped",
+    "error",
+  ];
 
   /* ------------------------------------------------------------------------
      The state object
@@ -131,6 +156,9 @@
     },
     projects: [],
     projectsFilter: "all",
+    projectsQuery: "",
+    /** The project the Build composer is working on, if any. */
+    activeProjectId: "",
     services: { mode: "unknown", ready: false },
   };
 
@@ -241,33 +269,48 @@
 
   /* ------------------------------------------------------------------------
      Projects — the store holds the list; projectService reads/writes it.
+
+     The array is not a second state owner: it is a mirror of what the service
+     returned. Every write below takes an already-normalised project and only
+     replaces a slot. Ordering, filtering and search are derived here so the
+     renderer never sorts or copies data of its own.
      ------------------------------------------------------------------------ */
+  function projectOrder(project) {
+    if (!project) return 0;
+    return Number(project.lastBuildAt || project.updatedAt || project.created || 0);
+  }
+
+  function sortProjects(projects) {
+    return projects.slice().sort((a, b) => {
+      const delta = projectOrder(b) - projectOrder(a);
+      if (delta !== 0) return delta;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }
+
   function setProjects(projects) {
-    state.projects = Array.isArray(projects) ? projects.slice() : [];
+    state.projects = Array.isArray(projects) ? sortProjects(projects.filter((p) => p && p.id)) : [];
     if (!projectFiltersExist(state.projectsFilter)) state.projectsFilter = "all";
+    if (state.activeProjectId && !state.projects.some((p) => p.id === state.activeProjectId)) {
+      state.activeProjectId = "";
+    }
     notify(["projects"]);
   }
 
   function insertProject(project) {
     if (!project || !project.id) return;
-    state.projects = [project, ...state.projects.filter((item) => item.id !== project.id)];
+    state.projects = sortProjects([project, ...state.projects.filter((item) => item.id !== project.id)]);
     notify(["projects"]);
   }
 
   function replaceProject(project) {
     if (!project || !project.id) return;
-    let found = false;
-    const projects = state.projects.map((item) => {
-      if (item.id !== project.id) return item;
-      found = true;
-      return { ...item, ...project };
-    });
+    const existing = state.projects.some((item) => item.id === project.id);
+    const next = existing
+      ? state.projects.map((item) => (item.id === project.id ? { ...item, ...project } : item))
+      : [project, ...state.projects];
 
-    if (!found) {
-      state.projects = [project, ...state.projects];
-    } else {
-      state.projects = projects;
-    }
+    state.projects = sortProjects(next);
     notify(["projects"]);
   }
 
@@ -276,24 +319,57 @@
     if (projects.length === state.projects.length) return;
     state.projects = projects;
     if (!projectFiltersExist(state.projectsFilter)) state.projectsFilter = "all";
+    if (state.activeProjectId === id) state.activeProjectId = "";
     notify(["projects"]);
   }
 
   function setProjectFilter(filter) {
-    if (filter === state.projectsFilter) return;
-    state.projectsFilter = String(filter || "all");
+    const next = String(filter || "all");
+    if (next === state.projectsFilter) return;
+    state.projectsFilter = next;
     notify(["projectsFilter"]);
   }
 
+  /** Local search over name + description. Never touches project data. */
+  function setProjectQuery(query) {
+    const next = String(query === undefined || query === null ? "" : query).slice(0, 60);
+    if (next === state.projectsQuery) return;
+    state.projectsQuery = next;
+    notify(["projectsQuery"]);
+  }
+
+  /**
+   * The project Build is currently working on. Setting it is a UI fact, not a
+   * data change: it never mutates the project record itself.
+   */
+  function setActiveProject(id) {
+    const next = typeof id === "string" && state.projects.some((p) => p.id === id) ? id : "";
+    if (next === state.activeProjectId) return;
+    state.activeProjectId = next;
+    notify(["activeProjectId"]);
+  }
+
+  function getActiveProject() {
+    if (!state.activeProjectId) return null;
+    const found = state.projects.find((project) => project.id === state.activeProjectId);
+    return found ? { ...found } : null;
+  }
+
+  function findProjectByRun(runId) {
+    if (!runId) return null;
+    const found = state.projects.find((project) => project.runId === runId);
+    return found ? { ...found } : null;
+  }
+
+  /** Filters are derived from the statuses that actually exist. */
   function projectFilters() {
-    // Derived from the statuses that actually exist, so no filter dead-ends.
     const present = new Set(state.projects.map((project) => project.status));
-    const order = ["ready", "building", "complete", "draft"];
     return [
       { id: "all", label: "All" },
-      ...order
-        .filter((status) => present.has(status))
-        .map((status) => ({ id: status, label: PROJECT_STATUS[status].label })),
+      ...PROJECT_STATUS_ORDER.filter((status) => present.has(status)).map((status) => ({
+        id: status,
+        label: PROJECT_STATUS[status].label,
+      })),
     ];
   }
 
@@ -541,7 +617,7 @@
     if (done) {
       addActivity("Validation passed");
       // The controller records the project through projectService.
-      BM.buildController?.recordCompletion?.(input.prompt || state.build.prompt);
+      BM.buildController?.recordCompletion?.(input.prompt || state.build.prompt, input.runId);
     }
 
     return done ? previousRun : null;
@@ -681,7 +757,12 @@
     replaceProject,
     removeProject,
     setProjectFilter,
+    setProjectQuery,
+    setActiveProject,
+    getActiveProject,
+    findProjectByRun,
     projectFilters,
+    PROJECT_STATUS_ORDER,
     projectNameFromPrompt,
 
     // build machine

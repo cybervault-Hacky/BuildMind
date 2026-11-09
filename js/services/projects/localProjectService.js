@@ -1,22 +1,43 @@
 /* ==========================================================================
    BuildMind — services/projects/localProjectService.js
    The project boundary. Today projects live in localStorage; a future
-   `remoteProjectService` implements the same six methods against a backend
-   and the renderers do not change.
+   `remoteProjectService` implements the same methods against a backend and the
+   renderers do not change.
 
    Public surface (contracts.js envelopes, never throws):
 
-     listProjects()        → { projects }
-     getProject(id)        → { project }
-     createProject(data)   → { project }
-     updateProject(id,data)→ { project }
-     deleteProject(id)     → { id }
-     subscribe(listener)   → unsubscribe
+     listProjects()              → { projects }
+     getProject(id)              → { project }
+     createProject(data)         → { project }
+     updateProject(id, patch)    → { project }
+     deleteProject(id)           → { id }
+     recordBuild(input)          → { project, created, duplicate }
+     markRun(id, outcome, runId) → { project }
+     subscribe(listener)         → unsubscribe
 
    Shape of a project:
-     { id, name, status, updated, art, scene, simulated? }
 
-   `status` is one of ready | building | complete | draft.
+     {
+       id, name, description, prompt,
+       status,                    // draft | ready | building | testing | fixing
+                                  // | validating | complete | stopped | error
+       created, updatedAt,        // epoch ms
+       lastBuildAt,               // epoch ms of the last *completed* build, 0 if none
+       runId,                     // the run that last completed a build here
+       art, scene, history[], sample?, simulated
+     }
+
+   Rules this file enforces:
+
+     • `lastBuildAt` is only ever written by `recordBuild`. A stopped or failed
+       run records its outcome in `history` and never touches it, so a project
+       can never claim a build that did not finish.
+     • `recordBuild` is idempotent on `runId`: the same run recorded twice
+       returns the first result and changes nothing, so a duplicated completion
+       event cannot create a second project.
+     • Every read normalises what it finds. Malformed records are repaired in
+       place (name, status, timestamps, prompt, art) instead of being trusted.
+
    Projects are local mock data. Nothing here publishes, uploads or syncs.
    ========================================================================== */
 
@@ -27,12 +48,31 @@
   if (!BM) return;
 
   const { createService, serviceOk: ok, serviceFail: fail, ERROR_TYPES, storage, STORAGE_KEYS } = BM;
+  const model = BM.projectModel;
 
   const KEY = STORAGE_KEYS.projects;
   const MAX_NAME = 60;
   const NAME_FALLBACK = "Untitled game";
-  const VALID_STATUS = ["ready", "building", "complete", "draft"];
+  const MAX_HISTORY = 12;
+
+  /** The lifecycle the frontend can actually reach. Mirrors BUILD + draft. */
+  const VALID_STATUS = [
+    "draft",
+    "ready",
+    "building",
+    "testing",
+    "fixing",
+    "validating",
+    "complete",
+    "stopped",
+    "error",
+  ];
+
+  /** States a run may move through while it is in flight. */
+  const RUN_STATUS = ["building", "testing", "fixing", "validating"];
+
   const SCENE_ARTS = ["lattice", "terrain", "graph", "plates", "dots", "arcs"];
+  const EVENT_TYPES = ["created", "complete", "stopped", "error", "building"];
 
   const listeners = new Set();
 
@@ -47,21 +87,30 @@
   }
 
   /* ------------------------------------------------------------------------
-     Input safety — names are user-controlled strings. They are stored as
-     plain text and only ever written to the DOM through textContent, so they
-     are never interpreted as HTML. Trimming and length-capping here keeps the
-     stored data predictable.
+     Input safety — names, descriptions and prompts are user-controlled
+     strings. They are stored as plain text and only ever written to the DOM
+     through textContent, so they are never interpreted as HTML. Trimming and
+     length-capping here keeps the stored data predictable.
      ------------------------------------------------------------------------ */
-  function safeName(value) {
-    const text = String(value === undefined || value === null ? "" : value)
+  function safeText(value, max) {
+    return String(value === undefined || value === null ? "" : value)
+      .replace(/[\u0000-\u001f\u007f]+/g, " ")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, MAX_NAME);
-    return text || NAME_FALLBACK;
+      .slice(0, max);
+  }
+
+  function safeName(value) {
+    return safeText(value, MAX_NAME) || NAME_FALLBACK;
   }
 
   function normalizeStatus(value) {
     return VALID_STATUS.indexOf(value) === -1 ? "draft" : value;
+  }
+
+  function stamp(value) {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? number : 0;
   }
 
   function artForName(name) {
@@ -74,22 +123,72 @@
     return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
-  function isValid(project) {
-    return Boolean(
-      project &&
-        typeof project.id === "string" &&
-        project.id &&
-        typeof project.name === "string" &&
-        typeof project.status === "string" &&
-        VALID_STATUS.indexOf(project.status) !== -1
-    );
+  function normalizeHistory(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter((entry) => entry && EVENT_TYPES.indexOf(entry.type) !== -1 && stamp(entry.at))
+      .slice(-MAX_HISTORY)
+      .map((entry) => ({
+        type: entry.type,
+        at: stamp(entry.at),
+        ...(entry.runId ? { runId: String(entry.runId).slice(0, 40) } : {}),
+      }));
   }
 
-  /** Read → validate → drop anything malformed. Corrupt storage yields []. */
+  /**
+   * Repair one stored record. Anything missing is filled with an honest
+   * default; nothing that could be a build claim is invented. `index` only
+   * feeds a deterministic fallback id for a record that lost its own.
+   */
+  function normalizeProject(raw, index) {
+    const input = raw && typeof raw === "object" ? raw : {};
+    const name = safeName(input.name);
+    const prompt = model.safePrompt(input.prompt);
+    const fallbackArt = artForName(name);
+
+    // Older records stored a relative label ("2 days ago") instead of a time.
+    const now = Date.now();
+    const legacyUpdated = model.parseLegacyLabel(input.updated, now);
+    const created = stamp(input.created) || legacyUpdated || stamp(input.updatedAt) || now;
+    const updatedAt = stamp(input.updatedAt) || legacyUpdated || created;
+    // A pre-lifecycle record said `lastBuild: true` and stored a relative
+    // label. Its stored time was the build time, so it migrates to one instead
+    // of being silently erased. Nothing newer than `updatedAt` is invented.
+    const status0 = normalizeStatus(input.status);
+    const legacyBuilt = input.lastBuild === true || status0 === "complete";
+    const lastBuildAt = stamp(input.lastBuildAt) || (legacyBuilt ? stamp(input.updatedAt) || legacyUpdated || 0 : 0);
+
+    const history = normalizeHistory(input.history);
+
+    return {
+      id: typeof input.id === "string" && input.id.trim()
+        ? input.id.trim().slice(0, 64)
+        : `recovered-${index}-${fallbackArt.scene}`,
+      name,
+      description: safeText(input.description, model.MAX_DESCRIPTION) || model.describeFromPrompt(prompt),
+      prompt,
+      status: status0,
+      created,
+      updatedAt: Math.max(updatedAt, created),
+      lastBuildAt,
+      runId: typeof input.runId === "string" ? input.runId.slice(0, 40) : "",
+      art: SCENE_ARTS.indexOf(input.art) === -1 ? fallbackArt.art : input.art,
+      scene: Number.isInteger(input.scene) && input.scene >= 0 && input.scene < SCENE_ARTS.length
+        ? input.scene
+        : fallbackArt.scene,
+      history,
+      simulated: true,
+      ...(input.sample ? { sample: true } : {}),
+    };
+  }
+
+  /** Read → normalise → drop only what is not even an object. */
   function read() {
     const stored = storage.readArray(KEY);
     if (stored === null) return null;
-    return stored.filter(isValid).map((project) => ({ ...project }));
+    return stored
+      .filter((project) => project && typeof project === "object")
+      .map((project, index) => normalizeProject(project, index));
   }
 
   function write(projects) {
@@ -100,16 +199,83 @@
   /* ------------------------------------------------------------------------
      Sample data — only for a brand-new visitor. Once a list has been written
      (even an empty one) it is respected as the user's real list.
+
+     They are labelled `sample: true` on the card, and only the two that show a
+     completed state carry a last-build time. The others are honestly unbuilt.
      ------------------------------------------------------------------------ */
   function samples() {
-    return [
-      { id: "sample-island", name: "Floating Island Survival", status: "ready", updated: "2 days ago", art: "lattice", scene: 0, sample: true },
-      { id: "sample-obby", name: "Checkpoint Obby", status: "building", updated: "5 hours ago", art: "terrain", scene: 1, sample: true },
-      { id: "sample-tycoon", name: "Dropper Tycoon", status: "ready", updated: "1 week ago", art: "graph", scene: 2, sample: true },
-      { id: "sample-arena", name: "Round-Based Arena", status: "draft", updated: "3 weeks ago", art: "plates", scene: 3, sample: true },
+    const now = Date.now();
+    const hours = (count) => now - count * 3600000;
+    const days = (count) => now - count * 86400000;
+
+    const seeds = [
+      {
+        id: "sample-island",
+        name: "Floating Island Survival",
+        prompt: "Create a survival game on a floating island with resource gathering.",
+        description: "Survival on floating islands with resource gathering",
+        status: "complete",
+        created: days(16),
+        updatedAt: hours(5),
+        lastBuildAt: hours(5),
+        runId: "sample-run-island",
+        art: "lattice",
+        scene: 0,
+        history: [{ type: "complete", at: hours(5) }],
+        sample: true,
+      },
+      {
+        id: "sample-obby",
+        name: "Checkpoint Obby",
+        prompt: "Make an obby with moving platforms, checkpoints and a timer.",
+        description: "Obby with moving platforms, checkpoints and a timer",
+        status: "ready",
+        created: days(9),
+        updatedAt: days(2),
+        art: "terrain",
+        scene: 1,
+        sample: true,
+      },
+      {
+        id: "sample-tycoon",
+        name: "Dropper Tycoon",
+        prompt: "Build a tycoon where players buy droppers and expand a base.",
+        description: "Tycoon where players buy droppers and expand a base",
+        status: "complete",
+        created: days(24),
+        updatedAt: days(6),
+        lastBuildAt: days(6),
+        runId: "sample-run-tycoon",
+        art: "graph",
+        scene: 2,
+        history: [{ type: "complete", at: days(6) }],
+        sample: true,
+      },
+      {
+        id: "sample-arena",
+        name: "Round-Based Arena",
+        prompt: "Create a round-based arena with classes and a scoreboard.",
+        description: "Round-based arena with classes and a scoreboard",
+        status: "draft",
+        created: days(30),
+        updatedAt: days(30),
+        art: "plates",
+        scene: 3,
+        sample: true,
+      },
     ];
+
+    return seeds.map((seed, index) => normalizeProject(seed, index));
   }
 
+  function persist(projects, project, extra) {
+    write(projects);
+    return ok({ project: { ...project }, ...(extra || {}) });
+  }
+
+  /* ------------------------------------------------------------------------
+     Reads
+     ------------------------------------------------------------------------ */
   function listProjects() {
     const stored = read();
     if (stored === null) {
@@ -127,28 +293,32 @@
     return ok({ project: { ...project } });
   }
 
+  /* ------------------------------------------------------------------------
+     Writes
+     ------------------------------------------------------------------------ */
   function createProject(data) {
     const input = data || {};
     const name = safeName(input.name);
+    const prompt = model.safePrompt(input.prompt);
+    const now = Date.now();
 
-    if (!name) return fail(ERROR_TYPES.VALIDATION, "Give the project a name.");
-
-    const art = artForName(name);
-    const project = {
+    const project = normalizeProject({
       id: input.id || newId(),
       name,
-      status: normalizeStatus(input.status || "draft"),
-      updated: safeName(input.updated || "Just now"),
-      art: SCENE_ARTS.indexOf(input.art) === -1 ? art.art : input.art,
-      scene: Number.isInteger(input.scene) ? input.scene : art.scene,
-      // A build produced this project; `updated` is its last build time.
-      lastBuild: true,
-      simulated: true,
-    };
+      description: input.description || model.describeFromPrompt(prompt),
+      prompt,
+      // A project created by hand starts as a draft; a project that arrived
+      // with a stored status keeps it (the status is only ever set by us).
+      status: input.status || (prompt ? "ready" : "draft"),
+      created: now,
+      updatedAt: now,
+      lastBuildAt: input.lastBuildAt,
+      art: input.art,
+      scene: input.scene,
+      history: [{ type: "created", at: now }],
+    }, 0);
 
-    const stored = read() || [];
-    write([project, ...stored]);
-    return ok({ project: { ...project } });
+    return persist([project, ...(read() || [])], project, { created: true });
   }
 
   function updateProject(id, data) {
@@ -160,16 +330,135 @@
     const next = { ...stored[index] };
 
     if (patch.name !== undefined) next.name = safeName(patch.name);
+    if (patch.prompt !== undefined) {
+      next.prompt = model.safePrompt(patch.prompt);
+      if (patch.description === undefined) {
+        next.description = model.describeFromPrompt(next.prompt);
+      }
+    }
+    if (patch.description !== undefined) {
+      next.description = safeText(patch.description, model.MAX_DESCRIPTION);
+    }
     if (patch.status !== undefined) next.status = normalizeStatus(patch.status);
-    if (patch.updated !== undefined) next.updated = safeName(patch.updated);
-    if (patch.lastBuild !== undefined) next.lastBuild = Boolean(patch.lastBuild);
     if (SCENE_ARTS.indexOf(patch.art) !== -1) next.art = patch.art;
-    if (Number.isInteger(patch.scene)) next.scene = patch.scene;
+    if (Number.isInteger(patch.scene) && patch.scene >= 0 && patch.scene < SCENE_ARTS.length) {
+      next.scene = patch.scene;
+    }
+    // `updatedAt` may be moved by a rename; `lastBuildAt` may not be set here —
+    // only recordBuild can claim a build.
+    next.updatedAt = stamp(patch.updatedAt) || Date.now();
 
     const projects = stored.slice();
     projects[index] = next;
-    write(projects);
-    return ok({ project: { ...next } });
+    return persist(projects, next);
+  }
+
+  /**
+   * Record the *outcome of a finished run* for one project.
+   *
+   * Idempotent on runId. If this run has already been recorded — the same
+   * `done` event delivered twice — the stored project is returned untouched.
+   */
+  function recordBuild(input) {
+    const request = input || {};
+    const runId = typeof request.runId === "string" ? request.runId.slice(0, 40) : "";
+    const prompt = model.safePrompt(request.prompt);
+    const now = stamp(request.at) || Date.now();
+
+    const stored = read() || [];
+
+    // 1. Duplicate protection: this run already recorded a build.
+    if (runId) {
+      const seen = stored.find((project) => project.runId === runId);
+      if (seen) return ok({ project: { ...seen }, created: false, duplicate: true });
+    }
+
+    // 2. Identity: an explicit project id wins. Failing that, a project with
+    //    the same derived name is the same project when it has never been
+    //    built (an unbuilt idea is exactly what this run fulfils) or when the
+    //    prompt is unchanged (the same idea built again from the composer).
+    //    A different prompt under a colliding name is a different project, so
+    //    an unrelated run can never overwrite someone else's finished work.
+    const wantedName = request.name ? safeName(request.name) : (prompt ? BM.projectNameFromPrompt(prompt) : "");
+    let index = request.projectId ? stored.findIndex((p) => p.id === request.projectId) : -1;
+    if (index === -1 && wantedName) {
+      index = stored.findIndex(
+        (p) =>
+          p.name.toLowerCase() === wantedName.toLowerCase() &&
+          (!p.runId || p.prompt === prompt)
+      );
+    }
+
+    if (index === -1) {
+      const created = normalizeProject({
+        name: wantedName || NAME_FALLBACK,
+        prompt,
+        description: request.description || model.describeFromPrompt(prompt),
+        status: "complete",
+        created: now,
+        updatedAt: now,
+        lastBuildAt: now,
+        runId,
+        history: [
+          { type: "created", at: now },
+          { type: "complete", at: now, ...(runId ? { runId } : {}) },
+        ],
+      }, stored.length);
+
+      return persist([created, ...stored], created, { created: true, duplicate: false });
+    }
+
+    const existing = stored[index];
+    const next = {
+      ...existing,
+      // Identity is retained: the name only changes if the record had none.
+      name: existing.name || wantedName || NAME_FALLBACK,
+      prompt: prompt || existing.prompt,
+      description: safeText(request.description, model.MAX_DESCRIPTION)
+        || model.describeFromPrompt(prompt)
+        || existing.description,
+      status: "complete",
+      updatedAt: now,
+      lastBuildAt: now,
+      runId: runId || existing.runId,
+      history: normalizeHistory([
+        ...existing.history,
+        { type: "complete", at: now, ...(runId ? { runId } : {}) },
+      ]),
+    };
+
+    const projects = stored.slice();
+    projects[index] = next;
+    return persist(projects, next, { created: false, duplicate: false });
+  }
+
+  /**
+   * Record a run that ended without producing a build. Sets the terminal
+   * status, appends one history entry, and leaves `lastBuildAt` alone.
+   */
+  function markRun(id, outcome, runId) {
+    const stored = read() || [];
+    const index = stored.findIndex((project) => project.id === id);
+    if (index === -1) return fail(ERROR_TYPES.VALIDATION, "That project could not be found.");
+
+    const type = outcome === "error" ? "error" : outcome === "stopped" ? "stopped" : "";
+    if (!type) return fail(ERROR_TYPES.VALIDATION, "That outcome is not recognised.");
+
+    const existing = stored[index];
+    const now = Date.now();
+    const next = {
+      ...existing,
+      status: type,
+      updatedAt: now,
+      history: normalizeHistory([
+        ...existing.history,
+        { type, at: now, ...(runId ? { runId: String(runId).slice(0, 40) } : {}) },
+      ]),
+    };
+
+    const projects = stored.slice();
+    projects[index] = next;
+    return persist(projects, next);
   }
 
   function deleteProject(id) {
@@ -194,8 +483,14 @@
     getProject,
     createProject,
     updateProject,
+    recordBuild,
+    markRun,
     deleteProject,
     subscribe,
+    /** Test/diagnostic hook: the lifecycle vocabulary this service accepts. */
+    _statuses() {
+      return { valid: VALID_STATUS.slice(), run: RUN_STATUS.slice() };
+    },
     _reset() {
       storage.remove(KEY);
       listeners.clear();

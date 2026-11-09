@@ -45,6 +45,11 @@
   .nav__link {
     padding-inline: 12px;
   }
+
+  /* Tablet: two comfortable card columns rather than a squeezed three */
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -489,6 +494,26 @@
     padding: 13px 14px;
   }
 
+  /* Filters scroll horizontally; search takes the full width beneath them. */
+  .project-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .project-toolbar .filter-row {
+    margin-bottom: 0;
+  }
+
+  .project-search {
+    width: 100%;
+  }
+
+  .project-search__input {
+    height: 38px;
+  }
+
   .filter-row {
     gap: 6px;
     margin-bottom: 18px;
@@ -692,14 +717,58 @@
     font-size: 12px;
   }
 
+  /* Filters keep their intrinsic width and scroll, instead of squeezing
+     five lifecycle states into 320px. */
   .segmented {
-    width: 100%;
+    width: auto;
   }
 
   .segmented__option {
-    flex: 1 1 0;
-    padding-inline: 8px;
+    flex: 0 0 auto;
+    padding-inline: 11px;
     font-size: 12px;
+  }
+
+  /* Card actions stay reachable at 320: the delete button grows to a 36px
+     touch target and the footer wraps rather than clipping. */
+  .project-card__foot {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .project-card__open {
+    height: 34px;
+  }
+
+  .project-card__desc {
+    min-height: 0;
+  }
+
+  .confirm__body {
+    padding: 20px 18px;
+  }
+
+  .confirm__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .confirm__actions .btn {
+    width: 100%;
+  }
+
+  .project-context {
+    padding: 12px;
+  }
+
+  .project-context__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   /* Settings rows: control sits full width and never overflows */

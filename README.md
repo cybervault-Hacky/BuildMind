@@ -26,7 +26,7 @@ exist and are documented below.
 | --- | --- |
 | `index.html` | First impression. Positioning, two entry actions, how a build runs, one shortcut to projects. |
 | `build.html` | The workspace. Game idea, AI configuration, connections, build activity, progress. |
-| `projects.html` | Started games. Preview, name, status, last activity, open. |
+| `projects.html` | Your games. Preview, name, lifecycle status, description, last build, open / delete, filters and search. |
 | `settings.html` | AI provider and model, Roblox and Studio connection state, appearance, general preferences. |
 
 No other pages exist by design.
@@ -65,7 +65,10 @@ buildmind/
 │   │   ├── connections/
 │   │   │   ├── mockRobloxService.js
 │   │   │   └── mockStudioService.js
-│   │   ├── projects/localProjectService.js
+│   │   ├── projects/
+│   │   │   ├── projectModel.js        pure project helpers: lifecycle copy,
+│   │   │   │                          relative times, descriptions, matching
+│   │   │   └── localProjectService.js the project boundary
 │   │   └── settings/localSettingsService.js
 │   └── controllers/
 │       ├── buildController.js       orchestration: validate → AI → state
@@ -170,7 +173,10 @@ connections roblox, studio: disconnected | connecting | connected
                                                  (flag persisted, state simulated)
 build       status, stage, progress, prompt, provider, model,
             runId, startedAt, endedAt, error     in memory
-projects    list + active filter                 persisted (local data)
+projects    list, active filter, local search,
+            active project id (Build's context)  persisted list;
+                                                 filter/search/active are
+                                                 in-memory view state
 apiKeyPresent                                    in memory only
 ```
 
@@ -221,6 +227,95 @@ idea → configuration → build → preparing → stages → result → project
   appears only after a completed run; stopping or failing never shows it and
   never creates a project.
 
+### Projects — lifecycle, identity, and the round trip back to Build
+
+A project is one record, owned by `projectService` and mirrored into
+`state.projects`. The renderer never sorts, copies or edits it; it reads the
+list, and every intent goes through `projectController`.
+
+**Lifecycle.** A project uses the same nine states the frontend can actually
+reach — no invented backend states and nothing that implies publishing,
+deploying or uploading:
+
+| State | Meaning |
+| --- | --- |
+| `draft` | Exists, has no finished idea yet |
+| `ready` | Has a prompt, no completed build |
+| `building` / `testing` / `fixing` / `validating` | A run is in flight |
+| `complete` | The last run finished |
+| `stopped` | The last run was stopped by the user |
+| `error` | The last run failed |
+
+Only `building`…`validating` can be set by a live run (the Build renderer
+mirrors the machine's status onto the open project). Terminal states are
+written by `projectController` when the run actually ends. **`lastBuildAt` is
+only ever written by `recordBuild`**, so a stopped or failed run can never
+claim a build — it appends `stopped` / `error` to the project's `history`
+instead.
+
+**Identity and duplicate protection.**
+
+```
+recordBuild({ prompt, runId, projectId })
+  1. the same runId was already recorded  → return it untouched (duplicate)
+  2. an explicit projectId wins            → rebuild of that project
+  3. same derived name, unbuilt or same prompt → that project
+  4. otherwise                             → a new project
+```
+
+Rule 1 is what makes a duplicated `done` event harmless. Rule 2 is what keeps
+"Build again" updating one record instead of growing the list. Rule 3 lets a
+build fulfil an unbuilt idea, while a *different* prompt under a colliding name
+stays a separate project, so an unrelated run can never overwrite finished
+work. Run ids are minted from the clock plus a page-lifetime counter, so a new
+page load cannot reuse an id already stored against a project.
+
+**Open and Build Again.** A card's action is a link to
+`build.html?project=<id>` — the id, never the name. On arrival the Build
+renderer asks `projectController.open(id)`, which sets the active project and
+returns the record; the composer takes the project's prompt as editable text.
+The provider and model stay whatever is configured *now*. No key is restored,
+because no service can return one.
+
+From there the primary action runs normally. On completion the controller
+records the result against the active project, so the card keeps its identity
+and its time moves to "Just now". "Open project" in the result panel links to
+`projects.html?project=<id>`, which marks the card and scrolls it into view.
+
+**Card hierarchy.** name → status → description (derived from the prompt) →
+last build (relative: "Just now", "X minutes ago", "Yesterday", "X days ago")
+→ Open / Delete. A project with no completed build says "Not built yet"; if its
+last event was a stop or a failure, the line says so instead. No card shows a
+player count, revenue, rating, download figure or any other metric, because
+none of those exist.
+
+**Filters and search.** The filter row is derived from the statuses present in
+the list, so no filter can ever dead-end. Search is local, matches a project's
+name and description only (never its prompt or any setting), is capped at 60
+characters, and lives in memory. Neither mutates project data.
+
+**Empty states.** Four distinct ones: no projects at all (with a Build a Game
+action), no match in the active filter, no match in the active filter *and*
+search, and no match in search alone. Each names its own reason and its own way
+out.
+
+**Deletion.** Kept, because a local list that can only grow is worse. It is
+confirmed in a native `<dialog>` that names the project and states the
+consequence in plain words, goes through
+`projectController.remove → projectService.deleteProject → state.removeProject`,
+persists, and never comes back after a reload. Focus moves into the dialog,
+returns to the trigger on cancel, and lands on a neighbouring card action after
+deletion. There is no trash, undo or recovery screen.
+
+**Previews.** Six original CSS scenes (`lattice`, `terrain`, `graph`,
+`plates`, `dots`, `arcs`) in six accent variants, chosen by a deterministic
+hash of the name. No images, no Roblox assets, no WebGL.
+
+**Project activity.** `history` keeps the last twelve real frontend events —
+`created`, `complete`, `stopped`, `error` — each with a timestamp. Nothing in
+it claims a compiled script, an uploaded asset, a file count, a deployment or a
+publish.
+
 ### Service status
 
 | Service | Mode | Notes |
@@ -241,7 +336,7 @@ Exactly five non-sensitive keys, all written through `services/storage.js`:
 | `buildmind.settings.v1` | provider, model, autoFix, hints |
 | `buildmind.preferences.v1` | motion |
 | `buildmind.connections.v1` | roblox / studio booleans |
-| `buildmind.projects.v1` | local project list |
+| `buildmind.projects.v1` | project records: id, name, description, prompt, status, timestamps, last build, run id, art, history |
 | `buildmind.draft.v1` | the composer prompt draft |
 
 Never persisted: API keys, tokens, passwords, session secrets. The adapter
@@ -251,6 +346,8 @@ accepts only the four known preference keys.
 ### Simulation boundaries
 
 - Builds, connections and the project created on completion are simulations.
+  A project is a local record of a simulated run — there is no playable game,
+  no upload and no deployment behind any card.
 - The API key is only ever checked for presence; the field is cleared when the
   run starts, the value is never stored, logged, sent or put in a URL.
 - There is no `fetch`, `XMLHttpRequest`, WebSocket or SSE anywhere in the

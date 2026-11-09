@@ -335,33 +335,101 @@ body.is-entering .site-header {
   animation: fade-in var(--dur-4) var(--ease-out) both;
 }
 
-/* Project card entrance */
-.project-card {
-  animation: scale-in var(--dur-4) var(--ease-out) both;
+/* Project card entrance.
+   Only a node JS created carries `is-entering`, so a card updated in place
+   never replays the animation when its status or build time changes. */
+.project-card.is-entering {
+  animation: card-in var(--dur-4) var(--ease-out) both;
 }
 
-.projects-grid .project-card:nth-child(1) {
+/* Removal — the card fades and shrinks before the node is dropped */
+.project-card.is-leaving {
+  animation: none;
+  opacity: 0;
+  transform: scale(0.985);
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Reaching a project from Build: a single calm ring, then gone */
+.project-card.is-highlight {
+  animation: card-highlight 1.6s var(--ease-out);
+}
+
+@keyframes card-highlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 147, 255, 0.32);
+  }
+  40% {
+    box-shadow: 0 0 0 3px rgba(139, 147, 255, 0.18);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 147, 255, 0);
+  }
+}
+
+/* The list itself settles when the filter or search result set changes */
+.projects-grid {
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+
+/* Empty states and the toolbar fade in when they become the visible surface */
+.empty:not([hidden]),
+.project-toolbar:not([hidden]) {
+  animation: fade-in var(--dur-3) var(--ease-out) both;
+}
+
+/* Dialog entrance */
+.confirm[open] {
+  animation: dialog-in var(--dur-3) var(--ease-out) both;
+}
+
+.confirm[open]::backdrop {
+  animation: fade-in var(--dur-3) var(--ease-out) both;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.projects-grid .project-card.is-entering:nth-child(1) {
   animation-delay: 40ms;
 }
-.projects-grid .project-card:nth-child(2) {
+.projects-grid .project-card.is-entering:nth-child(2) {
   animation-delay: 90ms;
 }
-.projects-grid .project-card:nth-child(3) {
+.projects-grid .project-card.is-entering:nth-child(3) {
   animation-delay: 140ms;
 }
-.projects-grid .project-card:nth-child(4) {
+.projects-grid .project-card.is-entering:nth-child(4) {
   animation-delay: 190ms;
 }
-.projects-grid .project-card:nth-child(5) {
+.projects-grid .project-card.is-entering:nth-child(5) {
   animation-delay: 240ms;
 }
-.projects-grid .project-card:nth-child(6) {
+.projects-grid .project-card.is-entering:nth-child(6) {
   animation-delay: 290ms;
 }
-.projects-grid .project-card:nth-child(7) {
+.projects-grid .project-card.is-entering:nth-child(7) {
   animation-delay: 340ms;
 }
-.projects-grid .project-card:nth-child(8) {
+.projects-grid .project-card.is-entering:nth-child(8) {
   animation-delay: 390ms;
 }
 

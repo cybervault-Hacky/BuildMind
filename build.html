@@ -93,6 +93,23 @@
         <div class="workspace">
           <!-- ============ Composer ============ -->
           <div class="composer">
+            <!-- Active project context. Hidden until a project is open, so a
+                 fresh Build never implies one is loaded. -->
+            <section class="project-context" id="project-context" aria-labelledby="project-context-label"
+                     data-reveal hidden>
+              <div class="project-context__body">
+                <h2 class="project-context__label" id="project-context-label">Building from project</h2>
+                <p class="project-context__title" id="project-context-title"></p>
+                <span class="project-context__meta" id="project-context-meta"></span>
+              </div>
+              <div class="project-context__actions">
+                <a class="btn btn--ghost btn--sm" href="projects.html">All projects</a>
+                <button class="btn btn--quiet btn--sm" type="button" id="project-context-close">
+                  Clear
+                </button>
+              </div>
+            </section>
+
             <!-- Prompt -->
             <section aria-labelledby="prompt-label" data-reveal>
               <div class="group-head">
@@ -353,6 +370,7 @@
                     Build again
                   </button>
                 </div>
+                <a class="result__link" href="projects.html">View all projects</a>
               </div>
             </div>
           </aside>
@@ -385,6 +403,7 @@
   <script src="js/services/ai/mockAIService.js"></script>
   <script src="js/services/connections/mockRobloxService.js"></script>
   <script src="js/services/connections/mockStudioService.js"></script>
+  <script src="js/services/projects/projectModel.js"></script>
   <script src="js/services/projects/localProjectService.js"></script>
   <script src="js/services/settings/localSettingsService.js"></script>
   <script src="js/controllers/buildController.js"></script>
