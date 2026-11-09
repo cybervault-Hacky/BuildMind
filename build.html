@@ -86,6 +86,8 @@
           </div>
         </div>
 
+        <p class="sr-only" id="build-live" role="status" aria-live="polite"></p>
+
         <div class="workspace">
           <!-- ============ Composer ============ -->
           <div class="composer">
@@ -96,6 +98,7 @@
                 <span class="group-hint group-hint--keys">⌘ + Enter to build</span>
               </div>
 
+              <div class="field-errors field" data-field="prompt">
               <div class="prompt-block">
                 <label class="sr-only" for="game-prompt">Describe the game you want to build</label>
                 <textarea class="prompt-block__textarea" id="game-prompt" name="prompt"
@@ -114,6 +117,8 @@
                   </div>
                 </div>
               </div>
+                <p class="field__error" id="prompt-error" hidden></p>
+              </div>
 
               <div class="chips chips--spaced" role="group" aria-label="Example game ideas">
                 <button class="chip" type="button" data-idea="Create a multiplayer survival game on a floating island.">Floating island survival</button>
@@ -131,31 +136,34 @@
               </div>
 
               <div class="config-grid">
-                <div class="field">
-                  <label class="field__label" for="provider">
-                    Provider
-                  </label>
+                <div class="field" data-field="provider">
+                  <label class="field__label" for="provider">Provider</label>
                   <select class="select" id="provider" name="provider">
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
                     <option value="google">Google</option>
                     <option value="xai">xAI</option>
                   </select>
+                  <p class="field__error" id="provider-error" hidden></p>
                 </div>
 
-                <div class="field">
-                  <label class="field__label" for="model">Model</label>
+                <div class="field" data-field="model">
+                  <label class="field__label" for="model">
+                    Model
+                    <span class="field__hint" id="model-hint">OpenAI</span>
+                  </label>
                   <select class="select" id="model" name="model"></select>
+                  <p class="field__error" id="model-error" hidden></p>
                 </div>
 
-                <div class="field config-grid__span">
+                <div class="field config-grid__span" data-field="apiKey">
                   <label class="field__label" for="api-key">
                     API key
                     <span class="field__hint" id="api-key-hint">Not saved</span>
                   </label>
                   <div class="input-group">
                     <input class="input" id="api-key" name="api-key" type="password"
-                           autocomplete="off" spellcheck="false" placeholder="sk-..." aria-describedby="api-key-hint">
+                           autocomplete="off" spellcheck="false" placeholder="sk-…" aria-describedby="api-key-hint">
                     <button class="input-group__action" type="button" id="api-key-toggle"
                             aria-label="Show API key" aria-pressed="false" data-icon="eye">
                       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
@@ -168,6 +176,7 @@
                       </svg>
                     </button>
                   </div>
+                  <p class="field__error" id="apiKey-error" hidden></p>
                 </div>
               </div>
             </section>
@@ -181,7 +190,7 @@
 
               <div class="panel">
                 <div class="panel__body panel__body--flush">
-                  <div class="connection">
+                  <div class="connection" id="roblox-row" data-status="disconnected">
                     <span class="connection__icon" aria-hidden="true">
                       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
                            stroke-linecap="round" stroke-linejoin="round">
@@ -203,7 +212,7 @@
                     </div>
                   </div>
 
-                  <div class="connection">
+                  <div class="connection" id="studio-row" data-status="disconnected">
                     <span class="connection__icon" aria-hidden="true">
                       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
                            stroke-linecap="round" stroke-linejoin="round">
@@ -337,6 +346,7 @@
   </div>
 
   <script src="js/app.js"></script>
+  <script src="js/state.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/build.js"></script>
 </body>

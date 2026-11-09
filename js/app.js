@@ -17,17 +17,6 @@
   /* ------------------------------------------------------------------------
      Constants
      ------------------------------------------------------------------------ */
-  const STORAGE_KEY = "buildmind.settings.v1";
-  const PREFERENCES_KEY = "buildmind.preferences.v1";
-
-  const DEFAULTS = {
-    provider: "openai",
-    model: "gpt-4.1",
-    motion: "full",
-    hints: true,
-    autoFix: true,
-  };
-
   /* ------------------------------------------------------------------------
      Small helpers
      ------------------------------------------------------------------------ */
@@ -106,6 +95,14 @@
     const body = ICONS[name] || ICONS.check;
     return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
+  }
+
+  /* ------------------------------------------------------------------------
+     Motion preference — the shell applies it to <html data-motion>
+     ------------------------------------------------------------------------ */
+  function applyMotionPreference(mode) {
+    const reduced = mode === "reduced";
+    document.documentElement.dataset.motionMode = reduced ? "reduced" : "full";
   }
 
   /* ------------------------------------------------------------------------
@@ -333,122 +330,6 @@
   }
 
   /* ------------------------------------------------------------------------
-     Preferences (appearance + motion)
-     ------------------------------------------------------------------------ */
-  function applyMotionPreference(mode) {
-    const reduced = mode === "reduced" || (mode === "system" && prefersReducedMotion());
-    document.documentElement.dataset.motion = reduced ? "reduced" : "full";
-  }
-
-  function loadPreferences() {
-    const prefs = readStore(PREFERENCES_KEY, { motion: DEFAULTS.motion });
-    applyMotionPreference(prefs.motion || DEFAULTS.motion);
-    return prefs;
-  }
-
-  function savePreferences(patch) {
-    const next = { ...loadPreferences(), ...patch };
-    writeStore(PREFERENCES_KEY, next);
-    if (next.motion) applyMotionPreference(next.motion);
-    return next;
-  }
-
-  /* ------------------------------------------------------------------------
-     Settings store — localStorage only, no server involved.
-     ------------------------------------------------------------------------ */
-  function loadSettings() {
-    return readStore(STORAGE_KEY, { ...DEFAULTS });
-  }
-
-  function saveSettings(patch) {
-    const next = { ...loadSettings(), ...patch };
-    writeStore(STORAGE_KEY, next);
-    return next;
-  }
-
-  /* ------------------------------------------------------------------------
-     Connection state (simulated)
-     ------------------------------------------------------------------------ */
-  const connections = {
-    roblox: { label: "Roblox", connected: false, kind: "account" },
-    studio: { label: "Roblox Studio", connected: false, kind: "bridge" },
-  };
-
-  const listeners = new Set();
-
-  function onStateChange(fn) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-  }
-
-  function emit(type, detail) {
-    listeners.forEach((fn) => {
-      try {
-        fn(type, detail);
-      } catch (err) {
-        console.error("[BuildMind] listener failed", err);
-      }
-    });
-  }
-
-  /**
-   * Simulated Roblox account connection.
-   * A later phase will replace the body with the OAuth hand-off.
-   */
-  async function connectRoblox(force) {
-    if (connections.roblox.connected && !force) return connections.roblox;
-    connections.roblox.connected = true;
-    connections.roblox.simulated = true;
-    emit("connection", { target: "roblox", connected: true });
-    return connections.roblox;
-  }
-
-  function disconnectRoblox() {
-    connections.roblox.connected = false;
-    emit("connection", { target: "roblox", connected: false });
-  }
-
-  /**
-   * Simulated Studio bridge handshake.
-   * A later phase will replace the body with the local bridge discovery.
-   */
-  async function connectStudio(force) {
-    if (connections.studio.connected && !force) return connections.studio;
-    await sleep(900);
-    connections.studio.connected = true;
-    connections.studio.simulated = true;
-    emit("connection", { target: "studio", connected: true });
-    return connections.studio;
-  }
-
-  function disconnectStudio() {
-    connections.studio.connected = false;
-    emit("connection", { target: "studio", connected: false });
-  }
-
-  function getConnections() {
-    return connections;
-  }
-
-  /** Re-apply a connection state without announcing a new change. */
-  function restoreConnections(patch) {
-    if (!patch || typeof patch !== "object") return;
-    ["roblox", "studio"].forEach((key) => {
-      if (typeof patch[key] === "boolean") {
-        connections[key].connected = patch[key];
-        connections[key].simulated = patch[key];
-      }
-    });
-  }
-
-  function snapshotConnections() {
-    return {
-      roblox: Boolean(connections.roblox.connected),
-      studio: Boolean(connections.studio.connected),
-    };
-  }
-
-  /* ------------------------------------------------------------------------
      Password reveal — shared by the composer and settings
      ------------------------------------------------------------------------ */
   function bindKeyReveal(input, button) {
@@ -488,60 +369,6 @@
     toastEl.classList.add("is-visible");
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => toastEl.classList.remove("is-visible"), 2200);
-  }
-
-  /* ------------------------------------------------------------------------
-     Build stages — shared vocabulary for the build page and projects
-     ------------------------------------------------------------------------ */
-  const BUILD_STAGES = [
-    { id: "understand", label: "Understanding idea" },
-    { id: "plan", label: "Planning" },
-    { id: "build", label: "Building" },
-    { id: "test", label: "Testing" },
-    { id: "fix", label: "Fixing" },
-    { id: "validate", label: "Validating" },
-    { id: "complete", label: "Complete" },
-  ];
-
-  /* ------------------------------------------------------------------------
-     Provider catalogue — UI data only, no keys, no endpoints
-     ------------------------------------------------------------------------ */
-  const PROVIDERS = [
-    {
-      id: "openai",
-      label: "OpenAI",
-      models: [
-        { id: "gpt-4.1", label: "GPT-4.1" },
-        { id: "gpt-4.1-mini", label: "GPT-4.1 mini" },
-        { id: "o4-mini", label: "o4-mini" },
-      ],
-    },
-    {
-      id: "anthropic",
-      label: "Anthropic",
-      models: [
-        { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-        { id: "claude-opus-4-1", label: "Claude Opus 4.1" },
-        { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-      ],
-    },
-    {
-      id: "google",
-      label: "Google",
-      models: [
-        { id: "gemini-2-5-pro", label: "Gemini 2.5 Pro" },
-        { id: "gemini-2-5-flash", label: "Gemini 2.5 Flash" },
-      ],
-    },
-    {
-      id: "xai",
-      label: "xAI",
-      models: [{ id: "grok-4", label: "Grok 4" }],
-    },
-  ];
-
-  function findProvider(id) {
-    return PROVIDERS.find((p) => p.id === id) || PROVIDERS[0];
   }
 
   /* ------------------------------------------------------------------------
@@ -770,11 +597,19 @@
      ------------------------------------------------------------------------ */
   function boot() {
     document.documentElement.classList.add("js");
-    loadPreferences();
+
+    // Motion is the one piece of state the shell needs before page scripts run.
+    const prefs = readStore("buildmind.preferences.v1", { motion: "full" });
+    applyMotionPreference(prefs.motion === "reduced" ? "reduced" : "full");
+
     initAmbient();
     initHeader();
     initPageTransitions();
     initReveals();
+
+    // Load the shared state once for every page; page scripts only render it.
+    BM.loadState?.();
+    BM.initSync?.();
 
     // Fill in shared brand marks and mark the active nav item defensively.
     $$("[data-brand-mark]").forEach((el) => {
@@ -783,7 +618,6 @@
 
     // Mount any visualizer that is present before page scripts run.
     $$("[data-world]").forEach((el) => mountWorld(el));
-
   }
 
   if (document.readyState === "loading") {
@@ -803,30 +637,13 @@
     icon,
     bindKeyReveal,
     prefersReducedMotion,
+    applyMotionPreference,
+    media,
     toast,
     readStore,
     writeStore,
-    loadSettings,
-    saveSettings,
-    loadPreferences,
-    savePreferences,
-    applyMotionPreference,
-    media,
-    connectRoblox,
-    disconnectRoblox,
-    connectStudio,
-    disconnectStudio,
-    getConnections,
-    restoreConnections,
-    snapshotConnections,
-    onStateChange,
-    BUILD_STAGES,
-    PROVIDERS,
-    findProvider,
     mountWorld,
     updateWorld,
     startWorldPreview,
-    keys: { STORAGE_KEY, PREFERENCES_KEY },
-    defaults: DEFAULTS,
   });
 })();

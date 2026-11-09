@@ -1,10 +1,10 @@
 /* ==========================================================================
    BuildMind — projects.js
-   Project list, filtering and generated previews.
+   A renderer over the project slice of js/state.js.
 
-   These entries are local sample data so the layout can be reviewed.
-   loadProjects() is the seam that will read real projects later.
-   Each card is labelled as a sample in its meta line.
+   Cards, filters and empty states are all painted from state, so filtering
+   never mutates the data and a completed simulated build appears here without
+   a reload. Projects are local mock data; no real game exists.
    ========================================================================== */
 
 (function () {
@@ -13,68 +13,32 @@
   const BM = window.BuildMind;
   if (!BM) return;
 
-  const { $, $$ } = BM;
+  const { $, PROJECT_STATUS, getState, subscribe, loadProjects, setProjectFilter, projectFilters } = BM;
+
+  const el = {};
+
+  function cache() {
+    el.grid = $("#projects-grid");
+    el.empty = $("#projects-empty");
+    el.noMatch = $("#projects-no-match");
+    el.filters = $("#project-filters");
+    el.count = $("#projects-count");
+    el.live = $("#projects-live");
+  }
 
   /* ------------------------------------------------------------------------
-     Sample data (local only)
+     Markup
      ------------------------------------------------------------------------ */
-  const SAMPLE_PROJECTS = [
-    {
-      id: "p1",
-      name: "Floating Island Survival",
-      status: "ready",
-      updated: "2 days ago",
-      art: "lattice",
-      scene: 0,
-    },
-    {
-      id: "p2",
-      name: "Checkpoint Obby",
-      status: "building",
-      updated: "5 hours ago",
-      art: "terrain",
-      scene: 1,
-    },
-    {
-      id: "p3",
-      name: "Dropper Tycoon",
-      status: "ready",
-      updated: "1 week ago",
-      art: "graph",
-      scene: 2,
-    },
-    {
-      id: "p4",
-      name: "Round-Based Arena",
-      status: "draft",
-      updated: "3 weeks ago",
-      art: "plates",
-      scene: 3,
-    },
-  ];
-
-  const STATUS = {
-    ready: { label: "Ready", tone: "ready" },
-    building: { label: "Building", tone: "active" },
-    draft: { label: "Draft", tone: "idle" },
-  };
-
-  let projects = [];
-  let filter = "all";
-
-  /* ------------------------------------------------------------------------
-     Rendering
-     ------------------------------------------------------------------------ */
-  /** One card per game: name, status, last activity, open. Nothing else. */
   function projectCard(project) {
-    const status = STATUS[project.status] || STATUS.draft;
+    const status = PROJECT_STATUS[project.status] || PROJECT_STATUS.draft;
     const card = document.createElement("a");
     card.className = "project-card";
     card.href = `build.html?prompt=${encodeURIComponent(project.name)}`;
     card.dataset.status = project.status;
+    card.dataset.id = project.id;
     card.setAttribute(
       "aria-label",
-      `${project.name} — ${status.label}, updated ${project.updated}`
+      `${project.name} — ${status.label}, updated ${project.updated}. Open in Build.`
     );
 
     card.innerHTML = `
@@ -101,7 +65,6 @@
 
     card.querySelector(".project-card__name").textContent = project.name;
     card.querySelector(".js-updated").textContent = project.updated;
-
     return card;
   }
 
@@ -118,62 +81,105 @@
     return tile;
   }
 
-  function visibleProjects() {
-    if (filter === "all") return projects;
-    return projects.filter((project) => project.status === filter);
+  /* ------------------------------------------------------------------------
+     Render
+     ------------------------------------------------------------------------ */
+  function renderFilters(view) {
+    if (!el.filters) return;
+
+    const filters = projectFilters();
+    // A filter that no longer has any matches falls back to "All".
+    const active = filters.some((f) => f.id === view.projectsFilter) ? view.projectsFilter : "all";
+
+    el.filters.innerHTML = filters
+      .map(
+        (filter) => `
+        <button class="segmented__option" type="button" data-filter="${filter.id}"
+                aria-pressed="${filter.id === active}">${filter.label}</button>`
+      )
+      .join("");
   }
 
   function render() {
-    const grid = $("#projects-grid");
-    const empty = $("#projects-empty");
-    const noMatch = $("#projects-no-match");
-    if (!grid) return;
+    const view = getState();
+    if (!el.grid) return;
 
-    grid.innerHTML = "";
+    const filters = projectFilters();
+    const active = filters.some((f) => f.id === view.projectsFilter) ? view.projectsFilter : "all";
 
-    const hasProjects = projects.length > 0;
-    const list = visibleProjects();
+    renderFilters(view);
 
-    empty.hidden = hasProjects;
-    noMatch.hidden = !(hasProjects && list.length === 0);
+    const list = active === "all"
+      ? view.projects
+      : view.projects.filter((project) => project.status === active);
 
-    if (!hasProjects) {
-      grid.hidden = true;
-      return;
+    el.grid.innerHTML = "";
+
+    const hasProjects = view.projects.length > 0;
+    const hasMatches = list.length > 0;
+
+    if (el.empty) el.empty.hidden = hasProjects;
+    if (el.noMatch) el.noMatch.hidden = !(hasProjects && !hasMatches);
+    el.grid.hidden = !hasProjects || !hasMatches;
+
+    if (el.count) {
+      el.count.textContent = hasProjects
+        ? `${view.projects.length} ${view.projects.length === 1 ? "project" : "projects"}`
+        : "";
     }
 
-    grid.hidden = false;
+    if (!hasProjects || !hasMatches) return;
 
-    if (!list.length) return;
-
-    list.forEach((project) => grid.appendChild(projectCard(project)));
-    grid.appendChild(newProjectTile());
+    list.forEach((project) => el.grid.appendChild(projectCard(project)));
+    el.grid.appendChild(newProjectTile());
   }
 
-  function initFilters() {
-    $$("[data-filter]").forEach((button) => {
-      button.addEventListener("click", () => {
-        filter = button.dataset.filter;
-        $$("[data-filter]").forEach((b) =>
-          b.setAttribute("aria-pressed", String(b === button))
-        );
-        render();
-      });
+  function announce(message) {
+    if (!el.live) return;
+    el.live.textContent = "";
+    requestAnimationFrame(() => {
+      el.live.textContent = message;
     });
   }
 
   /* ------------------------------------------------------------------------
-     Public seam — replace with a real fetch in a later phase.
+     Events
      ------------------------------------------------------------------------ */
-  function loadProjects() {
-    projects = SAMPLE_PROJECTS.slice();
-    render();
-    return projects;
+  function bindEvents() {
+    // Delegated: the filter buttons are re-rendered from state.
+    $("#projects-reset-filter")?.addEventListener("click", () => {
+      setProjectFilter("all");
+      announce("Showing all projects");
+    });
+
+    el.filters?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-filter]");
+      if (!button) return;
+
+      setProjectFilter(button.dataset.filter);
+      const label = button.textContent.trim();
+      announce(label === "All" ? "Showing all projects" : `Showing ${label.toLowerCase()} projects`);
+    });
   }
 
+  /* ------------------------------------------------------------------------
+     Init
+     ------------------------------------------------------------------------ */
   function init() {
-    initFilters();
-    loadProjects();
+    cache();
+    bindEvents();
+
+    // A stored list is already in state; loadProjects() is the seam that will
+    // fetch real projects later.
+    if (!getState().projects.length) loadProjects();
+
+    subscribe((view, changed) => {
+      if (!changed.length || changed.includes("projects") || changed.includes("projectsFilter")) {
+        render();
+      }
+    });
+
+    render();
   }
 
   if (document.readyState === "loading") {
@@ -181,6 +187,4 @@
   } else {
     init();
   }
-
-  Object.assign(BM, { loadProjects });
 })();

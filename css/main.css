@@ -728,13 +728,17 @@ body.is-sheet-open {
   border-radius: var(--r-md);
 }
 
-/* Loading state */
-.btn.is-loading {
-  color: transparent !important;
+/* Busy state — driven by aria-busy so the state machine owns it */
+.btn[aria-busy="true"] {
   pointer-events: none;
+  color: transparent !important;
 }
 
-.btn.is-loading::before {
+.btn[aria-busy="true"] svg {
+  opacity: 0;
+}
+
+.btn[aria-busy="true"]::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -748,15 +752,15 @@ body.is-sheet-open {
   animation: spin 720ms linear infinite;
 }
 
-.btn.is-loading::after {
+.btn[aria-busy="true"]::after {
   display: none;
 }
 
-.btn--primary.is-loading::before {
+.btn--primary[aria-busy="true"]::before {
   border-color: rgba(10, 10, 20, 0.35);
   border-top-color: var(--accent-ink);
-  color: var(--accent-ink);
 }
+
 
 /* Text link with arrow */
 .link-arrow {
@@ -1079,6 +1083,19 @@ body.is-sheet-open {
   color: var(--text);
 }
 
+.connection[data-status="connected"] .connection__icon {
+  color: var(--mint);
+  border-color: rgba(95, 224, 191, 0.28);
+  background: var(--mint-soft);
+}
+
+.connection[data-status="connecting"] .connection__icon {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  animation: pulse-dot 1.6s var(--ease-in-out) infinite;
+}
+
 .connection__title-row {
   display: flex;
   align-items: center;
@@ -1170,6 +1187,16 @@ body.is-sheet-open {
   font-size: 14px;
   color: var(--text-muted);
   max-width: 46ch;
+}
+
+.page-head__count {
+  margin-left: 6px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-head__count:empty {
+  margin: 0;
 }
 
 .page-head__actions {
@@ -1501,6 +1528,23 @@ body.is-sheet-open {
   transform: scale(0.97);
 }
 
+.chip[disabled],
+.select[disabled],
+.input[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chip[disabled]:hover {
+  color: var(--text-faint);
+  border-color: var(--line);
+  background: transparent;
+}
+
+.prompt-block__textarea[readonly] {
+  color: var(--text-soft);
+}
+
 /* Config grid */
 .config-grid {
   display: grid;
@@ -1588,6 +1632,14 @@ body.is-sheet-open {
 .build-bar__hint span {
   font-size: 11.5px;
   color: var(--text-faint);
+}
+
+.build-bar.is-error .build-bar__hint strong {
+  color: var(--rose);
+}
+
+.build-bar.is-error .build-bar__hint span {
+  color: var(--text-muted);
 }
 
 .build-bar .btn {
@@ -1712,6 +1764,21 @@ body.is-sheet-open {
 .timeline__step.is-done .timeline__meta {
   opacity: 1;
   color: var(--text-faint);
+}
+
+.timeline__step.is-failed .timeline__dot {
+  border-color: var(--rose);
+  background: var(--rose);
+  box-shadow: 0 0 0 4px rgba(240, 138, 138, 0.14);
+}
+
+.timeline__step.is-failed .timeline__label {
+  color: var(--rose);
+}
+
+.timeline__step.is-failed .timeline__meta {
+  opacity: 1;
+  color: var(--rose);
 }
 
 .timeline__step.is-complete .timeline__dot {

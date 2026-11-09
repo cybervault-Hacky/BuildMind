@@ -424,16 +424,16 @@ body.is-entering .site-header {
 }
 
 /* Users who prefer reduced data / no motion on the settings page */
-html[data-motion="reduced"] *,
-html[data-motion="reduced"] *::before,
-html[data-motion="reduced"] *::after {
+html[data-motion-mode="reduced"] *,
+html[data-motion-mode="reduced"] *::before,
+html[data-motion-mode="reduced"] *::after {
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }
 
-html[data-motion="reduced"] [data-reveal],
-html[data-motion="reduced"] [data-stagger] > * {
+html[data-motion-mode="reduced"] [data-reveal],
+html[data-motion-mode="reduced"] [data-stagger] > * {
   opacity: 1 !important;
   transform: none !important;
 }

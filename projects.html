@@ -70,6 +70,7 @@
             <h1 class="page-head__title" data-reveal tabindex="-1">Projects</h1>
             <p class="page-head__sub" data-reveal data-reveal-delay="50">
               Games you have started.
+              <span class="page-head__count" id="projects-count"></span>
             </p>
           </div>
           <div class="page-head__actions" data-reveal="fade" data-reveal-delay="100">
@@ -77,12 +78,9 @@
           </div>
         </div>
 
-        <div class="filter-row" data-reveal="fade" aria-label="Filter projects">
-          <div class="segmented" role="group" aria-label="Filter by status">
-            <button class="segmented__option" type="button" data-filter="all" aria-pressed="true">All</button>
-            <button class="segmented__option" type="button" data-filter="ready" aria-pressed="false">Ready</button>
-            <button class="segmented__option" type="button" data-filter="building" aria-pressed="false">Building</button>
-          </div>
+        <div class="filter-row" data-reveal="fade">
+          <!-- Filters are rendered from the project statuses that exist. -->
+          <div class="segmented" role="group" aria-label="Filter projects" id="project-filters"></div>
         </div>
 
         <div class="projects-grid" id="projects-grid" aria-live="polite"></div>
@@ -100,8 +98,13 @@
         </div>
 
         <div class="empty" id="projects-no-match" hidden>
-          <p class="empty__title">Nothing in this filter</p>
+          <p class="empty__title">No projects in this filter</p>
+          <button class="btn btn--ghost empty__action" type="button" id="projects-reset-filter">
+            Show all
+          </button>
         </div>
+
+        <p class="sr-only" id="projects-live" role="status" aria-live="polite"></p>
       </div>
     </main>
 
@@ -122,6 +125,7 @@
   </div>
 
   <script src="js/app.js"></script>
+  <script src="js/state.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/projects.js"></script>
 </body>

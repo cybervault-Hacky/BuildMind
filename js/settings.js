@@ -1,11 +1,11 @@
 /* ==========================================================================
    BuildMind — settings.js
-   Provider/model selection, simulated connections, motion preference and
-   the two general switches. Everything is stored in this browser only.
+   A renderer over the settings, motion and connection slices of js/state.js.
 
-   connectRoblox() / connectStudio() are simulated here. They never
-   touch the network, and the API key field is a placeholder that is never
-   persisted.
+   Edits go through the store, so the Build workspace sees the same provider,
+   model, motion preference and connection status. There is no second copy of
+   settings in this file. The API key field is a placeholder: only presence is
+   tracked, never the value.
    ========================================================================== */
 
 (function () {
@@ -16,19 +16,19 @@
 
   const {
     $,
-    $$,
     toast,
-    loadSettings,
-    saveSettings,
-    loadPreferences,
-    savePreferences,
+    getState,
+    subscribe,
     findProvider,
+    setProvider,
+    setModel,
+    setPreference,
+    setMotion,
+    resetSettings,
     connectRoblox,
     disconnectRoblox,
     connectStudio,
     disconnectStudio,
-    getConnections,
-    onStateChange,
   } = BM;
 
   const el = {};
@@ -43,6 +43,7 @@
   function cache() {
     el.provider = $("#settings-provider");
     el.model = $("#settings-model");
+    el.modelHint = $("#settings-model-hint");
     el.apiKey = $("#settings-api-key");
     el.apiKeyToggle = $("#settings-api-key-toggle");
     el.robloxStatus = $("#settings-roblox-status");
@@ -55,7 +56,7 @@
   }
 
   /* ------------------------------------------------------------------------
-     Status helper (mirrors build.js)
+     Render helpers
      ------------------------------------------------------------------------ */
   function setStatus(node, text, tone) {
     if (!node) return;
@@ -64,159 +65,166 @@
     if (label) label.textContent = text;
   }
 
-  /* ------------------------------------------------------------------------
-     AI section
-     ------------------------------------------------------------------------ */
-  function fillModels(providerId, selected) {
-    const provider = findProvider(providerId);
-    el.model.innerHTML = provider.models
-      .map((m) => `<option value="${m.id}">${m.label}</option>`)
+  function fillOptions(select, items, selected) {
+    if (!select) return;
+    const markup = items
+      .map(
+        (item) =>
+          `<option value="${item.id}"${item.id === selected ? " selected" : ""}>${item.label}</option>`
+      )
       .join("");
-    el.model.value = provider.models.some((m) => m.id === selected)
-      ? selected
-      : provider.models[0].id;
+
+    if (select.dataset.built !== markup) {
+      select.dataset.built = markup;
+      select.innerHTML = markup;
+    }
+    select.value = selected;
   }
 
-  function initAi() {
-    const settings = loadSettings();
+  function paintAi(view) {
+    const { settings } = view;
+    const provider = findProvider(settings.provider);
 
-    el.provider.value = findProvider(settings.provider).id;
-    fillModels(el.provider.value, settings.model);
+    fillOptions(el.provider, BM.PROVIDERS, settings.provider);
+    fillOptions(el.model, provider.models, settings.model);
+    if (el.modelHint) el.modelHint.textContent = provider.label;
+  }
 
-    el.provider.addEventListener("change", () => {
-      fillModels(el.provider.value);
-      saveSettings({ provider: el.provider.value, model: el.model.value });
-      toast("AI provider saved");
+  function connectionState(status) {
+    return {
+      label: { disconnected: "Not connected", connecting: "Connecting", connected: "Connected" }[status],
+      tone: { disconnected: "idle", connecting: "active", connected: "ready" }[status],
+      busy: status === "connecting",
+      button: status === "connected" ? "Disconnect" : status === "connecting" ? "Connecting…" : "Connect",
+    };
+  }
+
+  function paintConnections(view) {
+    [
+      ["roblox", el.robloxStatus, el.connectRoblox],
+      ["studio", el.studioStatus, el.connectStudio],
+    ].forEach(([target, statusNode, button]) => {
+      const state = connectionState(view.connections[target].status);
+      setStatus(statusNode, state.label, state.tone);
+
+      if (!button) return;
+      button.textContent = state.button;
+      button.disabled = state.busy;
+      button.setAttribute("aria-busy", String(state.busy));
+      button.setAttribute(
+        "aria-label",
+        `${view.connections[target].status === "connected" ? "Disconnect" : "Connect"} ${
+          target === "roblox" ? "Roblox account" : "Roblox Studio"
+        }`
+      );
+    });
+  }
+
+  function paintAppearance(view) {
+    document.querySelectorAll("button[data-motion]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.motion === view.motion));
+    });
+  }
+
+  function paintGeneral(view) {
+    el.autoFix?.setAttribute("aria-checked", String(view.settings.autoFix));
+    el.hints?.setAttribute("aria-checked", String(view.settings.hints));
+  }
+
+  function render(view, changed = []) {
+    if (!changed.length || changed.includes("settings")) {
+      paintAi(view);
+      paintGeneral(view);
+    }
+    if (!changed.length || changed.includes("connections")) paintConnections(view);
+    if (!changed.length || changed.includes("motion")) paintAppearance(view);
+  }
+
+  /* ------------------------------------------------------------------------
+     Events
+     ------------------------------------------------------------------------ */
+  function bindEvents() {
+    el.provider?.addEventListener("change", () => {
+      setProvider(el.provider.value);
+      toast("Provider updated");
     });
 
-    el.model.addEventListener("change", () => {
-      saveSettings({ model: el.model.value });
-      toast("Model saved");
+    el.model?.addEventListener("change", () => {
+      setModel(el.model.value);
+      toast("Model updated");
     });
 
     BM.bindKeyReveal(el.apiKey, el.apiKeyToggle);
-  }
-
-  /* ------------------------------------------------------------------------
-     Roblox section (simulated)
-     ------------------------------------------------------------------------ */
-  function paintConnections() {
-    const conns = getConnections();
-
-    setStatus(
-      el.robloxStatus,
-      conns.roblox.connected ? "Connected" : "Not connected",
-      conns.roblox.connected ? "ready" : "idle"
-    );
-    el.connectRoblox.textContent = conns.roblox.connected ? "Disconnect" : "Connect";
-    el.connectRoblox.setAttribute(
-      "aria-label",
-      conns.roblox.connected ? "Disconnect Roblox account" : "Connect Roblox account"
-    );
-
-    setStatus(
-      el.studioStatus,
-      conns.studio.connected ? "Connected" : "Not connected",
-      conns.studio.connected ? "ready" : "idle"
-    );
-    el.connectStudio.textContent = conns.studio.connected ? "Disconnect" : "Connect";
-    el.connectStudio.setAttribute(
-      "aria-label",
-      conns.studio.connected ? "Disconnect Roblox Studio" : "Connect Roblox Studio"
-    );
-  }
-
-  async function toggleRoblox() {
-    const button = el.connectRoblox;
-    if (getConnections().roblox.connected) {
-      disconnectRoblox();
-      toast("Roblox disconnected");
-      return;
-    }
-    button.classList.add("is-loading");
-    await connectRoblox();
-    button.classList.remove("is-loading");
-    toast("Roblox connection simulated");
-  }
-
-  async function toggleStudio() {
-    const button = el.connectStudio;
-    if (getConnections().studio.connected) {
-      disconnectStudio();
-      toast("Studio disconnected");
-      return;
-    }
-    button.classList.add("is-loading");
-    await connectStudio();
-    button.classList.remove("is-loading");
-    toast("Studio bridge simulated");
-  }
-
-  /* ------------------------------------------------------------------------
-     Appearance
-     ------------------------------------------------------------------------ */
-  function paintMotion(mode) {
-    $$("[data-motion]").forEach((button) => {
-      button.setAttribute("aria-pressed", String(button.dataset.motion === mode));
+    el.apiKey?.addEventListener("input", () => {
+      BM.setApiKeyPresent(Boolean(el.apiKey.value.trim()));
     });
-  }
 
-  function initAppearance() {
-    const prefs = loadPreferences();
-    paintMotion(prefs.motion || "full");
+    el.connectRoblox?.addEventListener("click", async () => {
+      if (getState().connections.roblox.status === "connected") {
+        disconnectRoblox();
+        toast("Roblox disconnected");
+        return;
+      }
+      await connectRoblox();
+      toast("Roblox connection simulated");
+    });
 
-    $$("[data-motion]").forEach((button) => {
+    el.connectStudio?.addEventListener("click", async () => {
+      if (getState().connections.studio.status === "connected") {
+        disconnectStudio();
+        toast("Studio disconnected");
+        return;
+      }
+      await connectStudio();
+      toast("Studio bridge simulated");
+    });
+
+    document.querySelectorAll("button[data-motion]").forEach((button) => {
       button.addEventListener("click", () => {
         const mode = button.dataset.motion;
-        savePreferences({ motion: mode });
-        paintMotion(mode);
+        if (mode === getState().motion) return;
+        setMotion(mode);
         toast(mode === "reduced" ? "Motion reduced" : "Full motion restored");
       });
     });
-  }
 
-  /* ------------------------------------------------------------------------
-     General switches
-     ------------------------------------------------------------------------ */
-  function initSwitches() {
-    const settings = loadSettings();
-
-    el.autoFix.setAttribute("aria-checked", String(settings.autoFix !== false));
-    el.hints.setAttribute("aria-checked", String(settings.hints !== false));
-
-    el.autoFix.addEventListener("click", () => {
+    el.autoFix?.addEventListener("click", () => {
       const next = el.autoFix.getAttribute("aria-checked") !== "true";
-      el.autoFix.setAttribute("aria-checked", String(next));
-      saveSettings({ autoFix: next });
+      setPreference("autoFix", next);
       toast(next ? "Auto-fix on" : "Auto-fix off");
     });
 
-    el.hints.addEventListener("click", () => {
+    el.hints?.addEventListener("click", () => {
       const next = el.hints.getAttribute("aria-checked") !== "true";
-      el.hints.setAttribute("aria-checked", String(next));
-      saveSettings({ hints: next });
+      setPreference("hints", next);
       toast(next ? "Hints on" : "Hints off");
+    });
+
+    el.reset?.addEventListener("click", () => {
+      resetSettings();
+      if (el.apiKey) el.apiKey.value = "";
+      BM.setApiKeyPresent(false);
+      toast("Settings reset");
     });
   }
 
   /* ------------------------------------------------------------------------
-     Reset
+     Deep links (#ai, #roblox, …) from the header and the home page
      ------------------------------------------------------------------------ */
-  function initReset() {
-    el.reset.addEventListener("click", () => {
-      saveSettings({ ...BM.defaults });
-      savePreferences({ motion: "full" });
+  function applyHash() {
+    if (!window.location.hash) return;
 
-      const settings = loadSettings();
-      el.provider.value = findProvider(settings.provider).id;
-      fillModels(el.provider.value, settings.model);
-      el.autoFix.setAttribute("aria-checked", String(settings.autoFix !== false));
-      el.hints.setAttribute("aria-checked", String(settings.hints !== false));
-      paintMotion("full");
-      el.apiKey.value = "";
+    const target = document.querySelector(window.location.hash);
+    if (!target) return;
 
-      toast("Settings reset");
-    });
+    window.setTimeout(() => {
+      target.scrollIntoView({
+        behavior: BM.prefersReducedMotion() ? "auto" : "smooth",
+        block: "start",
+      });
+      const heading = HEADINGS[target.id] ? $(HEADINGS[target.id]) : null;
+      heading?.focus({ preventScroll: true });
+    }, 220);
   }
 
   /* ------------------------------------------------------------------------
@@ -224,43 +232,10 @@
      ------------------------------------------------------------------------ */
   function init() {
     cache();
-    BM.restoreConnections(BM.readStore("buildmind.connections.v1", {}));
-    initAi();
-    paintConnections();
-    initAppearance();
-    initSwitches();
-    initReset();
-
-    el.connectRoblox.addEventListener("click", toggleRoblox);
-    el.connectStudio.addEventListener("click", toggleStudio);
-
-    onStateChange((type) => {
-      if (type !== "connection") return;
-      paintConnections();
-      BM.writeStore("buildmind.connections.v1", BM.snapshotConnections());
-    });
-
-    // Deep links from the header / home page (#ai, #roblox)
-    if (window.location.hash) {
-      const target = document.querySelector(window.location.hash);
-      if (target) {
-        window.setTimeout(() => {
-          target.scrollIntoView({
-            behavior: BM.prefersReducedMotion() ? "auto" : "smooth",
-            block: "start",
-          });
-          const heading = HEADINGS[target.id] ? $(HEADINGS[target.id]) : null;
-          heading?.focus({ preventScroll: true });
-        }, 220);
-      }
-    }
-
-    Object.assign(BM, {
-      connectRoblox: toggleRoblox,
-      connectStudio: toggleStudio,
-      saveSettings,
-      savePreferences,
-    });
+    bindEvents();
+    subscribe(render);
+    render(getState(), []);
+    applyHash();
   }
 
   if (document.readyState === "loading") {
