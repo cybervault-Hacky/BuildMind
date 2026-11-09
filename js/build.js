@@ -47,9 +47,13 @@
     lastRunId: -1,
     lastStatus: "",
     lastMarker: "",
+    feedCount: 0,
+    feedIds: [],
+    stageKey: "",
   };
 
   const LAST_INDEX = BUILD_STAGES.length - 1;
+  const MAX_FEED_NODES = 40;
 
   // Concise prompts that show the range of ideas BuildMind understands.
   // Clicking one only fills the composer; it never starts a build.
@@ -197,56 +201,54 @@
     const finished = status === BUILD.COMPLETE;
     const failed = status === BUILD.ERROR;
     const running = RUNNING_STATUSES.includes(status);
-    const current = running || failed ? stage : finished ? LAST_INDEX : -1;
+    const current = running || failed ? stage : -1;
 
     el.steps.forEach((step, i) => {
       const stageId = BUILD_STAGES[i] ? BUILD_STAGES[i].id : "";
-      const visited = Boolean(visits && visits[stageId]);
+      const times = (visits && visits[stageId]) || 0;
 
-      step.classList.remove("is-pending", "is-active", "is-done", "is-complete", "is-failed", "is-visited");
-      step.removeAttribute("aria-current");
-
-      const meta = $("[data-meta]", step);
-      if (meta) meta.textContent = "";
+      // Resolve the step's intended state, then write only what changed.
+      let state = "is-pending";
+      let meta = "";
+      let isCurrent = false;
 
       if (finished) {
-        if (i === LAST_INDEX) {
-          step.classList.add("is-complete");
-          if (meta) meta.textContent = "Ready";
-        } else if (visited) {
-          step.classList.add("is-done");
-          if (meta) meta.textContent = "Done";
+        state = i === LAST_INDEX ? "is-complete" : "is-done";
+        meta = i === LAST_INDEX ? "Ready" : "Done";
+      } else if (failed) {
+        if (i === current) {
+          state = "is-failed";
+          meta = "Failed";
+        } else if (times) {
+          state = "is-done";
+          meta = "Done";
         }
-        return;
-      }
-
-      if (failed) {
-        if (i < current && visited) {
-          step.classList.add("is-done");
-          if (meta) meta.textContent = "Done";
-        } else if (i === current) {
-          step.classList.add("is-failed");
-          if (meta) meta.textContent = "Failed";
+      } else if (current > -1) {
+        if (i === current) {
+          state = "is-active";
+          meta = "Now";
+          isCurrent = true;
+        } else if (times) {
+          state = "is-done";
+          meta = times > 1 ? "×2" : "Done";
         }
-        return;
       }
 
-      if (current === -1) {
-        step.classList.add("is-pending");
-        return;
+      const classes = ["timeline__step", state];
+      if (isCurrent && times > 1) classes.push("is-visited");
+      if (times > 1 && !isCurrent) classes.push("is-visited");
+      const nextClass = classes.join(" ");
+
+      if (step.className !== nextClass) step.className = nextClass;
+
+      if (isCurrent) {
+        if (step.getAttribute("aria-current") !== "step") step.setAttribute("aria-current", "step");
+      } else if (step.hasAttribute("aria-current")) {
+        step.removeAttribute("aria-current");
       }
 
-      if (i === current) {
-        step.classList.add("is-active");
-        if (visited && visits[stageId] > 1) step.classList.add("is-visited");
-        step.setAttribute("aria-current", "step");
-        if (meta) meta.textContent = "Now";
-      } else if (visited) {
-        step.classList.add("is-done");
-        if (meta) meta.textContent = visits[stageId] > 1 ? "×2" : "Done";
-      } else {
-        step.classList.add("is-pending");
-      }
+      const metaNode = $("[data-meta]", step);
+      if (metaNode && metaNode.textContent !== meta) metaNode.textContent = meta;
     });
   }
 
@@ -293,31 +295,37 @@
     el.stageNow.dataset.status = preparing ? "preparing" : running ? "running" : build.status;
   }
 
-  /** Agent activity feed: newest first, capped, no per-tick rebuilds. */
+  /** Agent activity feed: newest first, appended one entry at a time. */
   function paintActivity(build) {
     if (!el.feed) return;
 
     const activity = build.activity || [];
-    const runActive =
-      RUNNING_STATUSES.includes(build.status) || build.phase === "preparing" || build.status === BUILD.COMPLETE;
+    const total = activity.length;
 
-    if (el.feedPanel) el.feedPanel.hidden = activity.length === 0;
-    if (el.feedEmpty) el.feedEmpty.hidden = activity.length > 0;
-    if (el.feedCount) el.feedCount.textContent = activity.length ? String(activity.length) : "";
+    if (el.feedPanel) el.feedPanel.hidden = total === 0;
+    if (el.feedEmpty) el.feedEmpty.hidden = total > 0;
+    if (el.feedCount) el.feedCount.textContent = total ? String(total) : "";
 
-    // Only rebuild when the newest entry actually changed.
-    const newest = activity.length ? activity[activity.length - 1].id : "";
-    if (el.feed.dataset.last === newest) return;
-    el.feed.dataset.last = newest;
+    // A new run resets the list rather than diffing it.
+    if (total < local.feedCount) {
+      el.feed.innerHTML = "";
+      local.feedIds = [];
+    }
+    local.feedCount = total;
 
-    const fragment = document.createDocumentFragment();
-    activity
+    // Only the entries we have not painted yet are inserted (newest on top).
+    const painted = new Set(local.feedIds);
+    const fresh = activity.filter((entry) => !painted.has(entry.id));
+    if (!fresh.length) return;
+
+    fresh
       .slice()
       .reverse()
       .forEach((entry) => {
         const item = document.createElement("li");
         item.className = "log__item";
         item.dataset.stage = entry.stage || "";
+        item.dataset.id = entry.id;
 
         const dot = document.createElement("span");
         dot.className = "log__dot";
@@ -329,13 +337,14 @@
 
         item.appendChild(dot);
         item.appendChild(text);
-        fragment.appendChild(item);
+        el.feed.prepend(item);
+        local.feedIds.push(entry.id);
       });
 
-    el.feed.innerHTML = "";
-    el.feed.appendChild(fragment);
-    // A completed run leaves the feed in place; a stopped one clears on reset.
-    el.feed.dataset.live = runActive ? "true" : "false";
+    // Keep the DOM bounded even if a very long run keeps emitting.
+    while (el.feed.children.length > MAX_FEED_NODES) {
+      el.feed.removeChild(el.feed.lastElementChild);
+    }
   }
 
   /** Result summary — only after a completed run, never after stop or error. */
@@ -760,14 +769,22 @@
     const build = view.build;
 
     if (changed.includes("build") || changed.length === 0) {
-      paintStatusPills(build);
-      paintStageNow(build);
-      paintTimeline(build);
-      paintStageMarks(build);
+      // Progress ticks arrive several times a second; only the pieces that
+      // actually depend on the number are repainted for those.
+      const stageKey = `${build.runId}:${build.status}:${build.stage}:${build.phase}`;
+      const movedStage = stageKey !== local.stageKey;
+      local.stageKey = stageKey;
+
       paintProgress(build);
+      if (movedStage) {
+        paintStatusPills(build);
+        paintStageNow(build);
+        paintTimeline(build);
+        paintStageMarks(build);
+        paintAction(build);
+      }
       paintActivity(build);
       paintResult(build);
-      paintAction(build);
 
       // The visualizer only moves while a run is in flight.
       updateWorld(el.world, {

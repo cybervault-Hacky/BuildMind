@@ -189,14 +189,43 @@ checked against `TRANSITIONS`, so the UI cannot show two contradictory states.
 Each run carries a `runId`; stopping or failing bumps it, so a late event from a
 dead run is ignored by both the controller and the store.
 
-The seven stages are defined once in `services/ai/stages.js` and drive the
-service timing, the timeline, the progress markers and the runner.
+A run also has a **phase**: `preparing` covers the short beat between the click
+being accepted and the first stage arriving, so the UI can acknowledge the
+action instead of jumping from idle to stage one. The machine treats
+`preparing` as in-flight, which is what makes repeated clicks safe.
+
+`fixing → testing` is a legal move: a fix can hand back for another test pass
+before validation. Some runs loop and some do not, decided deterministically
+from the prompt, so both paths exist without a random flip on every run.
+
+The seven stages are defined once in `services/ai/stages.js` — label,
+description, activity lines, status, progress target and duration — and drive
+the service timing, the timeline, the progress markers and the runner.
+
+### Build workflow
+
+```
+idea → configuration → build → preparing → stages → result → project
+```
+
+- **Activity log** — simulated lines such as "Planned core systems" or
+  "Checked gameplay systems", released as the stage progresses. These describe
+  internal planning steps only; nothing claims a compilation, upload or
+  deployment.
+- **Current stage** — title, description, index ("3 of 7") and status, so the
+  active step never depends on colour.
+- **Progress** — one authoritative, monotonic value owned by the store. It never
+  moves backwards, so a repeat test pass cannot pull the bar back.
+- **Result** — a compact summary (concept, build status, validation, created
+  time) with exactly two next actions: open the project, or build again. It
+  appears only after a completed run; stopping or failing never shows it and
+  never creates a project.
 
 ### Service status
 
 | Service | Mode | Notes |
 | --- | --- | --- |
-| `aiService` | **simulated** | Timed stages, no model, no request |
+| `aiService` | **simulated** | Timed stages, activity lines, no model, no request |
 | `robloxService` | **simulated** | No OAuth, no account, no request |
 | `studioService` | **simulated** | No bridge, no plugin, no request |
 | `projectService` | **local** | localStorage, no backend |
@@ -235,8 +264,9 @@ accepts only the four known preference keys.
 - Cursor-following ambient light (desktop pointers only), generated
   world-construction visualizer, scroll reveals, page fade transitions
 - Build workspace: prompt composer with examples and a counter, provider and
-  model selectors, masked API-key field, connection rows, activity timeline,
-  progress with stage markers, and a stoppable simulated run
+  model selectors, masked API-key field, connection rows, a current-stage card,
+  a described seven-step timeline, a simulated activity log, progress with
+  stage markers, and a stoppable simulated run with a result summary
 - Projects: sample projects, status filters, CSS-generated previews, empty
   states
 - Settings: provider and model, motion preference, switches, local reset
@@ -266,7 +296,9 @@ aiService.getModels(providerId)              // → models
 aiService.validateConfiguration({ … })       // → { valid, errors }
 aiService.startBuild({ prompt, provider, model, hasKey })  // → { runId, … }
 aiService.stopBuild(runId)                   // → { stopped }
-aiService.subscribe(listener)                // stage / done / error / cancel
+aiService.subscribe(listener)                // see the event contract below
+aiService.failBuild(runId)                   // simulated failure, for recovery
+aiService.planForPrompt(prompt)              // which path a run will take
 
 // Roblox and Studio — separate integrations, same shape
 robloxService.connect() / .disconnect() / .getConnectionState() / .subscribe()
@@ -294,6 +326,23 @@ settingsController.load() / .setProvider(id) / .setModel(id) / .setMotion(mode)
 What a future implementation has to keep: the envelope convention, the
 `disconnected | connecting | connected` status vocabulary, and the rule that
 services never hold UI state and never throw.
+
+### AI event contract
+
+`aiService.subscribe()` listeners receive one schema. Every event carries the
+`runId` it belongs to, and consumers must ignore anything that is not their
+active run:
+
+```js
+{ type: "start",    runId, run }
+{ type: "stage",    runId, stageIndex, stageId, stageLabel, status,
+                    progress, description, activity[] }
+{ type: "progress", runId, stageIndex, progress }
+{ type: "activity", runId, stageIndex, message, at }
+{ type: "done",     runId, run }
+{ type: "error",    runId, error }
+{ type: "cancel",   runId, run }
+```
 
 ## Notes
 

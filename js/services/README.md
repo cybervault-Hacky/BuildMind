@@ -23,6 +23,8 @@ settings/      localSettingsService.js (load/save/reset + prompt draft)
 4. Services never call each other's storage directly; persistence goes through
    `storage.js`.
 5. No network calls. No keys. No provider SDKs.
+6. `aiService` events follow one schema and always carry a `runId`; consumers
+   ignore events from a run that is no longer active.
 
 ## Replacing a mock
 

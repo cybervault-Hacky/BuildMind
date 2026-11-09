@@ -168,7 +168,9 @@
     // A key supplied earlier in this session is remembered as a flag, so a
     // retry does not ask the user to type it again.
     BM.endRun("error-clear");
-    BM.prepareRun({ prompt, runId: `run-reset-${Date.now().toString(36)}` });
+    // `endRun` has already returned the machine to a clean ready state; going
+    // through `prepareRun` here would leave it stuck in `preparing`, because
+    // the first service event (which clears that phase) has not arrived yet.
     return start({ prompt, hasKey: keySuppliedThisSession || BM.getState().apiKeyPresent });
   }
 
