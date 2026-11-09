@@ -558,6 +558,22 @@
     width: 100%;
   }
 
+  /* Status chips share a line with the heading on desktop; on a phone they
+     wrap onto their own line rather than squeezing the title. */
+  .settings-section__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .setting-row__title-row {
+    gap: 8px;
+  }
+
+  .setting-row__state {
+    white-space: normal;
+  }
+
   .segmented {
     width: 100%;
   }

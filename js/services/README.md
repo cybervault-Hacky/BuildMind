@@ -11,7 +11,8 @@ connections/   mockRobloxService.js, mockStudioService.js — deliberately separ
 projects/      projectModel.js (pure helpers) +
                localProjectService.js (list/get/create/update/recordBuild/
                markRun/delete)
-settings/      localSettingsService.js (load/save/reset + prompt draft)
+settings/      localSettingsService.js (load/save/reset + prompt draft +
+               reset scope)
 ```
 
 ## Rules
@@ -87,6 +88,42 @@ invented.
 last-build line, description derivation from a prompt, status metadata, event
 copy, ordering and the name/description search matcher. It has no state and
 touches no storage, so both the service and the renderer can use it.
+
+## The settings service
+
+`localSettingsService` is the only writer of `buildmind.settings.v1`,
+`buildmind.preferences.v1` and `buildmind.connections.v1`.
+
+| Method | Returns | Notes |
+| --- | --- | --- |
+| `loadSettings()` | `{ settings, motion, connections, systemMotion }` | normalised on read; `systemMotion` is the OS preference, reported not stored |
+| `saveSettings(patch)` | `{ settings, motion, connections, systemMotion }` | accepts `provider`, `model`, `autoFix`, `hints`, plus `motion` and `connections`, each written to its own key |
+| `resetSettings()` | `{ settings, motion, connections, systemMotion, reset }` | restores the three configuration keys; `reset` lists the scope it applied |
+| `loadPromptDraft()` / `savePromptDraft(text)` | `{ prompt }` | 600-character cap |
+| `getPersistedKeys()` | `{ keys, all, sensitive: [] }` | diagnostics; `sensitive` is always empty because no such key exists |
+| `_defaults()` | `{ provider, model, autoFix, hints }` | test hook, unwrapped |
+| `_resetScope()` | `["provider","model","preferences","motion","connections"]` | the single description of what reset changes |
+
+**Normalisation is the guarantee.** `normalize()` rejects an unknown provider
+(→ `openai`), rejects a model that does not belong to the provider (→ that
+provider's default) and coerces the booleans. A stored pair that a catalogue
+change invalidates therefore loads as a valid pair; nothing downstream has to
+defend against it.
+
+**Reset never touches user work.** It rewrites `settings`, `preferences` and
+`connections` and nothing else. `buildmind.projects.v1` (every project and its
+history) and `buildmind.draft.v1` (the prompt draft) are not settings and are
+left exactly as they were. There is no `clearAll` on the public surface.
+
+**No key writer exists.** The service has no method that accepts an API key, so
+there is no path — accidental or otherwise — from the key field to storage. The
+key's presence for a session is a boolean in `js/state.js` that starts false on
+every load.
+
+**Connections are stored as booleans, not statuses.** `{ roblox: boolean,
+studio: boolean }` can only express "connected" or "not connected"; the
+transient `connecting` status lives in state and is never persisted, so a reload
+cannot land on a stuck transition.
 
 ## Replacing a mock
 

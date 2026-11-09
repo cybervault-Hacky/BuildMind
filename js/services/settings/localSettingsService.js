@@ -5,9 +5,10 @@
 
    Public surface (contracts.js envelopes, never throws):
 
-     loadSettings()                 → { settings, motion, connections }
-     saveSettings(patch)            → { settings, motion, connections }
-     resetSettings()                → { settings, motion, connections }
+     loadSettings()                 → { settings, motion, connections, systemMotion }
+     saveSettings(patch)            → { settings, motion, connections, systemMotion }
+     resetSettings()                → { settings, motion, connections, systemMotion,
+                                        reset: [which slices were restored] }
      loadPromptDraft() / savePromptDraft(prompt)
      getPersistedKeys()             → { keys }   (documentation + diagnostics)
 
@@ -39,6 +40,13 @@
   const ALLOWED = ["provider", "model", "autoFix", "hints"];
   const MAX_PROMPT = 600;
 
+  /**
+   * The scope of a reset, spelled out once so the controller, the UI copy and
+   * the tests cannot drift. Projects and the prompt draft are deliberately
+   * absent: neither is a setting, and reset must not touch user work.
+   */
+  const RESET_SCOPE = ["provider", "model", "preferences", "motion", "connections"];
+
   /** Coerce a stored/provider pair into something always valid. */
   function normalize(settings) {
     const input = settings || {};
@@ -65,9 +73,28 @@
     return { roblox: conns.roblox === true, studio: conns.studio === true };
   }
 
+  /**
+   * The OS-level motion preference. Reported, never persisted: the user's own
+   * choice stays the stored value, and this flag only lets the UI explain why
+   * motion looks reduced even when "Full" is selected.
+   */
+  function readSystemMotion() {
+    try {
+      if (typeof window.matchMedia !== "function") return "unset";
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
+    } catch (err) {
+      return "unset";
+    }
+  }
+
   function loadSettings() {
     const settings = normalize(storage.readObject(STORAGE_KEYS.settings, DEFAULTS));
-    return ok({ settings, motion: readMotion(), connections: readConnections() });
+    return ok({
+      settings,
+      motion: readMotion(),
+      connections: readConnections(),
+      systemMotion: readSystemMotion(),
+    });
   }
 
   function saveSettings(patch) {
@@ -98,10 +125,22 @@
     return loadSettings();
   }
 
+  /**
+   * Restore every supported default. Projects (`buildmind.projects.v1`) and the
+   * prompt draft (`buildmind.draft.v1`) are not settings and are never touched
+   * here — a reset must not delete anyone's work.
+   */
   function resetSettings() {
     storage.write(STORAGE_KEYS.settings, { ...DEFAULTS });
     storage.write(STORAGE_KEYS.preferences, { motion: "full" });
-    return ok({ settings: { ...DEFAULTS }, motion: "full", connections: readConnections() });
+    storage.write(STORAGE_KEYS.connections, { roblox: false, studio: false });
+    return ok({
+      settings: { ...DEFAULTS },
+      motion: "full",
+      connections: readConnections(),
+      systemMotion: readSystemMotion(),
+      reset: RESET_SCOPE.slice(),
+    });
   }
 
   function loadPromptDraft() {
@@ -135,7 +174,12 @@
     loadPromptDraft,
     savePromptDraft,
     getPersistedKeys,
-    _defaults: DEFAULTS,
+    _defaults() {
+      return { ...DEFAULTS };
+    },
+    _resetScope() {
+      return RESET_SCOPE.slice();
+    },
     _clearAll: clearAll,
     _fail(message) {
       // Exposed only so the error path can be exercised in tests.

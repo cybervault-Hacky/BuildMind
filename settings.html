@@ -71,55 +71,62 @@
           <div>
             <h1 class="page-head__title" data-reveal tabindex="-1">Settings</h1>
             <p class="page-head__sub" data-reveal data-reveal-delay="50">
-              AI, connections and appearance.
+              AI, connections and preferences. Changes save as you make them.
             </p>
           </div>
         </div>
 
         <div class="settings">
-          <!-- AI -->
+          <!-- ================= AI configuration ================= -->
           <section class="settings-section" id="ai" aria-labelledby="ai-title" data-reveal>
             <div class="settings-section__head">
-              <h2 class="settings-section__title" id="ai-title" tabindex="-1">AI</h2>
-              <p class="settings-section__note">Keys are never stored</p>
-            </div>
-
-            <div class="setting-row">
-              <span class="setting-row__copy">
-                <span class="setting-row__title">Provider</span>
-              </span>
-              <span class="setting-row__control">
-                <label class="sr-only" for="settings-provider">Provider</label>
-                <select class="select" id="settings-provider">
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google</option>
-                  <option value="xai">xAI</option>
-                </select>
+              <div class="settings-section__titles">
+                <h2 class="settings-section__title" id="ai-title" tabindex="-1">AI configuration</h2>
+                <p class="settings-section__note" id="ai-note">
+                  Simulated — no provider is contacted.
+                </p>
+              </div>
+              <!-- Configuration status: derived from state, never colour-only. -->
+              <span class="status status--idle" id="settings-config-status">
+                <span class="status__dot" aria-hidden="true"></span>
+                <span class="status__text">Not configured</span>
               </span>
             </div>
 
             <div class="setting-row">
               <span class="setting-row__copy">
-                <span class="setting-row__title">Model</span>
-                <span class="setting-row__note" id="settings-model-hint">OpenAI</span>
+                <label class="setting-row__title" for="settings-provider">Provider</label>
+                <span class="setting-row__note" id="settings-provider-note">Which model family to use</span>
               </span>
               <span class="setting-row__control">
-                <label class="sr-only" for="settings-model">Model</label>
-                <select class="select" id="settings-model"></select>
+                <select class="select" id="settings-provider" name="provider"
+                        aria-describedby="settings-provider-note"></select>
+              </span>
+            </div>
+
+            <div class="setting-row">
+              <span class="setting-row__copy">
+                <label class="setting-row__title" for="settings-model">Model</label>
+                <span class="setting-row__note" id="settings-model-hint">Models for the selected provider</span>
+              </span>
+              <span class="setting-row__control">
+                <select class="select" id="settings-model" name="model"
+                        aria-describedby="settings-model-hint"></select>
               </span>
             </div>
 
             <div class="setting-row setting-row--stacked">
               <span class="setting-row__copy">
-                <span class="setting-row__title">API key</span>
-                <span class="setting-row__note">Not saved</span>
+                <label class="setting-row__title" for="settings-api-key">API key</label>
+                <span class="setting-row__note" id="settings-key-note">
+                  Used for this session. Not saved.
+                </span>
               </span>
-              <span class="setting-row__control">
+              <span class="setting-row__control setting-row__control--stack">
                 <span class="input-group">
-                  <label class="sr-only" for="settings-api-key">API key</label>
-                  <input class="input" id="settings-api-key" type="password"
-                         autocomplete="off" spellcheck="false" placeholder="sk-...">
+                  <input class="input" id="settings-api-key" name="api-key" type="password"
+                         autocomplete="off" spellcheck="false"
+                         aria-describedby="settings-key-note settings-key-state">
                   <button class="input-group__action" type="button" id="settings-api-key-toggle"
                           aria-label="Show API key" aria-pressed="false" data-icon="eye">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
@@ -132,15 +139,21 @@
                     </svg>
                   </button>
                 </span>
+                <p class="setting-row__state" id="settings-key-state"></p>
+                <p class="field__error" id="settings-key-error" hidden></p>
               </span>
             </div>
           </section>
 
-          <!-- Roblox -->
+          <!-- ================= Connections ================= -->
           <section class="settings-section" id="roblox" aria-labelledby="roblox-title" data-reveal>
             <div class="settings-section__head">
-              <h2 class="settings-section__title" id="roblox-title" tabindex="-1">Roblox</h2>
-              <p class="settings-section__note">Simulated connections</p>
+              <div class="settings-section__titles">
+                <h2 class="settings-section__title" id="roblox-title" tabindex="-1">Connections</h2>
+                <p class="settings-section__note">
+                  Simulated for this session — no account is signed in and no bridge is opened.
+                </p>
+              </div>
             </div>
 
             <div class="setting-row">
@@ -152,10 +165,13 @@
                     <span class="status__text">Not connected</span>
                   </span>
                 </span>
-                <span class="setting-row__note">Account</span>
+                <span class="setting-row__note" id="settings-roblox-note">
+                  Targets a published game. Separate from Studio.
+                </span>
               </span>
               <span class="setting-row__control">
-                <button class="btn btn--ghost btn--sm" type="button" id="settings-connect-roblox">Connect</button>
+                <button class="btn btn--ghost btn--sm" type="button" id="settings-connect-roblox"
+                        aria-describedby="settings-roblox-note">Connect</button>
               </span>
             </div>
 
@@ -168,27 +184,33 @@
                     <span class="status__text">Not connected</span>
                   </span>
                 </span>
-                <span class="setting-row__note">Local bridge</span>
+                <span class="setting-row__note" id="settings-studio-note">
+                  Local bridge, separate from your account.
+                </span>
               </span>
               <span class="setting-row__control">
-                <button class="btn btn--ghost btn--sm" type="button" id="settings-connect-studio">Connect</button>
+                <button class="btn btn--ghost btn--sm" type="button" id="settings-connect-studio"
+                        aria-describedby="settings-studio-note">Connect</button>
               </span>
             </div>
           </section>
 
-          <!-- Appearance -->
+          <!-- ================= Preferences ================= -->
           <section class="settings-section" id="appearance" aria-labelledby="appearance-title" data-reveal>
             <div class="settings-section__head">
-              <h2 class="settings-section__title" id="appearance-title" tabindex="-1">Appearance</h2>
+              <div class="settings-section__titles">
+                <h2 class="settings-section__title" id="appearance-title" tabindex="-1">Preferences</h2>
+                <p class="settings-section__note">Applies immediately across every page.</p>
+              </div>
             </div>
 
             <div class="setting-row">
               <span class="setting-row__copy">
-                <span class="setting-row__title">Motion</span>
-                <span class="setting-row__note">Reduce animation across the app</span>
+                <span class="setting-row__title" id="motion-title">Motion</span>
+                <span class="setting-row__note" id="motion-note">Reduce animation across the app</span>
               </span>
               <span class="setting-row__control">
-                <span class="segmented" role="group" aria-label="Motion preference">
+                <span class="segmented" role="group" aria-labelledby="motion-title motion-note">
                   <button class="segmented__option" type="button" data-motion="full" aria-pressed="true">Full</button>
                   <button class="segmented__option" type="button" data-motion="reduced" aria-pressed="false">Reduced</button>
                 </span>
@@ -197,69 +219,88 @@
 
             <div class="setting-row">
               <span class="setting-row__copy">
-                <span class="setting-row__title">Theme</span>
-                <span class="setting-row__note">Dark only for now</span>
+                <span class="setting-row__title">Appearance</span>
+                <span class="setting-row__note">Dark interface, fixed for now</span>
               </span>
               <span class="setting-row__control">
-                <span class="segmented" role="group" aria-label="Theme preference">
-                  <button class="segmented__option" type="button" aria-pressed="true">Dark</button>
-                  <button class="segmented__option" type="button" aria-pressed="false" disabled>Light</button>
+                <span class="status status--ready">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Dark</span>
                 </span>
               </span>
             </div>
-          </section>
-
-          <!-- General -->
-          <section class="settings-section" id="general" aria-labelledby="general-title" data-reveal>
-            <div class="settings-section__head">
-              <h2 class="settings-section__title" id="general-title" tabindex="-1">General</h2>
-            </div>
 
             <div class="setting-row">
               <span class="setting-row__copy">
-                <span class="setting-row__title">Auto-fix failures</span>
-                <span class="setting-row__note">Repair failed tests during a build</span>
+                <span class="setting-row__title" id="toggle-autofix-title">Auto-fix during a build</span>
+                <span class="setting-row__note" id="toggle-autofix-note">
+                  Let a build run its repair pass when a check fails
+                </span>
               </span>
               <span class="setting-row__control">
                 <button class="switch" type="button" role="switch" id="toggle-autofix"
-                        aria-checked="true" aria-labelledby="toggle-autofix-label">
-                  <span class="sr-only" id="toggle-autofix-label">Fix issues automatically</span>
-                </button>
+                        aria-checked="true" aria-labelledby="toggle-autofix-title toggle-autofix-note"></button>
               </span>
             </div>
 
             <div class="setting-row">
               <span class="setting-row__copy">
-                <span class="setting-row__title">Build hints</span>
-                <span class="setting-row__note">Short suggestions while building</span>
+                <span class="setting-row__title" id="toggle-hints-title">Build hints</span>
+                <span class="setting-row__note" id="toggle-hints-note">
+                  Show short suggestions in the Build workspace
+                </span>
               </span>
               <span class="setting-row__control">
                 <button class="switch" type="button" role="switch" id="toggle-hints"
-                        aria-checked="true" aria-labelledby="toggle-hints-label">
-                  <span class="sr-only" id="toggle-hints-label">Show build hints</span>
-                </button>
+                        aria-checked="true" aria-labelledby="toggle-hints-title toggle-hints-note"></button>
               </span>
             </div>
           </section>
 
-          <!-- Danger-ish: quiet reset -->
+          <!-- ================= Stored data ================= -->
           <section class="settings-section" aria-labelledby="data-title" data-reveal>
             <div class="settings-section__head">
-              <h2 class="settings-section__title" id="data-title" tabindex="-1">Local data</h2>
-              <p class="settings-section__note">Settings are stored in this browser only.</p>
+              <div class="settings-section__titles">
+                <h2 class="settings-section__title" id="data-title" tabindex="-1">Stored in this browser</h2>
+                <p class="settings-section__note" id="data-note">
+                  Preferences save as you change them. Projects and prompts are not settings.
+                </p>
+              </div>
             </div>
 
             <div class="setting-row">
               <span class="setting-row__copy">
                 <span class="setting-row__title">Reset settings</span>
-                <span class="setting-row__note">Restore defaults in this browser</span>
+                <span class="setting-row__note" id="reset-note">
+                  Restores the default provider, model, motion and preferences, and disconnects both
+                  simulated connections. Your projects and prompt draft are kept.
+                </span>
               </span>
               <span class="setting-row__control">
-                <button class="btn btn--ghost btn--sm" type="button" id="reset-settings">Reset</button>
+                <button class="btn btn--ghost btn--sm" type="button" id="reset-settings"
+                        aria-describedby="reset-note">Reset…</button>
               </span>
             </div>
           </section>
         </div>
+
+        <p class="sr-only" id="settings-live" role="status" aria-live="polite"></p>
+
+        <!-- Reset confirmation — the same native dialog pattern as Projects. -->
+        <dialog class="confirm" id="reset-dialog" aria-labelledby="reset-dialog-title"
+                aria-describedby="reset-dialog-note">
+          <div class="confirm__body">
+            <h2 class="confirm__title" id="reset-dialog-title">Reset settings?</h2>
+            <p class="confirm__note" id="reset-dialog-note">
+              Restores the default provider and model, full motion and the default preferences, and
+              disconnects both simulated connections. Your projects and prompt draft are kept.
+            </p>
+            <div class="confirm__actions">
+              <button class="btn btn--ghost btn--sm" type="button" id="reset-cancel">Keep settings</button>
+              <button class="btn btn--danger btn--sm" type="button" id="reset-confirm">Reset settings</button>
+            </div>
+          </div>
+        </dialog>
       </div>
     </main>
 

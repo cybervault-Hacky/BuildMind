@@ -316,6 +316,71 @@ hash of the name. No images, no Roblox assets, no WebGL.
 it claims a compiled script, an uploaded asset, a file count, a deployment or a
 publish.
 
+### Settings — configuration, status and reset
+
+Settings is the only place configuration is edited, and it holds no state of
+its own. The page renders `state.settings`; every change leaves through
+`settingsController`, is validated against the provider catalogue, is
+persisted by `settingsService`, and comes back through the store.
+
+**One derivation, two pages.** `settingsController.describeConfiguration()`
+computes the status from live state every time it is called:
+
+| Status | When | What it means |
+| --- | --- | --- |
+| `Not configured` | the provider is not in the catalogue | nothing can be chosen yet |
+| `Incomplete` | there is no valid model for the provider, or the provider needs a key and none is present | one thing is missing |
+| `Ready` | a valid provider, a valid model, and a key if the provider requires one | a build can start |
+
+Nothing is stored to remember a status, so the Settings chip and the Build chip
+cannot drift apart — both call the same function with the same state. The
+status is text plus a dot, never colour alone, and the note under the chip
+names what is missing and why.
+
+**Provider → model cascade.** `settingsController.setProvider()` writes the
+provider *and* that provider's default model in a single call. A model can only
+be saved through `setModel()`, which rejects anything the catalogue does not
+list for the current provider, and `localSettingsService.normalize()` repairs a
+stored pair that no longer matches (unknown provider → `openai`, cross-provider
+model → that provider's default). An invalid provider/model pair therefore
+cannot be loaded, saved, or shown for a frame.
+
+**The API key is session-only.** It is typed into a password field, kept in the
+input element (and, for a running build, passed to the service in memory), and
+never written anywhere: not to `localStorage`, not to `sessionStorage`, not to
+the URL, not to state, not to a log, not to an error message. State holds one
+boolean, `apiKeyPresent`, and it resets on reload. The copy says so —
+"Used for this session. Not saved." — and the per-field line says the key is
+*held*, never *verified*: there is no provider call in this app, so there is
+nothing to verify it against. A blank or whitespace-only value is called out
+locally (`aria-invalid` plus a message) and does not count as present.
+
+**Connections are two simulations.** The Roblox account and Roblox Studio are
+separate rows, separate flags, separate statuses. Both are `simulated` in the
+service layer and both say so in the UI. While a transition is in flight the
+button is disabled and `aria-busy`, so a second click cannot start a second
+attempt (`connectionController` also refuses a duplicate with an `operation`
+error). A ticket per target invalidates in-flight callbacks: if the target is
+disconnected while connecting, the late callback returns `superseded` and does
+not repaint the button or write a connection.
+
+**Reset is scoped and confirmed.** The reset button opens a native `<dialog>`
+that names exactly what changes. Confirming calls
+`settingsController.reset()` → `settingsService.resetSettings()`, which writes
+the three configuration keys only (`settings`, `preferences`, `connections`) and
+returns the scope it applied:
+
+| Restored | Kept |
+| --- | --- |
+| provider, model, auto-fix, hints | `buildmind.projects.v1` — every project and its history |
+| motion, including `html[data-motion-mode]` | `buildmind.draft.v1` — the prompt draft |
+| both simulated connections | the session's API key, because it was never stored |
+
+The dialog moves focus to "Keep settings", Escape and the backdrop both dismiss,
+focus returns to the button that opened it, and the result is announced through
+the page's polite live region. Settings save as they change — there is no Save,
+Cancel or Discard anywhere, and the page says so.
+
 ### Service status
 
 | Service | Mode | Notes |
@@ -366,7 +431,9 @@ accepts only the four known preference keys.
   stage markers, and a stoppable simulated run with a result summary
 - Projects: sample projects, status filters, CSS-generated previews, empty
   states
-- Settings: provider and model, motion preference, switches, local reset
+- Settings: provider and model with a live configuration status, a session-only
+  API key with a reveal control, two separate simulated connections, motion and
+  preference switches, and a scoped, confirmed reset
 - Stored in `localStorage`: settings, motion preference, the simulated
   connection flags and the local project list. The API key is never stored.
 

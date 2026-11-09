@@ -80,6 +80,8 @@
     el.model = $("#model");
     el.apiKey = $("#api-key");
     el.apiKeyToggle = $("#api-key-toggle");
+    el.apiKeyState = $("#api-key-state");
+    el.configStatus = $("#build-config-status");
     el.buildButton = $("#build-button");
     el.buildBar = $(".build-bar");
     el.hintTitle = $("#build-hint-title");
@@ -566,8 +568,38 @@
   }
 
   /* ------------------------------------------------------------------------
-     Provider / model
+     Provider / model / configuration status
      ------------------------------------------------------------------------ */
+
+  /**
+   * The configuration chip on this page and the one in Settings are painted from
+   * the same derivation, so the two pages cannot disagree about readiness.
+   */
+  function setConfigStatus(config) {
+    if (!el.configStatus) return;
+    const textEl = el.configStatus.querySelector(".status__text");
+    if (textEl && textEl.textContent !== config.label) textEl.textContent = config.label;
+    const next = `status status--${config.tone}`;
+    if (el.configStatus.className !== next) el.configStatus.className = next;
+    if (el.configStatus.getAttribute("title") !== config.note) {
+      el.configStatus.setAttribute("title", config.note);
+    }
+  }
+
+  function paintConfigStatus() {
+    const config = BM.settingsController.describeConfiguration(getState());
+    setConfigStatus(config);
+
+    if (el.apiKeyState) {
+      const message = config.keyPresent
+        ? "Key held for this session in memory. Not saved."
+        : config.needsKey
+        ? `${config.provider.label} needs a key before a build can run.`
+        : "No key needed for this provider.";
+      if (el.apiKeyState.textContent !== message) el.apiKeyState.textContent = message;
+    }
+  }
+
   function paintProviderOptions() {
     if (!el.provider) return;
 
@@ -593,8 +625,9 @@
     if (!el.model) return;
 
     const { settings } = getState();
-    const provider = providerFor(settings.provider);
-    const options = provider.models
+    const provider = providerFor(settings.provider) || { label: "No provider", models: [] };
+    const models = provider.models;
+    const options = models
       .map(
         (model) =>
           `<option value="${model.id}"${
@@ -607,6 +640,9 @@
       el.model.dataset.built = options;
       el.model.innerHTML = options;
     }
+    // No provider means no models: say so instead of showing a stale list.
+    el.model.disabled = models.length === 0;
+    if (models.length === 0) return;
     el.model.value = settings.model;
 
     const hint = $("#model-hint");
@@ -807,9 +843,10 @@
       });
     }
 
-    if (changed.includes("settings") || changed.length === 0) {
+    if (changed.includes("settings") || changed.includes("apiKeyPresent") || changed.length === 0) {
       paintProviderOptions();
       paintModelOptions();
+      paintConfigStatus();
     }
 
     if (
@@ -912,7 +949,13 @@
 
     // configuration
     el.provider?.addEventListener("change", () => {
+      if (el.provider.disabled) return;
+      setConfigStatus({ label: "Updating…", tone: "warn", note: "Applying the new provider." });
       BM.settingsController.setProvider(el.provider.value).then((result) => {
+        // The model list belongs to the new provider, so repaint both together.
+        paintProviderOptions();
+        paintModelOptions();
+        paintConfigStatus();
         if (!BM.isOk(result)) return toast(result.error.message);
         setFieldError("provider", "");
         toast("Provider updated");
@@ -920,14 +963,25 @@
     });
 
     el.model?.addEventListener("change", () => {
+      if (el.model.disabled) return;
       BM.settingsController.setModel(el.model.value).then((result) => {
+        paintModelOptions();
+        paintConfigStatus();
         if (!BM.isOk(result)) return toast(result.error.message);
         setFieldError("model", "");
       });
     });
 
     el.apiKey?.addEventListener("input", () => {
-      if (el.apiKey.value.trim()) setFieldError("apiKey", "");
+      const value = el.apiKey ? el.apiKey.value : "";
+      const state = BM.settingsController.describeKeyState(value);
+      setFieldError("apiKey", "");
+      el.apiKey?.setAttribute("aria-invalid", String(state.invalid));
+      if (state.invalid) setFieldError("apiKey", state.message);
+      // Presence only: the key itself never enters state. Clearing the field
+      // must not claim the session still has a key it was just told about.
+      setApiKeyPresent(state.present);
+      paintConfigStatus();
     });
 
     BM.bindKeyReveal(el.apiKey, el.apiKeyToggle);

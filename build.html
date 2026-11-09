@@ -151,7 +151,13 @@
             <section aria-labelledby="ai-label" data-reveal data-reveal-delay="60">
               <div class="group-head">
                 <h2 class="group-label" id="ai-label">AI configuration</h2>
-                <a class="group-link" href="settings.html#ai">Manage in Settings</a>
+                <span class="group-head__aside">
+                  <span class="status status--idle" id="build-config-status">
+                    <span class="status__dot" aria-hidden="true"></span>
+                    <span class="status__text">Not configured</span>
+                  </span>
+                  <a class="group-link" href="settings.html#ai">Manage in Settings</a>
+                </span>
               </div>
 
               <div class="config-grid">
@@ -178,11 +184,11 @@
                 <div class="field config-grid__span" data-field="apiKey">
                   <label class="field__label" for="api-key">
                     API key
-                    <span class="field__hint" id="api-key-hint">Not saved</span>
+                    <span class="field__hint" id="api-key-hint">Used for this session. Not saved.</span>
                   </label>
                   <div class="input-group">
                     <input class="input" id="api-key" name="api-key" type="password"
-                           autocomplete="off" spellcheck="false" placeholder="sk-…" aria-describedby="api-key-hint">
+                           autocomplete="off" spellcheck="false" aria-describedby="api-key-hint">
                     <button class="input-group__action" type="button" id="api-key-toggle"
                             aria-label="Show API key" aria-pressed="false" data-icon="eye">
                       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
@@ -195,6 +201,7 @@
                       </svg>
                     </button>
                   </div>
+                  <p class="field__state" id="api-key-state"></p>
                   <p class="field__error" id="apiKey-error" hidden></p>
                 </div>
               </div>

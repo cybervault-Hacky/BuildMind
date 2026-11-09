@@ -72,25 +72,65 @@
     return connect(target);
   }
 
+  /**
+   * Per-target attempt counters. A callback from an attempt that has been
+   * superseded (disconnect during connect, a reset, a second navigation)
+   * compares its ticket and refuses to repaint an old status.
+   */
+  const attempts = { roblox: 0, studio: 0 };
+
+  function nextAttempt(target) {
+    attempts[target] += 1;
+    return attempts[target];
+  }
+
+  function isCurrent(target, ticket) {
+    return attempts[target] === ticket;
+  }
+
   function connect(target) {
     const service = serviceFor(target);
     if (!service) {
       return Promise.resolve(BM.serviceFail(ERROR_TYPES.CONFIGURATION, "That integration is unknown."));
     }
 
+    // A second connect must not supersede the one already in flight: it would
+    // invalidate the first attempt's ticket and leave the store behind the
+    // service. Refuse before touching the ticket.
+    if (status(target) === "connecting") {
+      return Promise.resolve(
+        BM.serviceFail(ERROR_TYPES.OPERATION, "A connection is already in progress.", { duplicate: true })
+      );
+    }
+
+    const ticket = nextAttempt(target);
     // The service owns the `connecting` status; mirror it straight away so the
     // button can be disabled in the same frame.
     BM.setConnectionStatus(target, "connecting");
 
     return service.connect().then((result) => {
+      // A disconnect (or reset) happened while this was in flight: report what
+      // the store actually says now instead of resurrecting the old status.
+      if (!isCurrent(target, ticket)) {
+        return BM.serviceOk({
+          target,
+          status: status(target),
+          label: LABELS[target],
+          simulated: true,
+          superseded: true,
+        });
+      }
+
       if (!BM.isOk(result)) {
+        // Never leave the UI claiming a state the service did not reach.
         BM.setConnectionStatus(target, "disconnected");
+        persist();
         return result;
       }
 
       const nextStatus = result.data.status === "connected" ? "connected" : "disconnected";
       BM.setConnectionStatus(target, nextStatus);
-      persist(target);
+      persist();
 
       return BM.serviceOk({ target, status: nextStatus, label: LABELS[target], simulated: true });
     });
@@ -102,11 +142,30 @@
       return Promise.resolve(BM.serviceFail(ERROR_TYPES.CONFIGURATION, "That integration is unknown."));
     }
 
+    const ticket = nextAttempt(target);
+    // Settle the store first: the service call is synchronous for a mock, but
+    // the UI must not show "connecting" for a transition that already ended.
+    BM.setConnectionStatus(target, "disconnected");
+
     return service.disconnect().then((result) => {
-      if (!BM.isOk(result)) return result;
+      if (!isCurrent(target, ticket)) {
+        return BM.serviceOk({
+          target,
+          status: status(target),
+          label: LABELS[target],
+          simulated: true,
+          superseded: true,
+        });
+      }
+
+      if (!BM.isOk(result)) {
+        // Never leave the UI claiming a state the service did not reach.
+        BM.setConnectionStatus(target, status(target));
+        return result;
+      }
 
       BM.setConnectionStatus(target, "disconnected");
-      persist(target);
+      persist();
 
       return BM.serviceOk({ target, status: "disconnected", label: LABELS[target], simulated: true });
     });
@@ -122,6 +181,11 @@
     });
   }
 
+  /** True while a target is mid-transition — the UI's disable signal. */
+  function isBusy(target) {
+    return status(target) === "connecting";
+  }
+
   BM.connectionController = {
     mode: "mock",
     toggle,
@@ -129,6 +193,7 @@
     disconnect,
     status,
     isConnected,
+    isBusy,
     restore,
     label(target) {
       return LABELS[target] || target;

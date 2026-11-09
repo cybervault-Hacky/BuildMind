@@ -33,6 +33,13 @@
 
   let status = STATUS.DISCONNECTED;
   let pending = null;
+  /**
+   * Bumped on every accepted transition. A late callback from a superseded
+   * attempt compares its ticket and returns without touching status, so a
+   * disconnect during a connect can never be overwritten by that connect
+   * finishing afterwards.
+   */
+  let ticket = 0;
   const listeners = new Set();
 
   function emit(next) {
@@ -57,6 +64,11 @@
     return ok({ target: TARGET, label: LABEL, status, simulated: true });
   }
 
+  /**
+   * A connect resolves to the state that ended the attempt, which is not always
+   * "connected": a disconnect (or a reset) can supersede it mid-flight. Callers
+   * are told `superseded` so they do not report success that did not happen.
+   */
   function connect() {
     if (status === STATUS.CONNECTED) {
       return ok({ target: TARGET, status, simulated: true, changed: false, alreadyConnected: true });
@@ -67,8 +79,16 @@
 
     setStatus(STATUS.CONNECTING);
 
+    const mine = (ticket += 1);
     pending = new Promise((resolve) => {
       window.setTimeout(() => {
+        // Superseded by a disconnect (or a reset) while this was in flight.
+        if (mine !== ticket) {
+          resolve(
+            ok({ target: TARGET, status, simulated: true, changed: false, superseded: true })
+          );
+          return;
+        }
         pending = null;
         setStatus(STATUS.CONNECTED);
         resolve(ok({ target: TARGET, status, simulated: true, changed: true }));
@@ -82,6 +102,8 @@
     if (status === STATUS.DISCONNECTED) {
       return ok({ target: TARGET, status, simulated: true, changed: false });
     }
+    // Invalidate any in-flight connect and drop the timer's right to settle.
+    ticket += 1;
     pending = null;
     setStatus(STATUS.DISCONNECTED);
     return ok({ target: TARGET, status, simulated: true, changed: true });
@@ -100,7 +122,7 @@
     getConnectionState,
     subscribe,
     _reset() {
-      window.clearTimeout(pending);
+      ticket += 1;
       pending = null;
       const changed = setStatus(STATUS.DISCONNECTED);
       listeners.clear();
