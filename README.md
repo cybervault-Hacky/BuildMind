@@ -255,7 +255,8 @@ accepts only the four known preference keys.
 ## Integration points
 
 The UI is already written against the service interfaces, so a real integration
-replaces one file and leaves the pages untouched.
+replaces one file and leaves the pages untouched. `js/services/README.md`
+documents the layer's rules for whoever writes that file.
 
 ```js
 // AI — replace the implementation, keep the surface
