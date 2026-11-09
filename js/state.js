@@ -1,105 +1,36 @@
 /* ==========================================================================
    BuildMind — state.js
-   The single frontend state model for the product.
+   The single owner of application state.
 
-   Everything the UI needs lives in `state` below: settings, motion preference,
-   connection status, the build state machine, projects and the active project
-   filter. Pages never keep their own copies — they subscribe and render.
+   Layer responsibilities (see README):
+     UI (build/projects/settings/navigation)
+       ↓ user intent
+     Controllers (build/connection/project/settings)
+       ↓ service calls
+     Services (ai/roblox/studio/projects/settings)
+       ↓ results
+     THIS FILE — the only writer of state → subscribers → renderers
 
-   Nothing here talks to a network. Connections, builds and project creation
-   are all local simulations. The API key is never persisted, never sent and
-   never logged: only an `apiKeyPresent` boolean exists, in memory.
+   What lives here: the state object, subscribe/getState, the build state
+   machine, and small "apply" functions that only accept data other layers
+   have already produced. What does not live here: persistence (services),
+   provider lists (services/ai/providers.js), build stage timings (services/
+   ai/stages.js), connection simulation (services/connections) and any project
+   or settings I/O.
+
+   Nothing in this file performs a network request, and no API key is ever
+   stored: only an `apiKeyPresent` boolean exists, in memory.
    ========================================================================== */
 
 (function () {
   "use strict";
 
   const BM = (window.BuildMind = window.BuildMind || {});
-  const { readStore, writeStore, clamp } = BM;
 
   /* ------------------------------------------------------------------------
-     Storage keys — settings, motion and connections are shared across pages,
-     projects are stored separately, keys are never stored at all.
-     ------------------------------------------------------------------------ */
-  const KEYS = {
-    settings: "buildmind.settings.v1",
-    preferences: "buildmind.preferences.v1",
-    connections: "buildmind.connections.v1",
-    projects: "buildmind.projects.v1",
-  };
-
-  const SETTINGS_DEFAULTS = {
-    provider: "openai",
-    model: "gpt-4.1",
-    autoFix: true,
-    hints: true,
-  };
-
-  /* ------------------------------------------------------------------------
-     AI provider catalogue — UI data only. Phase 3 never calls a provider.
-     ------------------------------------------------------------------------ */
-  const PROVIDERS = [
-    {
-      id: "openai",
-      label: "OpenAI",
-      requiresKey: true,
-      models: [
-        { id: "gpt-4.1", label: "GPT-4.1" },
-        { id: "gpt-4.1-mini", label: "GPT-4.1 mini" },
-        { id: "o4-mini", label: "o4-mini" },
-      ],
-    },
-    {
-      id: "anthropic",
-      label: "Anthropic",
-      requiresKey: true,
-      models: [
-        { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-        { id: "claude-opus-4-1", label: "Claude Opus 4.1" },
-        { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-      ],
-    },
-    {
-      id: "google",
-      label: "Google",
-      requiresKey: true,
-      models: [
-        { id: "gemini-2-5-pro", label: "Gemini 2.5 Pro" },
-        { id: "gemini-2-5-flash", label: "Gemini 2.5 Flash" },
-      ],
-    },
-    {
-      id: "xai",
-      label: "xAI",
-      requiresKey: true,
-      models: [{ id: "grok-4", label: "Grok 4" }],
-    },
-  ];
-
-  function findProvider(id) {
-    return PROVIDERS.find((provider) => provider.id === id) || PROVIDERS[0];
-  }
-
-  /* ------------------------------------------------------------------------
-     Build stages — one definition, used by the timeline, the stage markers,
-     the progress component and the runner.
-     ------------------------------------------------------------------------ */
-  const BUILD_STAGES = [
-    { id: "understand", label: "Understanding idea", status: "building", progress: 8, ms: 1100 },
-    { id: "plan", label: "Planning", status: "building", progress: 18, ms: 1400 },
-    { id: "build", label: "Building", status: "building", progress: 56, ms: 2600 },
-    { id: "test", label: "Testing", status: "testing", progress: 78, ms: 2000 },
-    { id: "fix", label: "Fixing", status: "fixing", progress: 78, ms: 1700 },
-    { id: "validate", label: "Validating", status: "validating", progress: 94, ms: 1400 },
-    { id: "complete", label: "Complete", status: "complete", progress: 100, ms: 900 },
-  ];
-
-  const LAST_STAGE = BUILD_STAGES.length - 1;
-
-  /* ------------------------------------------------------------------------
-     Build state machine.
-     A transition is only applied when it appears in this table, so the UI can
-     never show two contradictory states at once.
+     Build state machine
+     A move is applied only when it appears in TRANSITIONS, so the UI can never
+     show two contradictory states at once.
      ------------------------------------------------------------------------ */
   const BUILD = {
     READY: "ready",
@@ -113,7 +44,6 @@
   };
 
   const RUNNING_STATUSES = [BUILD.BUILDING, BUILD.TESTING, BUILD.FIXING, BUILD.VALIDATING];
-
   const TERMINAL_STATUSES = [BUILD.COMPLETE, BUILD.STOPPED, BUILD.ERROR];
 
   const TRANSITIONS = {
@@ -127,7 +57,7 @@
     error: [BUILD.READY, BUILD.BUILDING],
   };
 
-  /** Human labels used by the status pills and the live region. */
+  /** Human labels used by status pills and the live region. */
   const STATUS_LABEL = {
     ready: "Ready",
     building: "Building",
@@ -139,7 +69,7 @@
     error: "Failed",
   };
 
-  /** Status pill tone for each state. */
+  /** Status pill tone per state — never the only signal (text always too). */
   const STATUS_TONE = {
     ready: "idle",
     building: "active",
@@ -151,14 +81,7 @@
     error: "error",
   };
 
-  function statusForStage(index) {
-    const stage = BUILD_STAGES[index];
-    return stage ? stage.status : BUILD.READY;
-  }
-
-  /* ------------------------------------------------------------------------
-     Project status vocabulary (shared by the cards and the filters).
-     ------------------------------------------------------------------------ */
+  /** Project status vocabulary shared by cards and filters. */
   const PROJECT_STATUS = {
     ready: { label: "Ready", tone: "ready" },
     building: { label: "Building", tone: "active" },
@@ -166,24 +89,17 @@
     draft: { label: "Draft", tone: "idle" },
   };
 
-  const SCENE_ARTS = ["lattice", "terrain", "graph", "plates", "dots", "arcs"];
-
   /* ------------------------------------------------------------------------
-     Seed projects — clearly local sample data.
-     ------------------------------------------------------------------------ */
-  const SAMPLE_PROJECTS = [
-    { id: "sample-island", name: "Floating Island Survival", status: "ready", updated: "2 days ago", art: "lattice", scene: 0, sample: true },
-    { id: "sample-obby", name: "Checkpoint Obby", status: "building", updated: "5 hours ago", art: "terrain", scene: 1, sample: true },
-    { id: "sample-tycoon", name: "Dropper Tycoon", status: "ready", updated: "1 week ago", art: "graph", scene: 2, sample: true },
-    { id: "sample-arena", name: "Round-Based Arena", status: "draft", updated: "3 weeks ago", art: "plates", scene: 3, sample: true },
-  ];
-
-  /* ------------------------------------------------------------------------
-     The store
+     The state object
      ------------------------------------------------------------------------ */
   const state = {
     page: document.body ? document.body.dataset.page || "" : "",
-    settings: { ...SETTINGS_DEFAULTS },
+    settings: {
+      provider: "",
+      model: "",
+      autoFix: true,
+      hints: true,
+    },
     motion: "full",
     connections: {
       roblox: { status: "disconnected" }, // disconnected | connecting | connected
@@ -195,6 +111,8 @@
       stage: -1,
       progress: 0,
       prompt: "",
+      provider: "",
+      model: "",
       runId: 0,
       startedAt: 0,
       endedAt: 0,
@@ -202,10 +120,10 @@
     },
     projects: [],
     projectsFilter: "all",
+    services: { mode: "unknown", ready: false },
   };
 
   const listeners = new Set();
-  let persistTimer = 0;
 
   function snapshot() {
     return {
@@ -217,6 +135,7 @@
       },
       build: { ...state.build },
       projects: state.projects.slice(),
+      services: { ...state.services },
     };
   }
 
@@ -242,243 +161,131 @@
     });
   }
 
-  /** Commit a partial update. `changed` lists the slices that moved. */
-  function commit(patch, changed) {
-    Object.assign(state, patch);
-    notify(changed);
-    if (changed.some((key) => key !== "build" && key !== "projectsFilter")) schedulePersist();
-  }
-
-  function schedulePersist() {
-    window.clearTimeout(persistTimer);
-    persistTimer = window.setTimeout(persist, 60);
-  }
-
-  function persist() {
-    writeStore(KEYS.settings, state.settings);
-    writeStore(KEYS.preferences, { motion: state.motion });
-    writeStore(KEYS.connections, {
-      roblox: state.connections.roblox.status === "connected",
-      studio: state.connections.studio.status === "connected",
-    });
-    try {
-      window.localStorage.setItem(KEYS.projects, JSON.stringify(state.projects));
-    } catch (err) {
-      /* storage unavailable: state stays in memory only */
-    }
-  }
-
   /* ------------------------------------------------------------------------
-     Loading
+     Apply functions — called by controllers with already-validated data.
+     They never fetch, persist or validate against a provider.
      ------------------------------------------------------------------------ */
-  function loadState() {
-    const settings = readStore(KEYS.settings, SETTINGS_DEFAULTS);
-    const provider = findProvider(settings.provider);
-    const model = provider.models.some((m) => m.id === settings.model)
-      ? settings.model
-      : provider.models[0].id;
-
-    state.settings = {
-      provider: provider.id,
-      model,
-      autoFix: settings.autoFix !== false,
-      hints: settings.hints !== false,
-    };
-
-    const prefs = readStore(KEYS.preferences, { motion: "full" });
-    state.motion = prefs.motion === "reduced" ? "reduced" : "full";
-    BM.applyMotionPreference?.(state.motion);
-
-    const conns = readStore(KEYS.connections, {});
-    state.connections.roblox.status = conns.roblox ? "connected" : "disconnected";
-    state.connections.studio.status = conns.studio ? "connected" : "disconnected";
-
-    // The last prompt is restored so leaving the page mid-thought is not destructive.
-    const draft = readStore("buildmind.draft.v1", { prompt: "" });
-    state.build.prompt = typeof draft.prompt === "string" ? draft.prompt : "";
-
-    // Projects: an existing list is respected as-is, even when it is empty.
-    // Samples only seed a first-time visitor.
-    const stored = readRawArray(KEYS.projects);
-    state.projects = stored ? stored.filter(isValidProject) : SAMPLE_PROJECTS.slice();
-
-    state.apiKeyPresent = false;
-    return snapshot();
+  function findProviderConfig(id) {
+    return BM.providerCatalog ? BM.providerCatalog.resolve(id) : null;
   }
 
-  /** Arrays are stored and read as-is; readStore() merges plain objects.
-      Returns null when nothing has been stored yet. */
-  function readRawArray(key) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (raw === null) return null;
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : null;
-    } catch (err) {
-      return null;
-    }
+  function applySettings(settings) {
+    if (!settings) return;
+    state.settings = { ...state.settings, ...settings };
+    notify(["settings"]);
   }
 
-  function isValidProject(project) {
-    return (
-      project &&
-      typeof project.id === "string" &&
-      typeof project.name === "string" &&
-      typeof project.status === "string" &&
-      PROJECT_STATUS[project.status]
-    );
-  }
-
-  /* ------------------------------------------------------------------------
-     Settings actions
-     ------------------------------------------------------------------------ */
-  function setProvider(id) {
-    const provider = findProvider(id);
-    if (provider.id === state.settings.provider) return;
-
-    // A model always belongs to the provider that is selected.
-    state.settings = {
-      ...state.settings,
-      provider: provider.id,
-      model: provider.models[0].id,
-    };
-    commit({ settings: state.settings }, ["settings"]);
-  }
-
-  function setModel(id) {
-    const provider = findProvider(state.settings.provider);
-    if (!provider.models.some((model) => model.id === id)) return;
-    if (id === state.settings.model) return;
-
-    state.settings = { ...state.settings, model: id };
-    commit({ settings: state.settings }, ["settings"]);
-  }
-
-  function setPreference(key, value) {
-    if (!(key in SETTINGS_DEFAULTS) || ["provider", "model"].includes(key)) return;
-
-    state.settings = { ...state.settings, [key]: Boolean(value) };
-    commit({ settings: state.settings }, ["settings"]);
-  }
-
-  function setMotion(mode) {
+  function applyMotion(mode) {
     const next = mode === "reduced" ? "reduced" : "full";
+    BM.applyMotionPreference?.(next);
     if (next === state.motion) return;
-
-    BM.applyMotionPreference(next);
-    commit({ motion: next }, ["motion"]);
-  }
-
-  function resetSettings() {
-    const provider = findProvider(SETTINGS_DEFAULTS.provider);
-    state.settings = { ...SETTINGS_DEFAULTS, model: provider.models[0].id };
-    state.motion = "full";
-    BM.applyMotionPreference("full");
-    commit({ settings: state.settings, motion: state.motion }, ["settings", "motion"]);
-  }
-
-  /**
-   * The key itself is never stored — only whether one is present.
-   * @param {boolean} present
-   */
-  /** Keep the composer draft so navigation does not lose the user's idea. */
-  function setPromptDraft(prompt) {
-    const text = String(prompt || "");
-    if (text === state.build.prompt) return;
-    state.build.prompt = text;
-    writeStore("buildmind.draft.v1", { prompt: text.slice(0, 600) });
+    state.motion = next;
+    notify(["motion"]);
   }
 
   function setApiKeyPresent(present) {
     const next = Boolean(present);
     if (next === state.apiKeyPresent) return;
-    commit({ apiKeyPresent: next }, ["apiKeyPresent"]);
+    state.apiKeyPresent = next;
+    notify(["apiKeyPresent"]);
+  }
+
+  function setPromptDraft(prompt) {
+    const text = String(prompt === undefined || prompt === null ? "" : prompt);
+    if (text === state.build.prompt) return;
+    state.build = { ...state.build, prompt: text };
+    // Draft persistence belongs to settingsService.
+    BM.settingsService?.savePromptDraft(text);
+    notify(["build"]);
+  }
+
+  function setServiceMode(mode, ready) {
+    state.services = { mode: mode || "local", ready: Boolean(ready) };
+    notify(["services"]);
   }
 
   /* ------------------------------------------------------------------------
-     Connection actions — simulated, with an honest `connecting` phase.
+     Connections — status only. The simulation lives in the services; this is
+     the store side of it.
      ------------------------------------------------------------------------ */
-  const CONNECT_DELAY = { roblox: 800, studio: 1100 };
-
   function setConnectionStatus(target, status) {
     if (!state.connections[target]) return;
+    if (state.connections[target].status === status) return;
+
     state.connections = {
       ...state.connections,
       [target]: { ...state.connections[target], status },
     };
-    commit({ connections: state.connections }, ["connections"]);
-  }
-
-  async function connect(target) {
-    const connection = state.connections[target];
-    if (!connection || connection.status !== "disconnected") return pendingConnect(target);
-
-    setConnectionStatus(target, "connecting");
-    await new Promise((resolve) => window.setTimeout(resolve, CONNECT_DELAY[target] || 800));
-    setConnectionStatus(target, "connected");
-    return true;
-  }
-
-  function pendingConnect(target) {
-    return state.connections[target].status === "connected";
-  }
-
-  function disconnect(target) {
-    if (!state.connections[target]) return;
-    setConnectionStatus(target, "disconnected");
-  }
-
-  function connectRoblox() {
-    return connect("roblox");
-  }
-
-  function connectStudio() {
-    return connect("studio");
-  }
-
-  function disconnectRoblox() {
-    disconnect("roblox");
-  }
-
-  function disconnectStudio() {
-    disconnect("studio");
+    notify(["connections"]);
   }
 
   function isConnected(target) {
-    return state.connections[target].status === "connected";
+    return Boolean(state.connections[target] && state.connections[target].status === "connected");
   }
 
   /* ------------------------------------------------------------------------
-     Projects
+     Projects — the store holds the list; projectService reads/writes it.
      ------------------------------------------------------------------------ */
-  function loadProjects() {
-    // In a later phase this becomes a fetch; the call signature stays the same.
-    if (readRawArray(KEYS.projects) === null && !state.projects.length) {
-      state.projects = SAMPLE_PROJECTS.slice();
+  function setProjects(projects) {
+    state.projects = Array.isArray(projects) ? projects.slice() : [];
+    if (!projectFiltersExist(state.projectsFilter)) state.projectsFilter = "all";
+    notify(["projects"]);
+  }
+
+  function insertProject(project) {
+    if (!project || !project.id) return;
+    state.projects = [project, ...state.projects.filter((item) => item.id !== project.id)];
+    notify(["projects"]);
+  }
+
+  function replaceProject(project) {
+    if (!project || !project.id) return;
+    let found = false;
+    const projects = state.projects.map((item) => {
+      if (item.id !== project.id) return item;
+      found = true;
+      return { ...item, ...project };
+    });
+
+    if (!found) {
+      state.projects = [project, ...state.projects];
+    } else {
+      state.projects = projects;
     }
     notify(["projects"]);
-    return state.projects.slice();
+  }
+
+  function removeProject(id) {
+    const projects = state.projects.filter((item) => item.id !== id);
+    if (projects.length === state.projects.length) return;
+    state.projects = projects;
+    if (!projectFiltersExist(state.projectsFilter)) state.projectsFilter = "all";
+    notify(["projects"]);
   }
 
   function setProjectFilter(filter) {
     if (filter === state.projectsFilter) return;
-    commit({ projectsFilter: filter }, ["projectsFilter"]);
+    state.projectsFilter = String(filter || "all");
+    notify(["projectsFilter"]);
   }
 
   function projectFilters() {
-    // Filters are derived from the statuses that actually exist, so no filter
-    // can lead to a dead end.
+    // Derived from the statuses that actually exist, so no filter dead-ends.
     const present = new Set(state.projects.map((project) => project.status));
     const order = ["ready", "building", "complete", "draft"];
     return [
       { id: "all", label: "All" },
-      ...order.filter((status) => present.has(status)).map((status) => ({
-        id: status,
-        label: PROJECT_STATUS[status].label,
-      })),
+      ...order
+        .filter((status) => present.has(status))
+        .map((status) => ({ id: status, label: PROJECT_STATUS[status].label })),
     ];
   }
 
+  function projectFiltersExist(filter) {
+    return projectFilters().some((item) => item.id === filter);
+  }
+
+  /** Turn a prompt into a short project title, e.g. "Floating Island Survival". */
   const NAME_FILLER = new Set([
     "a", "an", "the", "with", "and", "for", "of", "on", "in", "to", "where", "that",
     "players", "player", "game", "games", "map", "level", "mode",
@@ -486,7 +293,6 @@
 
   const NAME_SCENE_WORDS = new Set(["survival", "obby", "tycoon", "arena", "racing", "horror"]);
 
-  /** Turn a prompt into a short project title, e.g. "Floating Island Survival". */
   function projectNameFromPrompt(prompt) {
     const cleaned = String(prompt || "")
       .replace(/^(please\s+)?(create|make|build|design|generate)\s+/i, "")
@@ -507,10 +313,9 @@
       .slice(0, 2);
     const scene = words.find((word) => NAME_SCENE_WORDS.has(word.toLowerCase()));
 
-    const parts = (picked.length ? picked : words.slice(0, 2));
-    if (scene && !parts.includes(scene)) parts.push(scene);
+    const parts = picked.length ? picked : words.slice(0, 2);
+    if (scene && parts.indexOf(scene) === -1) parts.push(scene);
 
-    // Title-case each word so "floating island" reads like a project name.
     const title = parts
       .slice(0, 3)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -519,58 +324,25 @@
     return title || "Untitled game";
   }
 
-  function artForName(name) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) % 997;
-    return { art: SCENE_ARTS[hash % SCENE_ARTS.length], scene: hash % 6 };
-  }
-
-  /**
-   * Represent the result of a finished simulated build as a project entry.
-   * This is local mock data: no real game is created or published.
-   */
-  function addProjectFromBuild(prompt) {
-    const name = projectNameFromPrompt(prompt);
-    const art = artForName(name);
-    const existing = state.projects.find((project) => project.name === name);
-
-    if (existing) {
-      state.projects = state.projects.map((project) =>
-        project.id === existing.id
-          ? { ...project, status: "complete", updated: "Just now", simulated: true }
-          : project
-      );
-    } else {
-      state.projects = [
-        {
-          id: `local-${Date.now().toString(36)}`,
-          name,
-          status: "complete",
-          updated: "Just now",
-          art: art.art,
-          scene: art.scene,
-          simulated: true,
-        },
-        ...state.projects,
-      ];
-    }
-
-    commit({ projects: state.projects }, ["projects"]);
-    return name;
-  }
-
   /* ------------------------------------------------------------------------
-     Build state machine + simulated runner
+     Build machine
+     The controller decides *when* to move; this file decides whether the move
+     is legal. Stage metadata comes from services/ai/stages.js.
      ------------------------------------------------------------------------ */
-  let stageTimer = 0;
-  let pendingWait = null;
+  function stages() {
+    return BM.BUILD_STAGES || [];
+  }
+
+  function lastStageIndex() {
+    return stages().length - 1;
+  }
 
   function isRunning(build) {
-    return RUNNING_STATUSES.includes((build || state.build).status);
+    return RUNNING_STATUSES.indexOf((build || state.build).status) !== -1;
   }
 
   function canTransition(from, to) {
-    return (TRANSITIONS[from] || []).includes(to);
+    return (TRANSITIONS[from] || []).indexOf(to) !== -1;
   }
 
   /** Apply a build patch only when the status move is legal. */
@@ -579,165 +351,121 @@
 
     if (patch.status && patch.status !== state.build.status) {
       if (!canTransition(state.build.status, patch.status)) {
-        console.warn(
-          `[BuildMind] blocked build transition ${state.build.status} → ${patch.status}`
-        );
+        console.warn(`[BuildMind] blocked build transition ${state.build.status} → ${patch.status}`);
         return false;
       }
     }
 
     state.build = next;
-    commit({ build: state.build }, ["build"]);
+    notify(["build"]);
     return true;
   }
 
-  function clearWait() {
-    window.clearTimeout(stageTimer);
-    stageTimer = 0;
-    if (pendingWait) {
-      const resolve = pendingWait;
-      pendingWait = null;
-      resolve();
-    }
-  }
-
-  function wait(ms) {
-    return new Promise((resolve) => {
-      pendingWait = resolve;
-      stageTimer = window.setTimeout(() => {
-        pendingWait = null;
-        stageTimer = 0;
-        resolve();
-      }, ms);
-    });
-  }
-
-  /**
-   * Start a simulated build.
-   * The agent call will replace the body of this runner later; the call
-   * signature and the state machine stay the same.
-   */
-  async function startBuild(prompt) {
-    if (isRunning()) return false;
-
-    const text = String(prompt || "").trim();
-    if (!text) return false;
-
-    clearWait();
-
-    const runId = state.build.runId + 1;
-    state.build = {
+  function emptyBuild(prompt, runId) {
+    return {
       status: BUILD.READY,
       stage: -1,
       progress: 0,
-      prompt: text,
+      prompt: prompt === undefined ? state.build.prompt : prompt,
+      provider: state.settings.provider,
+      model: state.settings.model,
       runId,
       startedAt: 0,
       endedAt: 0,
       error: "",
     };
-    commit({ build: state.build }, ["build"]);
+  }
 
-    if (!updateBuild({ status: BUILD.BUILDING, startedAt: Date.now() })) return false;
+  /** Controller: a run is starting. Resets to a clean run, then to building. */
+  function beginRun(config) {
+    if (isRunning()) return false;
 
-    // A run is alive while it is still the current run and has not ended.
-    const alive = () =>
-      state.build.runId === runId &&
-      !TERMINAL_STATUSES.includes(state.build.status);
+    const input = config || {};
+    const runId = input.runId || `run-${state.build.runId + 1}`;
 
-    // Every stage except the final one advances the state machine.
-    for (let index = 0; index < LAST_STAGE; index += 1) {
-      if (!alive()) return false;
+    state.build = emptyBuild(String(input.prompt || "").trim(), runId);
+    state.build.provider = input.provider || state.settings.provider;
+    state.build.model = input.model || state.settings.model;
+    notify(["build"]);
 
-      const stage = BUILD_STAGES[index];
-      updateBuild({
-        stage: index,
-        progress: stage.progress,
-        status: statusForStage(index),
-      });
+    return updateBuild({ status: BUILD.BUILDING, startedAt: Date.now() });
+  }
 
-      await wait(stage.ms);
-    }
+  /** Controller: the service reported a stage (index is never the last one). */
+  function advanceRun(patch) {
+    const input = patch || {};
+    const index = Number.isInteger(input.stage) ? input.stage : state.build.stage;
+    const stage = stages()[index];
 
-    if (!alive()) return false;
+    return updateBuild({
+      stage: index,
+      progress: typeof input.progress === "number" ? input.progress : stage ? stage.progress : state.build.progress,
+      status: input.status || (stage ? stage.status : state.build.status),
+    });
+  }
 
-    // The last stage is only reached by finishing, never by a loop tick.
-    updateBuild({
-      stage: LAST_STAGE,
+  /** Controller: the service finished. The only path to `complete`. */
+  function completeRun(config) {
+    const input = config || {};
+    const previousRun = state.build.runId;
+
+    const done = updateBuild({
+      stage: lastStageIndex(),
       progress: 100,
       status: BUILD.COMPLETE,
       endedAt: Date.now(),
+      error: "",
     });
 
-    // Finishing a run is the only place a project is produced.
-    addProjectFromBuild(text);
-    return true;
+    // The controller records the project through projectService.
+    if (done) BM.buildController?.recordCompletion?.(input.prompt || state.build.prompt);
+
+    return done ? previousRun : null;
   }
 
-  function stopBuild() {
-    if (!isRunning()) return false;
+  /** Controller: end a run as stopped or failed. Bumps runId to kill stale work. */
+  function endRun(outcome, reason) {
+    const next = outcome === "error" ? BUILD.ERROR : outcome === "error-clear" ? BUILD.READY : BUILD.STOPPED;
 
-    state.build.runId += 1;
-    clearWait();
-    updateBuild({ status: BUILD.STOPPED, endedAt: Date.now() });
-    return true;
-  }
+    // An illegal outcome must not touch the run id.
+    if (next !== state.build.status && !canTransition(state.build.status, next)) return false;
 
-  /** Simulated failure — used to prove the UI can recover. */
-  function failBuild(reason) {
-    if (!isRunning()) return false;
+    if (next === BUILD.ERROR || next === BUILD.STOPPED) {
+      // Bumping the run id is what makes any in-flight service event stale.
+      state.build = { ...state.build, runId: `run-${Date.now().toString(36)}` };
+    }
 
-    state.build.runId += 1;
-    clearWait();
-    updateBuild({
-      status: BUILD.ERROR,
-      endedAt: Date.now(),
-      error: reason || "The simulated run stopped unexpectedly.",
+    return updateBuild({
+      status: next,
+      endedAt: next === BUILD.READY ? 0 : Date.now(),
+      error: next === BUILD.ERROR ? reason || "The simulated run stopped unexpectedly." : "",
     });
-    return true;
-  }
-
-  /** Retry after a failure or a stop: full reset, then a fresh run. */
-  function retryBuild() {
-    if (isRunning()) return false;
-    const prompt = state.build.prompt;
-    resetBuild();
-    return startBuild(prompt);
   }
 
   function resetBuild() {
-    clearWait();
-    state.build = {
-      status: BUILD.READY,
-      stage: -1,
-      progress: 0,
-      prompt: state.build.prompt,
-      runId: state.build.runId + 1,
-      startedAt: 0,
-      endedAt: 0,
-      error: "",
-    };
-    commit({ build: state.build }, ["build"]);
+    state.build = emptyBuild(state.build.prompt, `run-${Date.now().toString(36)}`);
+    notify(["build"]);
   }
 
-  /* ------------------------------------------------------------------------
-     Validation — frontend configuration only, nothing is verified remotely.
-     ------------------------------------------------------------------------ */
-  function validateBuildConfig({ prompt, apiKey }) {
+  /**
+   * Frontend configuration validation kept for callers that have no service
+   * handle. Controllers use `aiService.validateConfiguration` instead.
+   */
+  function validateBuildConfig(input) {
+    const config = input || {};
+    const provider = findProviderConfig(state.settings.provider);
     const errors = {};
-    const text = String(prompt || "").trim();
+    const text = String(config.prompt || "").trim();
 
     if (!text) errors.prompt = "Describe the game you want to build.";
     else if (text.length < 8) errors.prompt = "A little more detail, at least a sentence.";
 
-    const provider = findProvider(state.settings.provider);
     if (!provider) errors.provider = "Choose an AI provider.";
     else if (!provider.models.some((model) => model.id === state.settings.model)) {
       errors.model = "Choose a model for this provider.";
     }
 
-    // Presence only. Phase 3 never verifies or transmits the key.
-    const hasKey = Boolean(apiKey && apiKey.trim()) || state.apiKeyPresent;
+    const hasKey = Boolean(config.apiKey && String(config.apiKey).trim()) || state.apiKeyPresent;
     if (provider && provider.requiresKey && !hasKey) {
       errors.apiKey = "Enter a key to run a build. It is never stored or sent.";
     }
@@ -746,27 +474,31 @@
   }
 
   /* ------------------------------------------------------------------------
-     Cross-page / cross-tab synchronisation
+     Boot — the store is filled by the settings/project controllers. This
+     function only wires lifecycle and cross-tab sync.
      ------------------------------------------------------------------------ */
+  function loadState() {
+    // A fresh page starts with no run in flight and no key in memory.
+    state.build = emptyBuild(state.build.prompt, 0);
+    state.apiKeyPresent = false;
+    return snapshot();
+  }
+
   function initSync() {
     window.addEventListener("storage", (event) => {
       if (!event.key) return;
 
-      if (event.key === KEYS.settings || event.key === KEYS.preferences) {
-        loadState();
-        BM.applyMotionPreference(state.motion);
-        notify(["settings", "motion"]);
-      } else if (event.key === KEYS.connections) {
-        const conns = readStore(KEYS.connections, {});
-        state.connections.roblox.status = conns.roblox ? "connected" : "disconnected";
-        state.connections.studio.status = conns.studio ? "connected" : "disconnected";
-        notify(["connections"]);
-      } else if (event.key === KEYS.projects) {
-        const stored = readRawArray(KEYS.projects);
-        if (stored) {
-          state.projects = stored.filter(isValidProject);
-          notify(["projects"]);
-        }
+      if (event.key === BM.STORAGE_KEYS.settings || event.key === BM.STORAGE_KEYS.preferences) {
+        BM.settingsController.load();
+      } else if (event.key === BM.STORAGE_KEYS.connections) {
+        BM.settingsService.loadSettings().then((result) => {
+          if (!BM.isOk(result)) return;
+          const { connections } = result.data;
+          setConnectionStatus("roblox", connections.roblox ? "connected" : "disconnected");
+          setConnectionStatus("studio", connections.studio ? "connected" : "disconnected");
+        });
+      } else if (event.key === BM.STORAGE_KEYS.projects) {
+        BM.projectController.load();
       }
     });
   }
@@ -775,54 +507,45 @@
      Public API
      ------------------------------------------------------------------------ */
   Object.assign(BM, {
-    KEYS,
-    PROVIDERS,
-    BUILD_STAGES,
-    PROJECT_STATUS,
     BUILD,
+    PROJECT_STATUS,
     RUNNING_STATUSES,
     TERMINAL_STATUSES,
     STATUS_LABEL,
     STATUS_TONE,
-    statusForStage,
-    findProvider,
+    TRANSITIONS,
 
     // state
     getState: snapshot,
     subscribe,
     loadState,
     initSync,
+    setServiceMode,
 
-    // settings
-    setProvider,
-    setModel,
-    setPreference,
-    setMotion,
-    resetSettings,
+    // apply (controllers only)
+    applySettings,
+    applyMotion,
     setApiKeyPresent,
     setPromptDraft,
-
-    // connections
-    connectRoblox,
-    disconnectRoblox,
-    connectStudio,
-    disconnectStudio,
+    setConnectionStatus,
     isConnected,
-
-    // projects
-    loadProjects,
+    setProjects,
+    insertProject,
+    replaceProject,
+    removeProject,
     setProjectFilter,
     projectFilters,
-    addProjectFromBuild,
     projectNameFromPrompt,
 
-    // build
-    startBuild,
-    stopBuild,
-    failBuild,
-    retryBuild,
+    // build machine
+    beginRun,
+    advanceRun,
+    completeRun,
+    endRun,
     resetBuild,
     isRunning,
+    updateBuild,
+    canTransition,
     validateBuildConfig,
   });
 })();

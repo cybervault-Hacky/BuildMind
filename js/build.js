@@ -2,12 +2,16 @@
    BuildMind — build.js
    The Build workspace.
 
-   This file is a renderer over js/state.js: it reads state, paints the
-   timeline, progress, connections and action bar, and forwards user intent to
-   the store. No build logic or duplicated state lives here.
+   This file is a renderer only. It reads state, paints the timeline, progress,
+   connections and action bar, and forwards user intent to the controllers:
 
-   Everything remains simulated. Nothing is sent anywhere and the API key is
-   only ever checked for presence.
+     build intent        → BM.buildController
+     connection toggles  → BM.connectionController
+     provider/model      → BM.settingsController
+
+   No build logic, provider list, connection simulation or persistence lives
+   here. Everything remains simulated; the API key is only checked for
+   presence and is handed to the controller in memory.
    ========================================================================== */
 
 (function () {
@@ -22,30 +26,20 @@
     icon,
     toast,
     BUILD_STAGES,
-    PROVIDERS,
     BUILD,
     STATUS_LABEL,
     STATUS_TONE,
     RUNNING_STATUSES,
-    findProvider,
     getState,
     subscribe,
-    setProvider,
-    setModel,
     setApiKeyPresent,
     setPromptDraft,
-    connectRoblox,
-    disconnectRoblox,
-    connectStudio,
-    disconnectStudio,
-    startBuild,
-    stopBuild,
-    retryBuild,
-    isRunning,
-    validateBuildConfig,
     mountWorld,
     updateWorld,
   } = BM;
+
+  const providerList = () => BM.providerCatalog.list();
+  const providerFor = (id) => BM.providerCatalog.resolve(id);
 
   const el = {};
   const local = {
@@ -379,14 +373,15 @@
     const status = getState().connections[target].status;
     if (status === "connecting") return;
 
-    if (status === "connected") {
-      target === "roblox" ? disconnectRoblox() : disconnectStudio();
-      toast(`${target === "roblox" ? "Roblox" : "Studio"} disconnected`);
+    const result = await BM.connectionController.toggle(target);
+    const label = target === "roblox" ? "Roblox connection" : "Studio bridge";
+
+    if (!BM.isOk(result)) {
+      toast(result.error.message || "The connection was not available.");
       return;
     }
 
-    await (target === "roblox" ? connectRoblox() : connectStudio());
-    toast(`${target === "roblox" ? "Roblox connection" : "Studio bridge"} simulated`);
+    toast(status === "connected" ? `${BM.connectionController.label(target)} disconnected` : `${label} simulated`);
   }
 
   /* ------------------------------------------------------------------------
@@ -396,12 +391,14 @@
     if (!el.provider) return;
 
     const { settings } = getState();
-    const options = PROVIDERS.map(
-      (provider) =>
-        `<option value="${provider.id}"${provider.id === settings.provider ? " selected" : ""}>${
-          provider.label
-        }</option>`
-    ).join("");
+    const options = providerList()
+      .map(
+        (provider) =>
+          `<option value="${provider.id}"${
+            provider.id === settings.provider ? " selected" : ""
+          }>${provider.label}</option>`
+      )
+      .join("");
 
     // Avoid rebuilding the list on every render; only when it is stale.
     if (el.provider.dataset.built !== options) {
@@ -415,7 +412,7 @@
     if (!el.model) return;
 
     const { settings } = getState();
-    const provider = findProvider(settings.provider);
+    const provider = providerFor(settings.provider);
     const options = provider.models
       .map(
         (model) =>
@@ -461,14 +458,15 @@
     const build = getState().build;
 
     if (RUNNING_STATUSES.includes(build.status)) {
-      stopBuild();
-      toast("Build stopped");
+      BM.buildController.stop().then(() => toast("Build stopped"));
       return;
     }
 
     if (build.status === BUILD.ERROR) {
       clearErrors();
-      retryBuild();
+      BM.buildController.retry().then((result) => {
+        if (!BM.isOk(result)) announce("Build not started. Check the highlighted fields.");
+      });
       return;
     }
 
@@ -480,41 +478,58 @@
 
     const prompt = el.prompt ? el.prompt.value : "";
     const key = el.apiKey ? el.apiKey.value : "";
-    const { valid, errors } = validateBuildConfig({ prompt, apiKey: key });
+    const hasKey = Boolean(key.trim()) || getState().apiKeyPresent;
 
-    if (!valid) {
-      // Attach the message to the field it belongs to, then move focus there.
-      Object.entries(errors).forEach(([field, message]) => setFieldError(field, message));
+    BM.buildController.checkConfiguration({ prompt, hasKey }).then((result) => {
+      const check = BM.isOk(result) ? result.data : { valid: false, errors: {} };
 
-      if (errors.prompt) {
-        el.prompt?.focus();
-        nudge(el.promptBlock);
-      } else if (errors.apiKey) {
-        el.apiKey?.focus();
-        nudge(el.apiKey?.closest(".input-group"));
+      if (!check.valid) {
+        // Attach each message to the field it belongs to, then move focus.
+        Object.keys(check.errors).forEach((field) => setFieldError(field, check.errors[field]));
+
+        if (check.errors.prompt) {
+          el.prompt?.focus();
+          nudge(el.promptBlock);
+        } else if (check.errors.apiKey) {
+          el.apiKey?.focus();
+          nudge(el.apiKey?.closest(".input-group"));
+        }
+        announce("Build not started. Check the highlighted fields.");
+        return;
       }
-      announce("Build not started. Check the highlighted fields.");
-      return;
-    }
 
-    // The key is never stored, sent or logged — the field is cleared and only
-    // a presence flag remains for the rest of the session.
-    setApiKeyPresent(Boolean(key.trim()));
-    if (key.trim()) {
-      el.apiKey.value = "";
-      el.apiKey.type = "password";
-      el.apiKeyToggle?.setAttribute("aria-pressed", "false");
-      el.apiKeyToggle?.setAttribute("aria-label", "Show API key");
-      el.apiKeyToggle?.querySelectorAll(".icon-eye").forEach((node) => node.removeAttribute("hidden"));
-      const eyeOff = el.apiKeyToggle?.querySelector(".icon-eye-off");
-      if (eyeOff) eyeOff.classList.add("is-off");
-    }
-    setFieldError("apiKey", "");
-    $("#api-key-hint")?.replaceChildren(
-      document.createTextNode("Key entered for this session · not saved")
-    );
+      // The key is handed to the controller in memory only — never stored,
+      // never logged, never put in a URL. The field is cleared immediately and
+      // only a presence flag remains for this session.
+      setApiKeyPresent(hasKey);
+      if (key.trim()) clearKeyField();
+      setFieldError("apiKey", "");
+      $("#api-key-hint")?.replaceChildren(
+        document.createTextNode("Key entered for this session · not saved")
+      );
 
-    startBuild(prompt);
+      BM.buildController.start({ prompt, hasKey }).then((started) => {
+        if (BM.isOk(started)) return;
+        if (started.error && started.error.type === "validation") {
+          Object.keys(started.error.fields || {}).forEach((field) =>
+            setFieldError(field, started.error.fields[field])
+          );
+        }
+        announce("Build could not start. Try again.");
+      });
+    });
+  }
+
+  /** Reset the key input and its reveal toggle after a submission. */
+  function clearKeyField() {
+    if (!el.apiKey) return;
+    el.apiKey.value = "";
+    el.apiKey.type = "password";
+    el.apiKeyToggle?.setAttribute("aria-pressed", "false");
+    el.apiKeyToggle?.setAttribute("aria-label", "Show API key");
+    el.apiKeyToggle?.querySelectorAll(".icon-eye").forEach((node) => node.removeAttribute("hidden"));
+    const eyeOff = el.apiKeyToggle?.querySelector(".icon-eye-off");
+    if (eyeOff) eyeOff.classList.add("is-off");
   }
 
   /** A short shake to point at the field that needs attention. */
@@ -597,7 +612,7 @@
     el.prompt?.addEventListener("keydown", (event) => {
       if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") return;
       event.preventDefault();
-      if (isRunning() || el.prompt.readOnly) return;
+      if (BM.isRunning() || el.prompt.readOnly) return;
       requestBuild();
     });
 
@@ -618,14 +633,18 @@
 
     // configuration
     el.provider?.addEventListener("change", () => {
-      setProvider(el.provider.value);
-      setFieldError("provider", "");
-      toast("Provider updated");
+      BM.settingsController.setProvider(el.provider.value).then((result) => {
+        if (!BM.isOk(result)) return toast(result.error.message);
+        setFieldError("provider", "");
+        toast("Provider updated");
+      });
     });
 
     el.model?.addEventListener("change", () => {
-      setModel(el.model.value);
-      setFieldError("model", "");
+      BM.settingsController.setModel(el.model.value).then((result) => {
+        if (!BM.isOk(result)) return toast(result.error.message);
+        setFieldError("model", "");
+      });
     });
 
     el.apiKey?.addEventListener("input", () => {

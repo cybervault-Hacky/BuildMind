@@ -2,9 +2,11 @@
    BuildMind — settings.js
    A renderer over the settings, motion and connection slices of js/state.js.
 
-   Edits go through the store, so the Build workspace sees the same provider,
-   model, motion preference and connection status. There is no second copy of
-   settings in this file. The API key field is a placeholder: only presence is
+   Edits go through the controllers, so the Build workspace sees the same
+   provider, model, motion preference and connection status. There is no second
+   copy of settings in this file and no persistence logic: providers come from
+   the catalogue, saving from settingsService, connections from
+   connectionController. The API key field is a placeholder — only presence is
    tracked, never the value.
    ========================================================================== */
 
@@ -14,22 +16,10 @@
   const BM = window.BuildMind;
   if (!BM) return;
 
-  const {
-    $,
-    toast,
-    getState,
-    subscribe,
-    findProvider,
-    setProvider,
-    setModel,
-    setPreference,
-    setMotion,
-    resetSettings,
-    connectRoblox,
-    disconnectRoblox,
-    connectStudio,
-    disconnectStudio,
-  } = BM;
+  const { $, toast, getState, subscribe } = BM;
+
+  const settings = () => BM.settingsController;
+  const connections = () => BM.connectionController;
 
   const el = {};
 
@@ -82,11 +72,10 @@
   }
 
   function paintAi(view) {
-    const { settings } = view;
-    const provider = findProvider(settings.provider);
+    const provider = settings().getProvider(view.settings.provider);
 
-    fillOptions(el.provider, BM.PROVIDERS, settings.provider);
-    fillOptions(el.model, provider.models, settings.model);
+    fillOptions(el.provider, settings().getProviders(), view.settings.provider);
+    fillOptions(el.model, settings().getModels(provider.id), view.settings.model);
     if (el.modelHint) el.modelHint.textContent = provider.label;
   }
 
@@ -145,13 +134,15 @@
      ------------------------------------------------------------------------ */
   function bindEvents() {
     el.provider?.addEventListener("change", () => {
-      setProvider(el.provider.value);
-      toast("Provider updated");
+      settings().setProvider(el.provider.value).then((result) => {
+        toast(BM.isOk(result) ? "Provider updated" : result.error.message);
+      });
     });
 
     el.model?.addEventListener("change", () => {
-      setModel(el.model.value);
-      toast("Model updated");
+      settings().setModel(el.model.value).then((result) => {
+        toast(BM.isOk(result) ? "Model updated" : result.error.message);
+      });
     });
 
     BM.bindKeyReveal(el.apiKey, el.apiKeyToggle);
@@ -159,53 +150,55 @@
       BM.setApiKeyPresent(Boolean(el.apiKey.value.trim()));
     });
 
-    el.connectRoblox?.addEventListener("click", async () => {
-      if (getState().connections.roblox.status === "connected") {
-        disconnectRoblox();
-        toast("Roblox disconnected");
-        return;
-      }
-      await connectRoblox();
-      toast("Roblox connection simulated");
-    });
-
-    el.connectStudio?.addEventListener("click", async () => {
-      if (getState().connections.studio.status === "connected") {
-        disconnectStudio();
-        toast("Studio disconnected");
-        return;
-      }
-      await connectStudio();
-      toast("Studio bridge simulated");
-    });
+    el.connectRoblox?.addEventListener("click", () => toggleConnection("roblox"));
+    el.connectStudio?.addEventListener("click", () => toggleConnection("studio"));
 
     document.querySelectorAll("button[data-motion]").forEach((button) => {
       button.addEventListener("click", () => {
         const mode = button.dataset.motion;
         if (mode === getState().motion) return;
-        setMotion(mode);
+        settings().setMotion(mode);
         toast(mode === "reduced" ? "Motion reduced" : "Full motion restored");
       });
     });
 
     el.autoFix?.addEventListener("click", () => {
       const next = el.autoFix.getAttribute("aria-checked") !== "true";
-      setPreference("autoFix", next);
+      settings().setPreference("autoFix", next);
       toast(next ? "Auto-fix on" : "Auto-fix off");
     });
 
     el.hints?.addEventListener("click", () => {
       const next = el.hints.getAttribute("aria-checked") !== "true";
-      setPreference("hints", next);
+      settings().setPreference("hints", next);
       toast(next ? "Hints on" : "Hints off");
     });
 
     el.reset?.addEventListener("click", () => {
-      resetSettings();
-      if (el.apiKey) el.apiKey.value = "";
-      BM.setApiKeyPresent(false);
-      toast("Settings reset");
+      settings().reset().then((result) => {
+        if (!BM.isOk(result)) return toast(result.error.message || "Settings could not be reset.");
+        if (el.apiKey) el.apiKey.value = "";
+        BM.setApiKeyPresent(false);
+        toast("Settings reset");
+      });
     });
+  }
+
+  /** One connection path for both pages. */
+  async function toggleConnection(target) {
+    const wasConnected = connections().isConnected(target);
+    const result = await connections().toggle(target);
+
+    if (!BM.isOk(result)) {
+      toast(result.error.message || "The connection was not available.");
+      return;
+    }
+
+    toast(
+      wasConnected
+        ? `${connections().label(target)} disconnected`
+        : `${target === "roblox" ? "Roblox connection" : "Studio bridge"} simulated`
+    );
   }
 
   /* ------------------------------------------------------------------------

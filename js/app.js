@@ -1,12 +1,18 @@
 /* ==========================================================================
    BuildMind — app.js
-   Shared frontend foundation: brand assets, ambient choreography, reveal
-   observers, storage helpers and the mock BuildMind state layer.
+   The application shell and boot sequence: brand marks, ambient choreography,
+   reveals, page transitions, toasts, the world visualizer and the helper
+   functions every page shares.
 
-   Every "connected" or "building" state below is simulated in the browser.
-   There are no network requests, no backend, no AI calls and no Roblox calls.
-   The public functions (connectRoblox, connectStudio, startBuild, ...) are the
-   seams where real integrations will be attached later.
+   State itself lives in js/state.js, integrations in js/services/ and the
+   orchestration between them in js/controllers/. This file only boots:
+     1. apply the motion preference (before paint)
+     2. initialise the service layer
+     3. load state through the controllers
+     4. start cross-tab sync
+
+   Every "connected" or "building" state is simulated in the browser. There are
+   no network requests, no backend, no AI calls and no Roblox calls.
    ========================================================================== */
 
 (function () {
@@ -37,27 +43,6 @@
 
   function prefersReducedMotion() {
     return media("(prefers-reduced-motion: reduce)").matches;
-  }
-
-  /** Read a JSON blob from localStorage without throwing in private modes. */
-  function readStore(key, fallback) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) return fallback;
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? { ...fallback, ...parsed } : fallback;
-    } catch (err) {
-      return fallback;
-    }
-  }
-
-  function writeStore(key, value) {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (err) {
-      return false;
-    }
   }
 
   /* ------------------------------------------------------------------------
@@ -595,12 +580,31 @@
   /* ------------------------------------------------------------------------
      Boot
      ------------------------------------------------------------------------ */
+  /**
+   * Initialise every service boundary once, then load state through the
+   * controllers. Order matters: state must exist before controllers load,
+   * and services must be initialised before a controller talks to them.
+   */
+  function initServices() {
+    BM.getState(); // touches state before any service does
+
+    const ai = BM.aiService;
+    ai?.initialize().then((result) => {
+      const mode = BM.isOk(result) && result.data ? result.data.mode : "unknown";
+      BM.setServiceMode(mode, BM.isOk(result));
+    });
+
+    // Project and settings controllers own the persisted slices.
+    BM.settingsController?.load();
+    BM.projectController?.load();
+  }
+
   function boot() {
     document.documentElement.classList.add("js");
 
-    // Motion is the one piece of state the shell needs before page scripts run.
-    const prefs = readStore("buildmind.preferences.v1", { motion: "full" });
-    applyMotionPreference(prefs.motion === "reduced" ? "reduced" : "full");
+    // Motion is the one preference the shell needs before paint. Reading it is
+    // the storage adapter's job, not the shell's.
+    applyMotionPreference("full");
 
     initAmbient();
     initHeader();
@@ -609,6 +613,7 @@
 
     // Load the shared state once for every page; page scripts only render it.
     BM.loadState?.();
+    BM.initServices();
     BM.initSync?.();
 
     // Fill in shared brand marks and mark the active nav item defensively.
@@ -640,10 +645,9 @@
     applyMotionPreference,
     media,
     toast,
-    readStore,
-    writeStore,
     mountWorld,
     updateWorld,
     startWorldPreview,
+    initServices,
   });
 })();

@@ -2,9 +2,13 @@
    BuildMind — projects.js
    A renderer over the project slice of js/state.js.
 
-   Cards, filters and empty states are all painted from state, so filtering
-   never mutates the data and a completed simulated build appears here without
-   a reload. Projects are local mock data; no real game exists.
+   This file never builds a project object and never edits the array. Reads
+   come from state; filter changes go to the project controller. Persistence
+   and validation belong to projectService.
+
+   Cards, filters and empty states are painted from state, so filtering never
+   mutates the data and a completed simulated build appears here without a
+   reload. Projects are local mock data; no real game exists.
    ========================================================================== */
 
 (function () {
@@ -13,7 +17,9 @@
   const BM = window.BuildMind;
   if (!BM) return;
 
-  const { $, PROJECT_STATUS, getState, subscribe, loadProjects, setProjectFilter, projectFilters } = BM;
+  const { $, PROJECT_STATUS, getState, subscribe } = BM;
+
+  const controller = () => BM.projectController;
 
   const el = {};
 
@@ -87,7 +93,7 @@
   function renderFilters(view) {
     if (!el.filters) return;
 
-    const filters = projectFilters();
+    const filters = controller().filters();
     // A filter that no longer has any matches falls back to "All".
     const active = filters.some((f) => f.id === view.projectsFilter) ? view.projectsFilter : "all";
 
@@ -104,14 +110,12 @@
     const view = getState();
     if (!el.grid) return;
 
-    const filters = projectFilters();
+    const filters = controller().filters();
     const active = filters.some((f) => f.id === view.projectsFilter) ? view.projectsFilter : "all";
 
     renderFilters(view);
 
-    const list = active === "all"
-      ? view.projects
-      : view.projects.filter((project) => project.status === active);
+    const list = controller().list(active);
 
     el.grid.innerHTML = "";
 
@@ -148,7 +152,7 @@
   function bindEvents() {
     // Delegated: the filter buttons are re-rendered from state.
     $("#projects-reset-filter")?.addEventListener("click", () => {
-      setProjectFilter("all");
+      controller().setFilter("all");
       announce("Showing all projects");
     });
 
@@ -156,7 +160,7 @@
       const button = event.target.closest("[data-filter]");
       if (!button) return;
 
-      setProjectFilter(button.dataset.filter);
+      controller().setFilter(button.dataset.filter);
       const label = button.textContent.trim();
       announce(label === "All" ? "Showing all projects" : `Showing ${label.toLowerCase()} projects`);
     });
@@ -169,9 +173,10 @@
     cache();
     bindEvents();
 
-    // A stored list is already in state; loadProjects() is the seam that will
-    // fetch real projects later.
-    if (!getState().projects.length) loadProjects();
+    // The list is normally loaded by boot(); reload when this page arrives
+    // before that (or after a full navigation) so the view is never empty
+    // by accident.
+    if (!getState().projects.length) controller().load();
 
     subscribe((view, changed) => {
       if (!changed.length || changed.includes("projects") || changed.includes("projectsFilter")) {
