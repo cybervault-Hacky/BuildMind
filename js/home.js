@@ -26,12 +26,19 @@
 
     let index = 0;
 
-    window.setInterval(() => {
-      if (document.hidden) return;
+    const paint = () => {
       steps.forEach((step, i) => {
         step.classList.toggle("is-live", i === index);
+        step.classList.toggle("is-past", i < index);
       });
+    };
+
+    paint();
+
+    window.setInterval(() => {
+      if (document.hidden) return;
       index = (index + 1) % steps.length;
+      paint();
     }, 2200);
   }
 

@@ -728,10 +728,6 @@ body.is-sheet-open {
   border-radius: var(--r-md);
 }
 
-.btn--block {
-  width: 100%;
-}
-
 /* Loading state */
 .btn.is-loading {
   color: transparent !important;
@@ -1229,38 +1225,12 @@ body.is-sheet-open {
 }
 
 .hero__meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px var(--s-4);
   margin-top: var(--s-7);
   padding-top: var(--s-5);
   border-top: 1px solid var(--line);
-  max-width: 440px;
-}
-
-.hero__meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  max-width: 460px;
   font-size: 12.5px;
   color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.hero__meta-item::before {
-  content: "";
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-  opacity: 0.55;
-}
-
-.hero__meta-sep {
-  width: 1px;
-  height: 12px;
-  background: var(--line-strong);
 }
 
 /* Hero visual container */
@@ -1325,6 +1295,11 @@ body.is-sheet-open {
   color: var(--accent);
   border-color: var(--accent-line);
   background: var(--accent-soft);
+}
+
+.pipeline__step.is-past .pipeline__step-num {
+  color: var(--text-muted);
+  border-color: rgba(139, 147, 255, 0.22);
 }
 
 .pipeline__arrow {

@@ -120,8 +120,7 @@
 
   function visibleProjects() {
     if (filter === "all") return projects;
-    if (filter === "building") return projects.filter((p) => p.status === "building");
-    return projects.filter((p) => p.status === filter);
+    return projects.filter((project) => project.status === filter);
   }
 
   function render() {
