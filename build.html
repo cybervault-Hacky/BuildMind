@@ -266,43 +266,16 @@
               <div class="panel__body">
                 <div class="worldviz worldviz--panel" data-world id="build-world"></div>
 
-                <ol class="timeline" id="build-timeline">
-                  <li class="timeline__step is-pending" data-stage="0">
-                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
-                    <span class="timeline__label">Understanding idea</span>
-                    <span class="timeline__meta" data-meta></span>
-                  </li>
-                  <li class="timeline__step is-pending" data-stage="1">
-                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
-                    <span class="timeline__label">Planning</span>
-                    <span class="timeline__meta" data-meta></span>
-                  </li>
-                  <li class="timeline__step is-pending" data-stage="2">
-                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
-                    <span class="timeline__label">Building</span>
-                    <span class="timeline__meta" data-meta></span>
-                  </li>
-                  <li class="timeline__step is-pending" data-stage="3">
-                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
-                    <span class="timeline__label">Testing</span>
-                    <span class="timeline__meta" data-meta></span>
-                  </li>
-                  <li class="timeline__step is-pending" data-stage="4">
-                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
-                    <span class="timeline__label">Fixing</span>
-                    <span class="timeline__meta" data-meta></span>
-                  </li>
-                  <li class="timeline__step is-pending" data-stage="5">
-                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
-                    <span class="timeline__label">Validating</span>
-                    <span class="timeline__meta" data-meta></span>
-                  </li>
-                  <li class="timeline__step is-pending" data-stage="6">
-                    <span class="timeline__rail"><span class="timeline__dot"></span></span>
-                    <span class="timeline__label">Complete</span>
-                    <span class="timeline__meta" data-meta></span>
-                  </li>
-                </ol>
+                <!-- Current stage: title + description + index, never colour alone -->
+                <div class="stage-now" id="stage-now" data-status="ready">
+                  <span class="stage-now__top">
+                    <span class="stage-now__label" id="stage-now-label">Ready</span>
+                    <span class="stage-now__index" id="stage-now-index"></span>
+                  </span>
+                  <span class="stage-now__desc" id="stage-now-desc">Describe a game to begin</span>
+                </div>
+
+                <ol class="timeline" id="build-timeline"></ol>
               </div>
             </div>
 
@@ -323,6 +296,62 @@
                     <span id="progress-state">Ready</span>
                     <span id="progress-time">—</span>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Agent activity feed — simulated log lines, newest first -->
+            <div class="panel" id="activity-feed-panel" data-reveal="fade" data-reveal-delay="180" hidden>
+              <div class="panel__head">
+                <span class="panel__title">Log</span>
+                <span class="log__count" id="activity-count">0</span>
+              </div>
+              <div class="panel__body">
+                <ol class="log" id="activity-feed" aria-label="Simulated build log"
+                    aria-live="off"></ol>
+                <p class="log__empty" id="activity-empty">
+                  Activity appears here while a build runs.
+                </p>
+              </div>
+            </div>
+
+            <!-- Result summary — only after a completed run -->
+            <div class="panel panel--result" id="build-result" data-reveal="fade"
+                 data-reveal-delay="100" hidden aria-labelledby="result-title">
+              <div class="panel__head">
+                <span class="panel__title" id="result-title">Build complete</span>
+                <span class="status status--ready" id="result-status">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Complete</span>
+                </span>
+              </div>
+              <div class="panel__body">
+                <dl class="result">
+                  <div class="result__row">
+                    <dt>Game concept</dt>
+                    <dd id="result-name">—</dd>
+                  </div>
+                  <div class="result__row">
+                    <dt>Build status</dt>
+                    <dd id="result-build">Complete</dd>
+                  </div>
+                  <div class="result__row">
+                    <dt>Validation</dt>
+                    <dd id="result-validation">Passed</dd>
+                  </div>
+                  <div class="result__row">
+                    <dt>Created</dt>
+                    <dd id="result-created">Just now</dd>
+                  </div>
+                </dl>
+                <p class="result__note">Simulated result — nothing was published.</p>
+                <div class="result__actions">
+                  <a class="btn btn--primary btn--sm" id="result-open" href="projects.html">
+                    Open project
+                  </a>
+                  <button class="btn btn--ghost btn--sm" type="button" id="result-again">
+                    Build again
+                  </button>
                 </div>
               </div>
             </div>

@@ -102,6 +102,17 @@
 }
 
 /* SVG world construction motion */
+@keyframes log-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes wv-dash {
   to {
     stroke-dashoffset: -64;
@@ -436,4 +447,13 @@ html[data-motion-mode="reduced"] [data-reveal],
 html[data-motion-mode="reduced"] [data-stagger] > * {
   opacity: 1 !important;
   transform: none !important;
+}
+
+/* Phase 5 components: the state is carried by text, so motion is optional */
+html[data-motion-mode="reduced"] .log__item {
+  animation: none !important;
+}
+
+html[data-motion-mode="reduced"] .timeline__desc {
+  transition: none !important;
 }

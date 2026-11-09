@@ -8,27 +8,37 @@
      initialize()                              → { ready, mode, providers }
      getProviders()                            → providers
      getModels(providerId)                     → models
-     validateConfiguration({provider,model,hasKey}) → { valid, errors }
-     startBuild(request)                       → { runId, prompt, provider, model }
+     validateConfiguration({provider,model,hasKey,prompt}) → { valid, errors }
+     startBuild(request)                       → { runId, prompt, provider, model, plan }
      stopBuild(runId)                          → { runId, stopped }
      subscribe(listener)                       → unsubscribe
      isAvailable()                             → boolean
 
-   `startBuild` emits progress events through `subscribe`:
+   Event contract — every event carries the run it belongs to:
 
-     { type: "start",  run  }
-     { type: "stage",  run  }   stage advanced (index, id, label, status, progress)
-     { type: "done",   run  }   finished — nothing was published anywhere
-     { type: "error",  run, error }
-     { type: "cancel", run  }
+     { type: "start",    runId, run }
+     { type: "stage",    runId, stageIndex, stageId, stageLabel, status,
+                         progress, description, activity[] }
+     { type: "progress", runId, stageIndex, progress }
+     { type: "activity", runId, stageIndex, message, at }
+     { type: "done",     runId, run }
+     { type: "error",    runId, error }
+     { type: "cancel",   runId, run }
+
+   Consumers must match `runId` against their active run and ignore anything
+   else — a cancelled run can keep emitting for one more tick internally.
+   After `start` there is a short PREPARE_MS beat before the first `stage`, so
+   the UI can show a "preparing" acknowledgement.
 
    The service holds no UI state. It knows a run only while it is working on
-   it, and it forgets everything the moment the run ends. Replacing this file
-   with `openaiAIService.js` (or a router) is the whole integration job: the
-   store and the renderers do not change.
+   it and forgets it the moment the run ends. Replacing this file with
+   `openaiAIService.js` (or a router) is the whole integration job: the store
+   and the renderers do not change.
 
    Nothing here performs a network request, reads a key or invents a model
-   response. Stages are timed, not generated.
+   response. Progress is interpolated between stage targets so the bar moves
+   smoothly, and every activity line describes an internal planning step —
+   never a real compilation, upload or deployment.
    ========================================================================== */
 
 (function () {
@@ -37,11 +47,21 @@
   const BM = window.BuildMind;
   if (!BM) return;
 
-  const { createService, serviceOk: ok, serviceFail: fail, ERROR_TYPES, BUILD_STAGES } = BM;
+  const { createService, serviceOk: ok, serviceFail: fail, ERROR_TYPES, BUILD_STAGES, STAGE_INDEX } = BM;
   const catalog = BM.providerCatalog;
 
   const MIN_PROMPT = 8;
   const MAX_PROMPT = 400;
+
+  /** How often progress interpolates towards the next stage target. */
+  const TICK_MS = 120;
+
+  /**
+   * Deliberate beat between accepting the request and reporting the first
+   * stage, so the UI can acknowledge the click ("Preparing build") instead of
+   * jumping straight from idle to stage one.
+   */
+  const PREPARE_MS = 420;
 
   /** Active runs, keyed by runId. Runtime bookkeeping only — not UI state. */
   const runs = new Map();
@@ -123,17 +143,63 @@
   }
 
   /* ------------------------------------------------------------------------
+     Run planning
+
+     Each run gets a deterministic plan derived from the prompt, so the same
+     idea behaves the same way and nothing is random per render. Some runs
+     take the short path (test → validate) and some loop through fixing.
+     ------------------------------------------------------------------------ */
+  function hashPrompt(prompt) {
+    let hash = 0;
+    for (let i = 0; i < prompt.length; i += 1) {
+      hash = (hash * 31 + prompt.charCodeAt(i)) % 1000003;
+    }
+    return hash;
+  }
+
+  function planFor(prompt) {
+    const hash = hashPrompt(prompt);
+    // Roughly two runs in three loop through the fixing stage; the rest go
+    // straight from testing to validation.
+    const needsFix = hash % 3 !== 0;
+
+    const sequence = ["understand", "plan", "build", "test"];
+    if (needsFix) sequence.push("fix", "test");
+    sequence.push("validate");
+
+    return {
+      sequence,
+      needsFix,
+      // Small pace variation stops repeated runs from feeling scripted.
+      pace: 0.9 + ((hash >> 3) % 5) * 0.05,
+    };
+  }
+
+  /* ------------------------------------------------------------------------
      Runs
      ------------------------------------------------------------------------ */
+  function stopTimers(run) {
+    window.clearTimeout(run.stageTimer);
+    window.clearInterval(run.tickTimer);
+    run.stageTimer = 0;
+    run.tickTimer = 0;
+  }
+
   function finish(runId) {
     const run = runs.get(runId);
     if (!run) return;
-    window.clearTimeout(run.timer);
+    stopTimers(run);
     runs.delete(runId);
   }
 
   function startBuild(request) {
     const input = normalizeRequest(request);
+
+    // A service-level backstop: one simulated run at a time, whatever the
+    // caller does. Duplicate clicks can never stack runs.
+    if (runs.size > 0) {
+      return fail(ERROR_TYPES.OPERATION, "A build is already running.", { duplicate: true });
+    }
 
     if (!input.prompt) {
       return fail(ERROR_TYPES.VALIDATION, "Describe the game you want to build.", {
@@ -152,46 +218,120 @@
     }
 
     runCounter += 1;
+    const plan = planFor(input.prompt);
     const run = {
       runId: `run-${runCounter}`,
       prompt: input.prompt,
       provider: provider.id,
       model,
       startedAt: Date.now(),
-      stage: -1,
+      plan,
+      sequenceIndex: -1,
+      stageIndex: -1,
+      activityIndex: -1,
+      progress: 0,
       cancelled: false,
       done: false,
-      timer: 0,
+      stageTimer: 0,
+      tickTimer: 0,
     };
 
     runs.set(run.runId, run);
-    emit({ type: "start", run: publicRun(run) });
+    emit({ type: "start", runId: run.runId, run: publicRun(run) });
 
-    // The first stage is emitted on the next tick, never synchronously, so a
-    // caller that subscribes after `startBuild()` resolves still sees it.
-    run.timer = window.setTimeout(() => advance(run), 0);
+    // The first stage is emitted after a short preparation beat, never
+    // synchronously, so a caller that subscribes after `startBuild()` resolves
+    // still sees every event.
+    run.stageTimer = window.setTimeout(() => advance(run), PREPARE_MS);
 
-    return ok({ runId: run.runId, prompt: run.prompt, provider: run.provider, model: run.model });
+    return ok({ runId: run.runId, prompt: run.prompt, provider: run.provider, model: run.model, plan });
   }
 
+  /** Move to the next stage in this run's own sequence. */
   function advance(run) {
     if (run.cancelled || run.done) return;
 
-    run.stage += 1;
-    const stage = BUILD_STAGES[run.stage];
+    run.sequenceIndex += 1;
+    const stageId = run.plan.sequence[run.sequenceIndex];
 
-    // All seven stages are reported, including the final "complete" one; the
-    // store decides which state each stage maps to.
-    emit({ type: "stage", run: publicRun(run) });
-
-    if (run.stage >= BUILD_STAGES.length - 1) {
+    if (!stageId) {
       run.done = true;
       finish(run.runId);
-      emit({ type: "done", run: publicRun(run) });
+      emit({ type: "done", runId: run.runId, run: publicRun(run) });
       return;
     }
 
-    run.timer = window.setTimeout(() => advance(run), stage.ms);
+    const stageIndex = STAGE_INDEX[stageId];
+    const stage = BUILD_STAGES[stageIndex];
+
+    run.stageIndex = stageIndex;
+    run.activityIndex = -1;
+    startInterpolation(run, stage);
+
+    emit({
+      type: "stage",
+      runId: run.runId,
+      stageIndex,
+      stageId,
+      stageLabel: stage.label,
+      description: stage.description,
+      status: stage.status,
+      progress: Math.max(stage.progress, run.progress),
+      activity: stage.activity.slice(),
+    });
+
+    run.stageTimer = window.setTimeout(() => advance(run), Math.round(stage.ms * run.plan.pace));
+  }
+
+  /**
+   * Walk progress towards the stage target in small steps so the bar never
+   * jumps. Activity lines are released on the same tick as progress moves.
+   */
+  function startInterpolation(run, stage) {
+    window.clearInterval(run.tickTimer);
+
+    const from = run.progress;
+    // A repeat visit to a stage must not pull the bar backwards.
+    const to = Math.max(stage.progress, run.progress);
+    const duration = Math.max(240, Math.round(stage.ms * run.plan.pace));
+    const startedAt = Date.now();
+    const activityCount = stage.activity.length;
+
+    run.tickTimer = window.setInterval(() => {
+      if (run.cancelled || run.done) {
+        window.clearInterval(run.tickTimer);
+        return;
+      }
+
+      const elapsed = Date.now() - startedAt;
+      const ratio = Math.min(1, elapsed / duration);
+      // Ease-out so the final approach settles rather than snapping.
+      const eased = 1 - Math.pow(1 - ratio, 2);
+      const next = from + (to - from) * eased;
+
+      if (next > run.progress) {
+        run.progress = Math.min(to, next);
+        emit({ type: "progress", runId: run.runId, stageIndex: run.stageIndex, progress: run.progress });
+      }
+
+      // Release activity lines evenly across the stage.
+      const due = Math.min(activityCount, Math.floor(ratio * activityCount));
+      while (run.activityIndex + 1 < due) {
+        run.activityIndex += 1;
+        emit({
+          type: "activity",
+          runId: run.runId,
+          stageIndex: run.stageIndex,
+          message: stage.activity[run.activityIndex],
+          at: Date.now(),
+        });
+      }
+
+      if (ratio >= 1) {
+        window.clearInterval(run.tickTimer);
+        run.tickTimer = 0;
+      }
+    }, TICK_MS);
   }
 
   function stopBuild(runId) {
@@ -203,20 +343,38 @@
 
     run.cancelled = true;
     finish(runId);
-    emit({ type: "cancel", run: publicRun(run) });
+    emit({ type: "cancel", runId: run.runId, run: publicRun(run) });
     return ok({ runId, stopped: true });
   }
 
+  /** Simulated failure — the UI and tests use this to prove recovery. */
+  function failBuild(runId, message) {
+    const run = runs.get(runId);
+    if (!run) return ok({ runId: runId || null, failed: false });
+
+    stopTimers(run);
+    runs.delete(runId);
+    emit({
+      type: "error",
+      runId: run.runId,
+      error: { type: ERROR_TYPES.OPERATION, message: message || "The simulated run stopped unexpectedly." },
+      run: publicRun(run),
+    });
+    return ok({ runId, failed: true });
+  }
+
   function publicRun(run) {
-    const stage = BUILD_STAGES[run.stage] || null;
+    const stage = BUILD_STAGES[run.stageIndex] || null;
     return {
       runId: run.runId,
       prompt: run.prompt,
       provider: run.provider,
       model: run.model,
-      stageIndex: run.stage,
-      stage: stage ? { ...stage } : null,
+      stageIndex: run.stageIndex,
+      stage: stage ? { ...stage, activity: stage.activity.slice() } : null,
       stageCount: BUILD_STAGES.length,
+      progress: run.progress,
+      needsFix: run.plan.needsFix,
       startedAt: run.startedAt,
     };
   }
@@ -231,6 +389,11 @@
     return Array.from(runs.keys());
   }
 
+  /** The plan a run will follow — exposed so tests can assert both paths. */
+  function planForPrompt(prompt) {
+    return ok(planFor(String(prompt || "")));
+  }
+
   BM.aiService = createService("mockAIService", {
     mode: "mock",
     initialize,
@@ -239,11 +402,13 @@
     validateConfiguration,
     startBuild,
     stopBuild,
+    failBuild,
     subscribe,
     isAvailable,
+    planForPrompt,
     _activeRuns: activeRuns,
     _reset() {
-      runs.forEach((run) => window.clearTimeout(run.timer));
+      runs.forEach((run) => stopTimers(run));
       runs.clear();
       listeners.clear();
       runCounter = 0;

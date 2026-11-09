@@ -45,8 +45,14 @@
   const local = {
     exampleIndex: Math.floor(Math.random() * 4),
     lastRunId: -1,
+    lastStatus: "",
+    lastMarker: "",
   };
 
+  const LAST_INDEX = BUILD_STAGES.length - 1;
+
+  // Concise prompts that show the range of ideas BuildMind understands.
+  // Clicking one only fills the composer; it never starts a build.
   const EXAMPLES = [
     "Create a multiplayer survival game on a floating island.",
     "Make an obby with moving platforms, checkpoints and a timer.",
@@ -91,6 +97,23 @@
     el.studioStatus = $("#studio-status");
     el.studioSub = $("#studio-sub");
     el.connectStudioBtn = $("#connect-studio");
+
+    // Phase 5: current stage, activity feed, result summary
+    el.stageNow = $("#stage-now");
+    el.stageNowLabel = $("#stage-now-label");
+    el.stageNowDesc = $("#stage-now-desc");
+    el.stageNowIndex = $("#stage-now-index");
+    el.feedPanel = $("#activity-feed-panel");
+    el.feed = $("#activity-feed");
+    el.feedEmpty = $("#activity-empty");
+    el.feedCount = $("#activity-count");
+    el.result = $("#build-result");
+    el.resultName = $("#result-name");
+    el.resultBuild = $("#result-build");
+    el.resultValidation = $("#result-validation");
+    el.resultCreated = $("#result-created");
+    el.resultOpen = $("#result-open");
+    el.resultAgain = $("#result-again");
   }
 
   /* ------------------------------------------------------------------------
@@ -146,9 +169,12 @@
 
     el.timeline.innerHTML = BUILD_STAGES.map(
       (stage, index) => `
-        <li class="timeline__step" data-stage="${index}">
+        <li class="timeline__step" data-stage="${index}" data-stage-id="${stage.id}">
           <span class="timeline__rail"><span class="timeline__dot"></span></span>
-          <span class="timeline__label">${stage.label}</span>
+          <span class="timeline__body">
+            <span class="timeline__label">${stage.label}</span>
+            <span class="timeline__desc">${stage.description}</span>
+          </span>
           <span class="timeline__meta" data-meta></span>
         </li>`
     ).join("");
@@ -167,26 +193,41 @@
   function paintTimeline(build) {
     if (!el.steps) return;
 
-    const { status, stage } = build;
+    const { status, stage, visits } = build;
     const finished = status === BUILD.COMPLETE;
     const failed = status === BUILD.ERROR;
-    const current = RUNNING_STATUSES.includes(status) ? stage : -1;
+    const running = RUNNING_STATUSES.includes(status);
+    const current = running || failed ? stage : finished ? LAST_INDEX : -1;
 
     el.steps.forEach((step, i) => {
-      step.classList.remove("is-pending", "is-active", "is-done", "is-complete", "is-visited");
+      const stageId = BUILD_STAGES[i] ? BUILD_STAGES[i].id : "";
+      const visited = Boolean(visits && visits[stageId]);
+
+      step.classList.remove("is-pending", "is-active", "is-done", "is-complete", "is-failed", "is-visited");
+      step.removeAttribute("aria-current");
 
       const meta = $("[data-meta]", step);
       if (meta) meta.textContent = "";
 
       if (finished) {
-        step.classList.add(i === stage ? "is-complete" : "is-done");
-        if (meta) meta.textContent = i === stage ? "Ready" : "Done";
+        if (i === LAST_INDEX) {
+          step.classList.add("is-complete");
+          if (meta) meta.textContent = "Ready";
+        } else if (visited) {
+          step.classList.add("is-done");
+          if (meta) meta.textContent = "Done";
+        }
         return;
       }
 
-      if (failed && i === stage) {
-        step.classList.add("is-failed");
-        if (meta) meta.textContent = "Failed";
+      if (failed) {
+        if (i < current && visited) {
+          step.classList.add("is-done");
+          if (meta) meta.textContent = "Done";
+        } else if (i === current) {
+          step.classList.add("is-failed");
+          if (meta) meta.textContent = "Failed";
+        }
         return;
       }
 
@@ -195,16 +236,129 @@
         return;
       }
 
-      if (i < current) {
-        step.classList.add("is-done");
-        if (meta) meta.textContent = "Done";
-      } else if (i === current) {
+      if (i === current) {
         step.classList.add("is-active");
-        if (meta) meta.textContent = "Working";
+        if (visited && visits[stageId] > 1) step.classList.add("is-visited");
+        step.setAttribute("aria-current", "step");
+        if (meta) meta.textContent = "Now";
+      } else if (visited) {
+        step.classList.add("is-done");
+        if (meta) meta.textContent = visits[stageId] > 1 ? "×2" : "Done";
       } else {
         step.classList.add("is-pending");
       }
     });
+  }
+
+  /** The unmistakable current stage: title, description, index, status. */
+  function paintStageNow(build) {
+    if (!el.stageNow) return;
+
+    const running = RUNNING_STATUSES.includes(build.status);
+    const preparing = build.phase === "preparing";
+    const finished = build.status === BUILD.COMPLETE;
+    const failed = build.status === BUILD.ERROR;
+
+    let label = "Ready";
+    let description = "Describe a game to begin";
+    let index = "";
+
+    if (preparing) {
+      label = "Preparing build";
+      description = "Getting ready to start";
+    } else if (running) {
+      const stage = BUILD_STAGES[build.stage];
+      label = build.stageLabel || (stage ? stage.label : "Building");
+      description = build.stageDescription || (stage ? stage.description : "");
+      index = `${build.stage + 1} of ${BUILD_STAGES.length}`;
+    } else if (finished) {
+      label = "Complete";
+      description = "Build ready for review";
+      index = `${BUILD_STAGES.length} of ${BUILD_STAGES.length}`;
+    } else if (failed) {
+      label = "Build could not be completed";
+      description = "Try again — nothing was published";
+    } else if (build.status === BUILD.STOPPED) {
+      label = "Build stopped";
+      description = "The build was stopped before completion";
+    } else if (build.stage >= 0) {
+      // A finished-but-reset run keeps its last stage context out of the way.
+      label = "Ready";
+      description = "Describe a game to begin";
+    }
+
+    el.stageNowLabel.textContent = label;
+    el.stageNowDesc.textContent = description;
+    el.stageNowIndex.textContent = index;
+    el.stageNow.dataset.status = preparing ? "preparing" : running ? "running" : build.status;
+  }
+
+  /** Agent activity feed: newest first, capped, no per-tick rebuilds. */
+  function paintActivity(build) {
+    if (!el.feed) return;
+
+    const activity = build.activity || [];
+    const runActive =
+      RUNNING_STATUSES.includes(build.status) || build.phase === "preparing" || build.status === BUILD.COMPLETE;
+
+    if (el.feedPanel) el.feedPanel.hidden = activity.length === 0;
+    if (el.feedEmpty) el.feedEmpty.hidden = activity.length > 0;
+    if (el.feedCount) el.feedCount.textContent = activity.length ? String(activity.length) : "";
+
+    // Only rebuild when the newest entry actually changed.
+    const newest = activity.length ? activity[activity.length - 1].id : "";
+    if (el.feed.dataset.last === newest) return;
+    el.feed.dataset.last = newest;
+
+    const fragment = document.createDocumentFragment();
+    activity
+      .slice()
+      .reverse()
+      .forEach((entry) => {
+        const item = document.createElement("li");
+        item.className = "log__item";
+        item.dataset.stage = entry.stage || "";
+
+        const dot = document.createElement("span");
+        dot.className = "log__dot";
+        dot.setAttribute("aria-hidden", "true");
+
+        const text = document.createElement("span");
+        text.className = "log__text";
+        text.textContent = entry.message;
+
+        item.appendChild(dot);
+        item.appendChild(text);
+        fragment.appendChild(item);
+      });
+
+    el.feed.innerHTML = "";
+    el.feed.appendChild(fragment);
+    // A completed run leaves the feed in place; a stopped one clears on reset.
+    el.feed.dataset.live = runActive ? "true" : "false";
+  }
+
+  /** Result summary — only after a completed run, never after stop or error. */
+  function paintResult(build) {
+    if (!el.result) return;
+
+    const result = build.result;
+    const show = build.status === BUILD.COMPLETE && Boolean(result);
+
+    el.result.hidden = !show;
+    if (!show) return;
+
+    if (el.resultName) el.resultName.textContent = result.name || "—";
+    if (el.resultBuild) el.resultBuild.textContent = "Complete";
+    if (el.resultValidation) {
+      el.resultValidation.textContent = result.validation === "passed" ? "Passed" : "Pending";
+    }
+    if (el.resultCreated) el.resultCreated.textContent = "Just now";
+    if (el.resultOpen) {
+      el.resultOpen.href = result.projectId
+        ? `build.html?project=${encodeURIComponent(result.projectId)}`
+        : "projects.html";
+    }
   }
 
   function paintStageMarks(build) {
@@ -261,18 +415,21 @@
     ready: ["Ready to build", "Simulated — nothing leaves your browser"],
     building: ["Building", "Simulated run — stop any time"],
     testing: ["Testing", "Simulated run — stop any time"],
-    fixing: ["Fixing", "Repairing simulated issues"],
+    fixing: ["Fixing", "Resolving detected issues"],
     validating: ["Validating", "Simulated run — stop any time"],
     complete: ["Build complete", "Added to Projects — simulated, nothing published"],
-    stopped: ["Stopped", "Nothing was published — start again any time"],
-    error: ["Something went wrong", "The simulated run failed — try again"],
+    stopped: ["Build stopped", "The build was stopped before completion"],
+    error: ["Build could not be completed", "Try again — nothing was published"],
   };
 
   function paintAction(build) {
     if (!el.buildButton) return;
 
-    const running = RUNNING_STATUSES.includes(build.status);
-    const hint = HINTS[build.status] || HINTS.ready;
+    const preparing = build.phase === "preparing";
+    const running = RUNNING_STATUSES.includes(build.status) || preparing;
+    const hint = preparing
+      ? ["Preparing build", "Starting the simulated run"]
+      : HINTS[build.status] || HINTS.ready;
 
     // Primary action label follows the state machine.
     let label = "Build Game";
@@ -283,7 +440,7 @@
     } else if (build.status === BUILD.COMPLETE) {
       label = "Build again";
     } else if (build.status === BUILD.STOPPED) {
-      label = "Start again";
+      label = "Build again";
     } else if (build.status === BUILD.ERROR) {
       label = "Try again";
     }
@@ -291,7 +448,13 @@
     el.buildButton.classList.toggle("btn--primary", !running);
     el.buildButton.classList.toggle("btn--ghost", running);
     el.buildButton.innerHTML = `${iconName}<span>${label}</span>`;
-    el.buildButton.setAttribute("aria-busy", String(running));
+    // Never `aria-busy` here: the button stays operable (it is the Stop
+    // control while running) and busy would also disable pointer events.
+    el.buildButton.removeAttribute("aria-busy");
+    el.buildButton.disabled = false;
+    // The markup ships the button hidden so there is never a dead action
+    // before the renderer runs; this is the one place it is revealed.
+    el.buildButton.hidden = false;
     el.buildButton.setAttribute(
       "aria-label",
       running ? "Stop the running build" : `${label} — simulated`
@@ -303,6 +466,7 @@
     if (el.buildBar) {
       el.buildBar.classList.toggle("is-running", running);
       el.buildBar.classList.toggle("is-error", build.status === BUILD.ERROR);
+      el.buildBar.classList.toggle("is-complete", build.status === BUILD.COMPLETE);
     }
 
     // Configuration is frozen only while a run is in flight.
@@ -457,7 +621,9 @@
   function handleBuildClick() {
     const build = getState().build;
 
-    if (RUNNING_STATUSES.includes(build.status)) {
+    // Covers the `preparing` beat as well as a live run: the second click is
+    // always a Stop, never a second build.
+    if (RUNNING_STATUSES.includes(build.status) || build.phase === "preparing") {
       BM.buildController.stop().then(() => toast("Build stopped"));
       return;
     }
@@ -548,6 +714,45 @@
     );
   }
 
+  /** One announcement per state edge, phrased for a screen reader. */
+  function announceActivity(build) {
+    if (build.phase === "preparing") {
+      announce("Preparing build");
+      return;
+    }
+
+    if (build.status === BUILD.COMPLETE) {
+      const name = build.result && build.result.name ? ` ${build.result.name}` : "";
+      announce(`Build complete.${name} Project created.`);
+      return;
+    }
+
+    if (build.status === BUILD.STOPPED) {
+      announce("Build stopped before completion. Nothing was published.");
+      return;
+    }
+
+    if (build.status === BUILD.ERROR) {
+      announce("Build could not be completed. Try again.");
+      return;
+    }
+
+    if (RUNNING_STATUSES.includes(build.status) && BUILD_STAGES[build.stage]) {
+      const stage = BUILD_STAGES[build.stage];
+      announce(`${stage.label}. ${build.stageDescription || stage.description}`);
+      return;
+    }
+
+    announce(`Build ${STATUS_LABEL[build.status].toLowerCase()}`);
+  }
+
+  /** Move focus to the result once, without stealing it mid-run. */
+  function focusResult() {
+    if (!el.result) return;
+    el.result.setAttribute("tabindex", "-1");
+    el.result.focus({ preventScroll: true });
+  }
+
   /* ------------------------------------------------------------------------
      Render — one entry point per state change
      ------------------------------------------------------------------------ */
@@ -556,9 +761,12 @@
 
     if (changed.includes("build") || changed.length === 0) {
       paintStatusPills(build);
+      paintStageNow(build);
       paintTimeline(build);
       paintStageMarks(build);
       paintProgress(build);
+      paintActivity(build);
+      paintResult(build);
       paintAction(build);
 
       // The visualizer only moves while a run is in flight.
@@ -588,13 +796,23 @@
         local.lastRunId = build.runId;
         clearErrors();
       }
-      announce(
-        `Build ${STATUS_LABEL[build.status].toLowerCase()}${
-          RUNNING_STATUSES.includes(build.status) && BUILD_STAGES[build.stage]
-            ? `: ${BUILD_STAGES[build.stage].label}`
-            : ""
-        }`
-      );
+
+      // Announce the meaningful edges only — not every progress tick.
+      const marker = `${build.status}:${build.phase}:${build.stage}`;
+      if (marker !== local.lastMarker) {
+        local.lastMarker = marker;
+        announceActivity(build);
+      }
+
+      // Move focus once, when a run settles, so keyboard users are not stranded.
+      if (build.status !== local.lastStatus) {
+        if (build.status === BUILD.COMPLETE && el.result && !el.result.hidden) {
+          focusResult();
+        } else if (build.status === BUILD.ERROR || build.status === BUILD.STOPPED) {
+          el.buildButton?.focus({ preventScroll: true });
+        }
+        local.lastStatus = build.status;
+      }
     }
   }
 
@@ -612,7 +830,7 @@
     el.prompt?.addEventListener("keydown", (event) => {
       if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") return;
       event.preventDefault();
-      if (BM.isRunning() || el.prompt.readOnly) return;
+      if (BM.buildController.isBusy() || el.prompt.readOnly) return;
       requestBuild();
     });
 
@@ -659,6 +877,13 @@
     // connections
     el.connectRobloxBtn?.addEventListener("click", () => toggleConnection("roblox"));
     el.connectStudioBtn?.addEventListener("click", () => toggleConnection("studio"));
+
+    // result actions: exactly two, both obvious
+    el.resultAgain?.addEventListener("click", () => requestBuild());
+    el.resultOpen?.addEventListener("click", () => {
+      // Deep link wins over the stored draft when opening a finished project.
+      if (!el.resultOpen.getAttribute("href")) el.resultOpen.href = "projects.html";
+    });
   }
 
   /* ------------------------------------------------------------------------

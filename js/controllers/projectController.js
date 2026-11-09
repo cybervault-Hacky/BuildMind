@@ -74,10 +74,10 @@
     const existing = BM.getState().projects.find((project) => project.name === name);
 
     if (existing) {
-      return update(existing.id, { status: "complete", updated: "Just now" });
+      return update(existing.id, { status: "complete", updated: "Just now", lastBuild: true });
     }
 
-    return create({ name, status: "complete", updated: "Just now" });
+    return create({ name, status: "complete", updated: "Just now", lastBuild: true });
   }
 
   /** Filters are derived from the data — never stored separately. */

@@ -50,7 +50,9 @@
     ready: [BUILD.BUILDING],
     building: [BUILD.TESTING, BUILD.BUILDING, BUILD.STOPPED, BUILD.ERROR],
     testing: [BUILD.FIXING, BUILD.VALIDATING, BUILD.STOPPED, BUILD.ERROR],
-    fixing: [BUILD.VALIDATING, BUILD.STOPPED, BUILD.ERROR],
+    // A fixing pass may hand back to testing before validation — that loop is
+    // the whole point of a fix. It is additive: no existing move is removed.
+    fixing: [BUILD.TESTING, BUILD.VALIDATING, BUILD.STOPPED, BUILD.ERROR],
     validating: [BUILD.COMPLETE, BUILD.STOPPED, BUILD.ERROR],
     complete: [BUILD.READY, BUILD.BUILDING],
     stopped: [BUILD.READY, BUILD.BUILDING],
@@ -117,6 +119,15 @@
       startedAt: 0,
       endedAt: 0,
       error: "",
+      // Phase 5 additions
+      phase: "ready",     // ready | preparing | running — "preparing" is the
+                          // moment between the click and the first stage
+      stageLabel: "",
+      stageDescription: "",
+      activity: [],       // [{ id, stage, message }] newest last
+      result: null,       // { name, projectId, status, validation, createdAt }
+      visits: {},         // stage id → times entered (a fixing loop revisits testing)
+      needsFix: false,
     },
     projects: [],
     projectsFilter: "all",
@@ -133,7 +144,12 @@
         roblox: { ...state.connections.roblox },
         studio: { ...state.connections.studio },
       },
-      build: { ...state.build },
+      build: {
+        ...state.build,
+        activity: state.build.activity.slice(),
+        result: state.build.result ? { ...state.build.result } : null,
+        visits: { ...state.build.visits },
+      },
       projects: state.projects.slice(),
       services: { ...state.services },
     };
@@ -285,20 +301,38 @@
     return projectFilters().some((item) => item.id === filter);
   }
 
-  /** Turn a prompt into a short project title, e.g. "Floating Island Survival". */
+  /* ------------------------------------------------------------------------
+     Project naming — deterministic, frontend-only, no model involved.
+
+     The goal is a short, readable card title. Three parts at most:
+       1. the distinctive words from the idea, minus filler
+       2. the genre word, always last when one is present
+     Two-word prompts therefore read naturally, and long prompts stay short.
+     ------------------------------------------------------------------------ */
   const NAME_FILLER = new Set([
     "a", "an", "the", "with", "and", "for", "of", "on", "in", "to", "where", "that",
-    "players", "player", "game", "games", "map", "level", "mode",
+    "players", "player", "game", "games", "map", "level", "mode", "some", "your", "my",
+    "create", "make", "build", "design", "generate", "please", "should", "can", "both",
+    "also", "into", "from", "has", "have", "use", "using", "based",
   ]);
 
-  const NAME_SCENE_WORDS = new Set(["survival", "obby", "tycoon", "arena", "racing", "horror"]);
+  const NAME_GENRES = ["survival", "obby", "tycoon", "arena", "racing", "horror", "simulator", "defense", "mining"];
+  const GENRE_SET = new Set(NAME_GENRES);
+  const MAX_NAME_WORDS = 3;
+
+  function titleCase(word) {
+    if (!word) return "";
+    // Keep hyphenated words readable ("Round-based").
+    return word
+      .split("-")
+      .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : part))
+      .join("-");
+  }
 
   function projectNameFromPrompt(prompt) {
     const cleaned = String(prompt || "")
-      .replace(/^(please\s+)?(create|make|build|design|generate)\s+/i, "")
-      .replace(/^(a|an|the)\s+/i, "")
-      .replace(/[.!?]+$/g, "")
       .replace(/\s+/g, " ")
+      .replace(/[.!?]+$/g, "")
       .trim();
 
     if (!cleaned) return "Untitled game";
@@ -308,18 +342,20 @@
       .map((word) => word.replace(/[^\w'-]/g, ""))
       .filter(Boolean);
 
-    const picked = words
-      .filter((word) => !NAME_FILLER.has(word.toLowerCase()) && !NAME_SCENE_WORDS.has(word.toLowerCase()))
-      .slice(0, 2);
-    const scene = words.find((word) => NAME_SCENE_WORDS.has(word.toLowerCase()));
+    // The genre word goes last, whatever position it held in the prompt.
+    const genre = words.find((word) => GENRE_SET.has(word.toLowerCase())) || "";
+    const distinctive = words.filter(
+      (word) => !NAME_FILLER.has(word.toLowerCase()) && word.toLowerCase() !== genre.toLowerCase()
+    );
 
-    const parts = picked.length ? picked : words.slice(0, 2);
-    if (scene && parts.indexOf(scene) === -1) parts.push(scene);
+    const parts = distinctive.slice(0, genre ? MAX_NAME_WORDS - 1 : MAX_NAME_WORDS);
+    if (genre) parts.push(genre);
 
-    const title = parts
-      .slice(0, 3)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+    const title = (parts.length ? parts : words.slice(0, MAX_NAME_WORDS))
+      .map(titleCase)
+      .join(" ")
+      .slice(0, 44)
+      .trim();
 
     return title || "Untitled game";
   }
@@ -345,11 +381,16 @@
     return (TRANSITIONS[from] || []).indexOf(to) !== -1;
   }
 
-  /** Apply a build patch only when the status move is legal. */
-  function updateBuild(patch) {
+  /**
+   * Apply a build patch only when the status move is legal.
+   * @param {object} patch
+   * @param {boolean} [skipCheck] used by callers that have already decided the
+   *   move is legal (a run stopped during the `preparing` beat, for instance)
+   */
+  function updateBuild(patch, skipCheck) {
     const next = { ...state.build, ...patch };
 
-    if (patch.status && patch.status !== state.build.status) {
+    if (!skipCheck && patch.status && patch.status !== state.build.status) {
       if (!canTransition(state.build.status, patch.status)) {
         console.warn(`[BuildMind] blocked build transition ${state.build.status} → ${patch.status}`);
         return false;
@@ -360,6 +401,8 @@
     notify(["build"]);
     return true;
   }
+
+  const MAX_ACTIVITY = 40;
 
   function emptyBuild(prompt, runId) {
     return {
@@ -373,11 +416,22 @@
       startedAt: 0,
       endedAt: 0,
       error: "",
+      phase: "ready",
+      stageLabel: "",
+      stageDescription: "",
+      activity: [],
+      result: null,
+      visits: {},
+      needsFix: false,
     };
   }
 
-  /** Controller: a run is starting. Resets to a clean run, then to building. */
-  function beginRun(config) {
+  /**
+   * Controller: a build has been requested.
+   * The machine stays `ready` but the phase becomes `preparing`, so the UI can
+   * acknowledge the click before the first stage arrives.
+   */
+  function prepareRun(config) {
     if (isRunning()) return false;
 
     const input = config || {};
@@ -386,60 +440,153 @@
     state.build = emptyBuild(String(input.prompt || "").trim(), runId);
     state.build.provider = input.provider || state.settings.provider;
     state.build.model = input.model || state.settings.model;
+    state.build.phase = "preparing";
+    state.build.needsFix = Boolean(input.needsFix);
     notify(["build"]);
-
-    return updateBuild({ status: BUILD.BUILDING, startedAt: Date.now() });
+    return true;
   }
 
-  /** Controller: the service reported a stage (index is never the last one). */
+  /** Controller: the service reported its first stage — the run is live. */
+  function beginRun(config) {
+    if (isRunning()) return false;
+
+    const input = config || {};
+    // `prepareRun` already reset the slice; this only moves it into building.
+    if (state.build.runId !== (input.runId || state.build.runId)) {
+      prepareRun(input);
+    }
+
+    return updateBuild({ status: BUILD.BUILDING, phase: "running", startedAt: Date.now() });
+  }
+
+  /** Controller: the service reported a stage. */
   function advanceRun(patch) {
     const input = patch || {};
     const index = Number.isInteger(input.stage) ? input.stage : state.build.stage;
     const stage = stages()[index];
+    const stageId = input.stageId || (stage ? stage.id : "");
+
+    const visits = { ...state.build.visits };
+    if (stageId) {
+      visits[stageId] = (visits[stageId] || 0) + 1;
+    }
+
+    // Progress is authoritative and monotonic: it never moves backwards, so a
+    // repeat visit cannot pull the bar or the markers back.
+    const target = typeof input.progress === "number" ? input.progress : stage ? stage.progress : state.build.progress;
 
     return updateBuild({
       stage: index,
-      progress: typeof input.progress === "number" ? input.progress : stage ? stage.progress : state.build.progress,
+      stageLabel: input.stageLabel || (stage ? stage.label : state.build.stageLabel),
+      stageDescription: input.description || (stage ? stage.description : state.build.stageDescription),
+      progress: Math.max(state.build.progress, target),
       status: input.status || (stage ? stage.status : state.build.status),
+      visits,
     });
+  }
+
+  /** Controller: smoothed progress from the service (never decreases). */
+  function setRunProgress(progress) {
+    const next = Math.max(state.build.progress, Math.min(100, Number(progress) || 0));
+    if (next === state.build.progress) return false;
+
+    state.build = { ...state.build, progress: next };
+    notify(["build"]);
+    return true;
+  }
+
+  /** Controller: one simulated activity line for the event stream. */
+  function addActivity(message) {
+    const text = String(message || "").trim();
+    if (!text) return false;
+
+    const activity = state.build.activity.concat({
+      id: `${state.build.runId}-${state.build.activity.length + 1}`,
+      stage: state.build.stageLabel,
+      message: text,
+    });
+
+    state.build = {
+      ...state.build,
+      activity: activity.slice(-MAX_ACTIVITY),
+    };
+    notify(["build"]);
+    return true;
   }
 
   /** Controller: the service finished. The only path to `complete`. */
   function completeRun(config) {
     const input = config || {};
     const previousRun = state.build.runId;
+    const endedAt = Date.now();
 
     const done = updateBuild({
       stage: lastStageIndex(),
+      stageLabel: stages()[lastStageIndex()] ? stages()[lastStageIndex()].label : "Complete",
+      stageDescription: stages()[lastStageIndex()] ? stages()[lastStageIndex()].description : "",
       progress: 100,
       status: BUILD.COMPLETE,
-      endedAt: Date.now(),
+      phase: "ready",
+      endedAt,
       error: "",
+      result: {
+        name: "",
+        projectId: "",
+        status: "complete",
+        validation: "passed",
+        createdAt: endedAt,
+      },
     });
 
-    // The controller records the project through projectService.
-    if (done) BM.buildController?.recordCompletion?.(input.prompt || state.build.prompt);
+    if (done) {
+      addActivity("Validation passed");
+      // The controller records the project through projectService.
+      BM.buildController?.recordCompletion?.(input.prompt || state.build.prompt);
+    }
 
     return done ? previousRun : null;
+  }
+
+  /** Controller: record the project that completion produced. */
+  function setRunResult(result) {
+    if (!state.build.result) return false;
+    state.build = {
+      ...state.build,
+      result: { ...state.build.result, ...(result || {}) },
+    };
+    notify(["build"]);
+    return true;
   }
 
   /** Controller: end a run as stopped or failed. Bumps runId to kill stale work. */
   function endRun(outcome, reason) {
     const next = outcome === "error" ? BUILD.ERROR : outcome === "error-clear" ? BUILD.READY : BUILD.STOPPED;
 
+    // A run stopped during the `preparing` beat has not reached `building` yet;
+    // it settles straight to `stopped` without inventing a transition.
+    const preparing = state.build.phase === "preparing";
+
     // An illegal outcome must not touch the run id.
-    if (next !== state.build.status && !canTransition(state.build.status, next)) return false;
+    if (next !== state.build.status && !canTransition(state.build.status, next)) {
+      if (!preparing) return false;
+    }
 
     if (next === BUILD.ERROR || next === BUILD.STOPPED) {
       // Bumping the run id is what makes any in-flight service event stale.
       state.build = { ...state.build, runId: `run-${Date.now().toString(36)}` };
     }
 
-    return updateBuild({
-      status: next,
-      endedAt: next === BUILD.READY ? 0 : Date.now(),
-      error: next === BUILD.ERROR ? reason || "The simulated run stopped unexpectedly." : "",
-    });
+    return updateBuild(
+      {
+        status: next,
+        phase: "ready",
+        endedAt: next === BUILD.READY ? 0 : Date.now(),
+        error: next === BUILD.ERROR ? reason || "The simulated run stopped unexpectedly." : "",
+        // A stopped or failed run never produces a result.
+        result: null,
+      },
+      preparing
+    );
   }
 
   function resetBuild() {
@@ -538,8 +685,12 @@
     projectNameFromPrompt,
 
     // build machine
+    prepareRun,
     beginRun,
     advanceRun,
+    setRunProgress,
+    addActivity,
+    setRunResult,
     completeRun,
     endRun,
     resetBuild,

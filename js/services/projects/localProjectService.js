@@ -141,6 +141,8 @@
       updated: safeName(input.updated || "Just now"),
       art: SCENE_ARTS.indexOf(input.art) === -1 ? art.art : input.art,
       scene: Number.isInteger(input.scene) ? input.scene : art.scene,
+      // A build produced this project; `updated` is its last build time.
+      lastBuild: true,
       simulated: true,
     };
 
@@ -160,6 +162,7 @@
     if (patch.name !== undefined) next.name = safeName(patch.name);
     if (patch.status !== undefined) next.status = normalizeStatus(patch.status);
     if (patch.updated !== undefined) next.updated = safeName(patch.updated);
+    if (patch.lastBuild !== undefined) next.lastBuild = Boolean(patch.lastBuild);
     if (SCENE_ARTS.indexOf(patch.art) !== -1) next.art = patch.art;
     if (Number.isInteger(patch.scene)) next.scene = patch.scene;
 

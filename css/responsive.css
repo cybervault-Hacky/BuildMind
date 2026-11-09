@@ -149,6 +149,12 @@
     gap: 16px;
   }
 
+  /* The log and result belong under the pair, spanning both columns */
+  .activity-col > #activity-feed-panel,
+  .activity-col > #build-result {
+    grid-column: 1 / -1;
+  }
+
   .build-bar {
     position: static;
     background: none;
@@ -437,6 +443,33 @@
     font-size: 13.5px;
   }
 
+  /* Current stage, activity log and result summary */
+  .stage-now {
+    padding: 10px 12px;
+  }
+
+  .stage-now__index {
+    font-size: 10px;
+  }
+
+  .log {
+    max-height: 150px;
+  }
+
+  .result__row {
+    grid-template-columns: minmax(74px, auto) minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .result__actions {
+    gap: 8px;
+  }
+
+  .result__actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
   /* Projects */
   .projects-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -624,6 +657,24 @@
   .timeline__step {
     grid-template-columns: 18px minmax(0, 1fr) auto;
     gap: 10px;
+  }
+
+  /* Phones: the stage description is the one line that may wrap */
+  .timeline__desc {
+    font-size: 10.5px;
+  }
+
+  .stage-now__desc {
+    font-size: 11px;
+  }
+
+  .log__item {
+    font-size: 11px;
+  }
+
+  .result__actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .panel__head,

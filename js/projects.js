@@ -70,7 +70,12 @@
       </span>`;
 
     card.querySelector(".project-card__name").textContent = project.name;
-    card.querySelector(".js-updated").textContent = project.updated;
+    // "Last build" only when the project records one; older samples just show
+    // their update time, so nothing is invented.
+    const updated = card.querySelector(".js-updated");
+    if (updated) {
+      updated.textContent = project.lastBuild ? `Last build ${project.updated}` : project.updated;
+    }
     return card;
   }
 

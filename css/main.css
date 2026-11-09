@@ -1713,10 +1713,41 @@ body.is-sheet-open {
   background: linear-gradient(to bottom, var(--accent-line), var(--line));
 }
 
+.timeline__body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
 .timeline__label {
   font-size: 13px;
   color: var(--text-faint);
   transition: color var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out);
+}
+
+/* Stage description — hidden until the stage matters, so the list stays calm */
+.timeline__desc {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-faint);
+  opacity: 0;
+  transform: translateY(-1px);
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity var(--dur-3) var(--ease-out), max-height var(--dur-3) var(--ease-out),
+    transform var(--dur-3) var(--ease-out);
+}
+
+.timeline__step.is-active .timeline__desc,
+.timeline__step.is-done.is-visited .timeline__desc,
+.timeline__step.is-complete .timeline__desc {
+  opacity: 1;
+  max-height: 34px;
+  transform: none;
+}
+
+.timeline__step.is-active .timeline__desc {
+  color: var(--text-soft);
 }
 
 .timeline__meta {
@@ -1900,6 +1931,197 @@ body.is-sheet-open {
 
 .progress.is-complete .progress__stage {
   background: var(--mint);
+}
+
+/* --------------------------------------------------------------------------
+   15b. Current stage — the unambiguous "what is happening now"
+   -------------------------------------------------------------------------- */
+.stage-now {
+  display: grid;
+  gap: 3px;
+  margin: var(--s-3) 0 var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  transition: border-color var(--dur-3) var(--ease-out), background var(--dur-3) var(--ease-out);
+}
+
+.stage-now__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.stage-now__label {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text-soft);
+  letter-spacing: -0.01em;
+  transition: color var(--dur-3) var(--ease-out);
+}
+
+.stage-now__index {
+  flex: none;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-now__desc {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.stage-now[data-status="preparing"] {
+  border-color: rgba(139, 147, 255, 0.28);
+}
+
+.stage-now[data-status="preparing"] .stage-now__label,
+.stage-now[data-status="running"] .stage-now__label {
+  color: var(--text);
+}
+
+.stage-now[data-status="running"] {
+  border-color: rgba(139, 147, 255, 0.32);
+  background: linear-gradient(180deg, rgba(139, 147, 255, 0.06), transparent 90%), var(--surface-2);
+}
+
+.stage-now[data-status="running"] .stage-now__desc {
+  color: var(--text-soft);
+}
+
+.stage-now[data-status="complete"] {
+  border-color: rgba(95, 224, 191, 0.3);
+}
+
+.stage-now[data-status="complete"] .stage-now__label {
+  color: var(--mint);
+}
+
+.stage-now[data-status="error"] {
+  border-color: rgba(240, 138, 138, 0.34);
+}
+
+.stage-now[data-status="error"] .stage-now__label {
+  color: var(--rose);
+}
+
+.stage-now[data-status="stopped"] .stage-now__label {
+  color: var(--text-soft);
+}
+
+/* --------------------------------------------------------------------------
+   15c. Activity log — simulated event stream
+   -------------------------------------------------------------------------- */
+.log {
+  display: grid;
+  gap: 7px;
+  max-height: 188px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-right: 2px;
+}
+
+.log__item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-soft);
+  animation: log-in var(--dur-4) var(--ease-out) both;
+}
+
+.log__dot {
+  width: 4px;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.65;
+}
+
+.log__item:first-child .log__text {
+  color: var(--text);
+}
+
+.log__count {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.log__empty {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+/* --------------------------------------------------------------------------
+   15d. Result summary
+   -------------------------------------------------------------------------- */
+.panel--result {
+  border-color: rgba(95, 224, 191, 0.26);
+}
+
+.panel--result .panel__body {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.result {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+}
+
+.result__row {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: var(--s-3);
+  align-items: baseline;
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.result__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.result dt {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.result dd {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.result__note {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.result__actions .btn {
+  flex: 0 1 auto;
 }
 
 /* --------------------------------------------------------------------------
