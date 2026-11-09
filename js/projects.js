@@ -2,8 +2,8 @@
    BuildMind — projects.js
    Project list, filtering and generated previews.
 
-   Phase 1 note: these entries are local sample data so the layout can be
-   reviewed. loadProjects() is the seam that will read real projects later.
+   These entries are local sample data so the layout can be reviewed.
+   loadProjects() is the seam that will read real projects later.
    Each card is labelled as a sample in its meta line.
    ========================================================================== */
 
@@ -13,7 +13,7 @@
   const BM = window.BuildMind;
   if (!BM) return;
 
-  const { $, $$, renderScene } = BM;
+  const { $, $$ } = BM;
 
   /* ------------------------------------------------------------------------
      Sample data (local only)
@@ -24,6 +24,7 @@
       name: "Floating Island Survival",
       status: "ready",
       updated: "2 days ago",
+      art: "lattice",
       scene: 0,
     },
     {
@@ -31,6 +32,7 @@
       name: "Checkpoint Obby",
       status: "building",
       updated: "5 hours ago",
+      art: "terrain",
       scene: 1,
     },
     {
@@ -38,6 +40,7 @@
       name: "Dropper Tycoon",
       status: "ready",
       updated: "1 week ago",
+      art: "graph",
       scene: 2,
     },
     {
@@ -45,20 +48,15 @@
       name: "Round-Based Arena",
       status: "draft",
       updated: "3 weeks ago",
+      art: "plates",
       scene: 3,
     },
   ];
 
-  const STATUS_LABEL = {
-    ready: "Ready",
-    building: "Building",
-    draft: "Draft",
-  };
-
-  const STATUS_TONE = {
-    ready: "ready",
-    building: "active",
-    draft: "idle",
+  const STATUS = {
+    ready: { label: "Ready", tone: "ready" },
+    building: { label: "Building", tone: "active" },
+    draft: { label: "Draft", tone: "idle" },
   };
 
   let projects = [];
@@ -67,26 +65,31 @@
   /* ------------------------------------------------------------------------
      Rendering
      ------------------------------------------------------------------------ */
+  /** One card per game: name, status, last activity, open. Nothing else. */
   function projectCard(project) {
+    const status = STATUS[project.status] || STATUS.draft;
     const card = document.createElement("a");
     card.className = "project-card";
     card.href = `build.html?prompt=${encodeURIComponent(project.name)}`;
-    card.setAttribute("aria-label", `Open ${project.name}`);
     card.dataset.status = project.status;
+    card.setAttribute(
+      "aria-label",
+      `${project.name} — ${status.label}, updated ${project.updated}`
+    );
 
     card.innerHTML = `
-      <div class="project-card__thumb" data-thumb></div>
-      <div class="project-card__body">
-        <span class="project-card__info">
-          <span class="project-card__name"></span>
-          <span class="project-card__meta">
-            <span class="status status--${STATUS_TONE[project.status]}">
-              <span class="status__dot" aria-hidden="true"></span>
-              <span class="status__text">${STATUS_LABEL[project.status]}</span>
-            </span>
-            <span class="sep" aria-hidden="true"></span>
-            <span class="js-updated"></span>
+      <span class="project-card__thumb">
+        <span class="project-card__art art-${project.art} scene-${project.scene}" aria-hidden="true"></span>
+      </span>
+      <span class="project-card__body">
+        <span class="project-card__name"></span>
+        <span class="project-card__meta">
+          <span class="status status--${status.tone}">
+            <span class="status__dot" aria-hidden="true"></span>
+            <span class="status__text">${status.label}</span>
           </span>
+          <span class="sep" aria-hidden="true"></span>
+          <span class="js-updated"></span>
         </span>
         <span class="project-card__open" aria-hidden="true">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
@@ -94,11 +97,10 @@
             <path d="M3.2 8h9.6M9 4.2 12.8 8 9 11.8"/>
           </svg>
         </span>
-      </div>`;
+      </span>`;
 
     card.querySelector(".project-card__name").textContent = project.name;
     card.querySelector(".js-updated").textContent = project.updated;
-    renderScene(card.querySelector("[data-thumb]"), project.scene);
 
     return card;
   }
@@ -173,7 +175,6 @@
   function init() {
     initFilters();
     loadProjects();
-    BM.refreshReveals?.();
   }
 
   if (document.readyState === "loading") {

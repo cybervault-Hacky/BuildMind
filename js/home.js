@@ -14,7 +14,9 @@
   function initWorld() {
     const el = $("#hero-world");
     if (!el) return;
-    startWorldPreview(el, 1);
+    // Preview only: no scan band, gentler pacing, pauses when the tab is hidden.
+    el.dataset.ambient = "true";
+    startWorldPreview(el, 0.75);
   }
 
   /** Walk the Idea → Build → Test → Play strip so it never feels static. */

@@ -3,8 +3,8 @@
    Shared frontend foundation: brand assets, ambient choreography, reveal
    observers, storage helpers and the mock BuildMind state layer.
 
-   Phase 1 note: every "connected" or "building" state below is simulated in
-   the browser. No network requests, no backend, no AI calls, no Roblox calls.
+   Every "connected" or "building" state below is simulated in the browser.
+   There are no network requests, no backend, no AI calls and no Roblox calls.
    The public functions (connectRoblox, connectStudio, startBuild, ...) are the
    seams where real integrations will be attached later.
    ========================================================================== */
@@ -24,9 +24,8 @@
     provider: "openai",
     model: "gpt-4.1",
     motion: "full",
-    robuxHints: true,
+    hints: true,
     autoFix: true,
-    density: "comfortable",
   };
 
   /* ------------------------------------------------------------------------
@@ -94,45 +93,19 @@
   );
 
   /* ------------------------------------------------------------------------
-     Icons — a single 16px stroke family, kept consistent everywhere
+     Icons — the two glyphs the UI swaps in at runtime. Everything else is
+     inline in the markup, so nothing unused ships.
      ------------------------------------------------------------------------ */
   const ICONS = {
-    home: '<path d="M3 7.5 8 3.5l5 4V13a.5.5 0 0 1-.5.5H9.5V10h-3v3.5H3.5A.5.5 0 0 1 3 13V7.5Z"/>',
-    build:
-      '<path d="M8 2.5 13.5 5.5v5L8 13.5 2.5 10.5v-5L8 2.5Z"/><path d="M8 8v5.5M8 8l3.2-1.8M8 8 4.8 6.2"/>',
-    projects:
-      '<rect x="2.5" y="3.5" width="11" height="9" rx="1.6"/><path d="M5.5 7h2M5.5 9.3h4.5"/>',
-    settings:
-      '<circle cx="8" cy="8" r="2.1"/><path d="M8 1.9v1.4M8 12.7v1.4M14.1 8h-1.4M3.3 8H1.9M12.3 3.7l-1 1M4.7 11.3l-1 1M12.3 12.3l-1-1M4.7 4.7l-1-1"/>',
-    arrow: '<path d="M3.2 8h9.6M9 4.2 12.8 8 9 11.8"/>',
-    arrowUpRight: '<path d="M4.6 11.4 11.4 4.6M5.6 4.6h5.8v5.8"/>',
-    plus: '<path d="M8 3.2v9.6M3.2 8h9.6"/>',
     check: '<path d="M3.2 8.4 6.4 11.6 12.8 4.8"/>',
-    spark:
-      '<path d="M8 1.9l1.5 4.1 4.1 1.5-4.1 1.5L8 13.1 6.5 9 2.4 7.5 6.5 6 8 1.9Z"/>',
-    plug: '<path d="M5.6 2.5v3M10.4 2.5v3M3.6 5.5h8.8v1.6a4.4 4.4 0 0 1-8.8 0V5.5ZM8 11.5v2"/>',
-    monitor: '<rect x="2" y="3" width="12" height="8" rx="1.4"/><path d="M5.6 13.4h4.8M8 11v2.4"/>',
-    key: '<circle cx="5.4" cy="9.6" r="2.6"/><path d="M7.3 7.7 12.6 2.4M10.4 4.6l1.6 1.6"/>',
-    eye: '<path d="M1.8 8S4.1 3.9 8 3.9 14.2 8 14.2 8s-2.3 4.1-6.2 4.1S1.8 8 1.8 8Z"/><circle cx="8" cy="8" r="1.7"/>',
-    eyeOff:
-      '<path d="M6.3 4.2A6.6 6.6 0 0 1 8 3.9c3.9 0 6.2 4.1 6.2 4.1a11 11 0 0 1-2 2.4M9.8 11.6A6.7 6.7 0 0 1 8 12.1C4.1 12.1 1.8 8 1.8 8a11 11 0 0 1 2.6-2.9M2.6 2.6l10.8 10.8"/>',
-    shield: '<path d="M8 2 13 4v4c0 3.1-2.1 5.4-5 6-2.9-.6-5-2.9-5-6V4l5-2Z"/>',
-    clock: '<circle cx="8" cy="8" r="5.6"/><path d="M8 5v3.2l2 1.2"/>',
-    play: '<path d="M5.6 3.6 12 8l-6.4 4.4V3.6Z"/>',
-    layers: '<path d="M8 2.4 13.6 5.4 8 8.4 2.4 5.4 8 2.4Z"/><path d="M2.4 8.2 8 11.2l5.6-3M2.4 11 8 14l5.6-3"/>',
-    refresh: '<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8M13.4 2.6v2.8h-2.8"/>',
-    info: '<circle cx="8" cy="8" r="5.6"/><path d="M8 7.2v3.4M8 5.2v.6"/>',
-    chevron: '<path d="M5.8 3.8 10 8l-4.2 4.2"/>',
     stop: '<rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1.2"/>',
-    warn: '<path d="M8 3 14 13H2L8 3Z"/><path d="M8 7v2.6M8 11.4v.4"/>',
   };
 
-  /** Return an inline SVG string for a named icon. */
-  function icon(name, cls = "") {
-    const body = ICONS[name] || ICONS.info;
+  /** Return an inline SVG string for a named runtime icon. */
+  function icon(name) {
+    const body = ICONS[name] || ICONS.check;
     return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
-      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"
-      ${cls ? `class="${cls}"` : ""}>${body}</svg>`;
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
   }
 
   /* ------------------------------------------------------------------------
@@ -249,12 +222,20 @@
     const sheet = $("#mobile-nav");
     if (!toggle || !sheet) return;
 
-    const setOpen = (open) => {
+    // `inert` keeps the sheet out of the tab order when it is closed.
+    const supportInert = "inert" in HTMLElement.prototype;
+
+    const setOpen = (open, { restoreFocus = false } = {}) => {
       toggle.setAttribute("aria-expanded", String(open));
       toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
       sheet.classList.toggle("is-open", open);
-      sheet.toggleAttribute("inert", !open);
-      document.body.style.overflow = open ? "hidden" : "";
+      if (supportInert) sheet.inert = !open;
+      else sheet.setAttribute("aria-hidden", String(!open));
+      document.body.classList.toggle("is-sheet-open", open);
+      if (!open) {
+        BM.updateActiveNav?.();
+        if (restoreFocus) toggle.focus({ preventScroll: true });
+      }
     };
 
     setOpen(false);
@@ -263,17 +244,39 @@
       setOpen(toggle.getAttribute("aria-expanded") !== "true");
     });
 
-    // Close on navigation or Escape
-    $$("a", sheet).forEach((link) => link.addEventListener("click", () => setOpen(false)));
+    // Closing on navigation must not cancel the click's own navigation.
+    $$("a", sheet).forEach((link) =>
+      link.addEventListener("click", () => setOpen(false))
+    );
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") {
-        setOpen(false);
+        setOpen(false, { restoreFocus: true });
+      }
+    });
+
+    // Keep focus inside the sheet while it is open.
+    sheet.addEventListener("keydown", (event) => {
+      if (event.key !== "Tab") return;
+      const focusables = $$(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        sheet
+      ).filter((node) => node.offsetParent !== null);
+      if (!focusables.length) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === first || active === toggle)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
         toggle.focus();
       }
     });
 
-    // Reset when resizing up to desktop
     const desktop = media("(min-width: 861px)");
     if (typeof desktop.addEventListener === "function") {
       desktop.addEventListener("change", (event) => {
@@ -351,7 +354,7 @@
   }
 
   /* ------------------------------------------------------------------------
-     Settings store — Phase 1 uses localStorage only.
+     Settings store — localStorage only, no server involved.
      ------------------------------------------------------------------------ */
   function loadSettings() {
     return readStore(STORAGE_KEY, { ...DEFAULTS });
@@ -390,7 +393,7 @@
 
   /**
    * Simulated Roblox account connection.
-   * Phase 2 will replace the body with the OAuth hand-off.
+   * A later phase will replace the body with the OAuth hand-off.
    */
   async function connectRoblox(force) {
     if (connections.roblox.connected && !force) return connections.roblox;
@@ -407,7 +410,7 @@
 
   /**
    * Simulated Studio bridge handshake.
-   * Phase 2 will replace the body with the local bridge discovery.
+   * A later phase will replace the body with the local bridge discovery.
    */
   async function connectStudio(force) {
     if (connections.studio.connected && !force) return connections.studio;
@@ -425,6 +428,45 @@
 
   function getConnections() {
     return connections;
+  }
+
+  /** Re-apply a connection state without announcing a new change. */
+  function restoreConnections(patch) {
+    if (!patch || typeof patch !== "object") return;
+    ["roblox", "studio"].forEach((key) => {
+      if (typeof patch[key] === "boolean") {
+        connections[key].connected = patch[key];
+        connections[key].simulated = patch[key];
+      }
+    });
+  }
+
+  function snapshotConnections() {
+    return {
+      roblox: Boolean(connections.roblox.connected),
+      studio: Boolean(connections.studio.connected),
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+     Password reveal — shared by the composer and settings
+     ------------------------------------------------------------------------ */
+  function bindKeyReveal(input, button) {
+    if (!input || !button) return;
+
+    const eye = button.querySelectorAll(".icon-eye");
+    const eyeOff = button.querySelector(".icon-eye-off");
+
+    button.addEventListener("click", () => {
+      const reveal = input.type === "password";
+      input.type = reveal ? "text" : "password";
+      button.setAttribute("aria-pressed", String(reveal));
+      button.setAttribute("aria-label", reveal ? "Hide API key" : "Show API key");
+      // Open eye while masked, struck-through eye while the key is visible.
+      eye.forEach((node) => node.toggleAttribute("hidden", reveal));
+      if (eyeOff) eyeOff.classList.toggle("is-off", !reveal);
+      input.focus({ preventScroll: true });
+    });
   }
 
   /* ------------------------------------------------------------------------
@@ -578,7 +620,7 @@
     const dotMarkup = nodes
       .map(
         (n, index) =>
-          `<circle class="wv-node ${n.accent ? "wv-node--accent" : ""}" cx="${n.x}" cy="${
+          `<circle class="${n.accent ? "wv-node wv-node--accent" : "wv-node"}" cx="${n.x}" cy="${
             n.y
           }" r="${n.r}" style="animation-delay:${index * 140}ms" />`
       )
@@ -691,6 +733,10 @@
 
     const tick = () => {
       if (halted) return;
+      if (document.hidden) {
+        timer = window.setTimeout(tick, 400);
+        return;
+      }
       progress += direction * (0.9 * speed);
       if (progress >= 100) {
         progress = 100;
@@ -720,176 +766,6 @@
   }
 
   /* ------------------------------------------------------------------------
-     Project thumbnails — generated abstract scenes, one language
-     ------------------------------------------------------------------------ */
-  const SCENE_VIEW = { w: 320, h: 180 };
-
-  function sceneLattice() {
-    const cells = [];
-    const hw = 16;
-    const hh = 8;
-    const ox = 160;
-    const oy = 92;
-    for (let i = 0; i < 5; i += 1) {
-      for (let j = 0; j < 5; j += 1) {
-        const x = ox + (i - j) * hw;
-        const y = oy + (i + j - 4) * hh;
-        const built = (i + j) % 3 !== 0;
-        cells.push(
-          `<polygon points="${x},${y - hh} ${x + hw},${y} ${x},${y + hh} ${x - hw},${y}"
-            fill="${built ? "rgba(139,147,255,0.16)" : "rgba(255,255,255,0.03)"}"
-            stroke="${built ? "rgba(139,147,255,0.34)" : "rgba(255,255,255,0.08)"}" stroke-width="1"/>`
-        );
-      }
-    }
-    return cells.join("");
-  }
-
-  function sceneArcs() {
-    const arcs = [];
-    for (let r = 30; r <= 118; r += 22) {
-      arcs.push(
-        `<path d="M ${160 - r} 132 A ${r} ${r} 0 0 1 ${160 + r} 132" fill="none"
-          stroke="rgba(139,147,255,${0.1 + r / 1400})" stroke-width="1"/>`
-      );
-    }
-    const dots = [
-      [92, 74],
-      [160, 46],
-      [228, 74],
-      [126, 116],
-      [196, 112],
-    ]
-      .map(
-        ([x, y], i) =>
-          `<circle cx="${x}" cy="${y}" r="${i === 1 ? 3.6 : 2.4}" fill="${
-            i === 1 ? "rgba(139,147,255,0.75)" : "rgba(255,255,255,0.28)"
-          }"/>`
-      )
-      .join("");
-    return arcs.join("") + dots;
-  }
-
-  function sceneTerrain() {
-    let paths = "";
-    for (let line = 0; line < 4; line += 1) {
-      let d = `M 0 ${104 + line * 11}`;
-      for (let x = 0; x <= 320; x += 32) {
-        const y =
-          104 + line * 11 + Math.sin((x / 320) * Math.PI * 2 + line * 0.7) * (9 - line * 1.5);
-        d += ` L ${x} ${y.toFixed(1)}`;
-      }
-      paths += `<path d="${d}" fill="none" stroke="rgba(139,147,255,${
-        0.26 - line * 0.05
-      })" stroke-width="1"/>`;
-    }
-    const blocks = [
-      [84, 88],
-      [148, 74],
-      [214, 92],
-    ]
-      .map(
-        ([x, y]) =>
-          `<rect x="${x}" y="${y}" width="20" height="20" rx="3" fill="rgba(255,255,255,0.05)"
-            stroke="rgba(139,147,255,0.28)" stroke-width="1"/>`
-      )
-      .join("");
-    return paths + blocks;
-  }
-
-  function sceneGraph() {
-    const pts = [
-      [58, 132],
-      [104, 68],
-      [160, 104],
-      [210, 54],
-      [262, 118],
-      [160, 152],
-    ];
-    const edges = [
-      [0, 1],
-      [1, 2],
-      [2, 3],
-      [3, 4],
-      [2, 5],
-      [4, 5],
-      [1, 3],
-    ]
-      .map(
-        ([a, b]) =>
-          `<line x1="${pts[a][0]}" y1="${pts[a][1]}" x2="${pts[b][0]}" y2="${pts[b][1]}"
-            stroke="rgba(139,147,255,0.20)" stroke-width="1" stroke-dasharray="2 4"/>`
-      )
-      .join("");
-    const dots = pts
-      .map(
-        ([x, y], i) =>
-          `<circle cx="${x}" cy="${y}" r="${i === 2 ? 4 : 2.6}" fill="${
-            i === 2 ? "rgba(139,147,255,0.8)" : "rgba(255,255,255,0.26)"
-          }"/>`
-      )
-      .join("");
-    return edges + dots;
-  }
-
-  function scenePlates() {
-    let out = "";
-    for (let layer = 3; layer >= 0; layer -= 1) {
-      const y = 78 + layer * 20;
-      const w = 96 + layer * 22;
-      out += `<path d="M ${160 - w} ${y} L 160 ${y - w * 0.42} L ${160 + w} ${y}
-        L 160 ${y + w * 0.42} Z" fill="rgba(139,147,255,${
-          0.03 + layer * 0.015
-        })" stroke="rgba(255,255,255,${0.05 + layer * 0.02})" stroke-width="1"/>`;
-    }
-    out += `<circle cx="160" cy="70" r="3.4" fill="rgba(95,224,191,0.7)"/>`;
-    return out;
-  }
-
-  function sceneDots() {
-    let out = "";
-    for (let y = 0; y < 5; y += 1) {
-      for (let x = 0; x < 9; x += 1) {
-        const cx = 40 + x * 30;
-        const cy = 52 + y * 19;
-        const active = (x + y) % 4 === 1;
-        out += `<circle cx="${cx}" cy="${cy}" r="${active ? 2.4 : 1.5}"
-          fill="${active ? "rgba(139,147,255,0.7)" : "rgba(255,255,255,0.13)"}"/>`;
-      }
-    }
-    out += `<path d="M 40 52 Q 100 24 160 90 T 280 128" fill="none"
-      stroke="rgba(139,147,255,0.32)" stroke-width="1"/>`;
-    return out;
-  }
-
-  const SCENES = [sceneLattice, sceneTerrain, sceneGraph, sceneArcs, scenePlates, sceneDots];
-
-  /**
-   * Render a generated thumbnail into a container.
-   * @param {HTMLElement} el
-   * @param {number} variant  index into the scene set
-   */
-  function renderScene(el, variant = 0) {
-    if (!el) return;
-    const scene = SCENES[variant % SCENES.length];
-    el.innerHTML = `
-      <svg viewBox="0 0 ${SCENE_VIEW.w} ${SCENE_VIEW.h}" preserveAspectRatio="xMidYMid slice"
-           role="img" aria-label="Abstract project preview" focusable="false">
-        <defs>
-          <radialGradient id="scene-bg-${variant}" cx="50%" cy="30%" r="70%">
-            <stop offset="0%" stop-color="#15151d"/>
-            <stop offset="100%" stop-color="#0c0c11"/>
-          </radialGradient>
-        </defs>
-        <rect width="${SCENE_VIEW.w}" height="${SCENE_VIEW.h}" fill="url(#scene-bg-${
-      variant % SCENES.length
-    })"/>
-        ${scene()}
-      </svg>`;
-    el.dataset.scene = String(variant % SCENES.length);
-  }
-
-  /* ------------------------------------------------------------------------
      Boot
      ------------------------------------------------------------------------ */
   function boot() {
@@ -908,8 +784,6 @@
     // Mount any visualizer that is present before page scripts run.
     $$("[data-world]").forEach((el) => mountWorld(el));
 
-    // Re-run reveals for any content injected after boot.
-    BM.refreshReveals = initReveals;
   }
 
   if (document.readyState === "loading") {
@@ -927,6 +801,7 @@
     clamp,
     sleep,
     icon,
+    bindKeyReveal,
     prefersReducedMotion,
     toast,
     readStore,
@@ -942,6 +817,8 @@
     connectStudio,
     disconnectStudio,
     getConnections,
+    restoreConnections,
+    snapshotConnections,
     onStateChange,
     BUILD_STAGES,
     PROVIDERS,
@@ -949,7 +826,6 @@
     mountWorld,
     updateWorld,
     startWorldPreview,
-    renderScene,
     keys: { STORAGE_KEY, PREFERENCES_KEY },
     defaults: DEFAULTS,
   });

@@ -2,9 +2,8 @@
    BuildMind — build.js
    The Build workspace.
 
-   Phase 1 is explicit mock behaviour: the build pipeline below is a timed
-   simulation that drives the activity timeline, the progress component and
-   the world visualizer. No request leaves the browser.
+   The build pipeline below is an explicit timed simulation: it drives the
+   activity timeline, the progress component and the world visualizer. No request leaves the browser.
 
    Public seams for the real implementation:
      startBuild(prompt, config)  -> begins a run
@@ -28,7 +27,6 @@
     loadSettings,
     saveSettings,
     BUILD_STAGES,
-    PROVIDERS,
     findProvider,
     updateWorld,
     mountWorld,
@@ -61,8 +59,11 @@
     el.apiKey = $("#api-key");
     el.apiKeyToggle = $("#api-key-toggle");
     el.buildButton = $("#build-button");
-    el.buildNote = $("#build-note");
+    el.buildBar = $(".build-bar");
     el.timeline = $("#build-timeline");
+    el.hintTitle = $("#build-hint-title");
+    el.hintNote = $("#build-hint-note");
+    el.progressStages = $("#progress-stages");
     el.world = $("#build-world");
     el.workspaceStatus = $("#workspace-status");
     el.buildStatus = $("#build-status");
@@ -95,7 +96,25 @@
     ).join("");
   }
 
+  function buildStageMarks() {
+    if (!el.progressStages) return;
+    el.progressStages.innerHTML = BUILD_STAGES.map(
+      (stage) => `<span class="progress__stage" data-mark></span>`
+    ).join("");
+    el.progressStageMarks = $$("[data-mark]", el.progressStages);
+  }
+
+  function paintStageMarks(index) {
+    if (!el.progressStageMarks) return;
+    const finished = index >= BUILD_STAGES.length - 1;
+    el.progressStageMarks.forEach((mark, i) => {
+      mark.classList.toggle("is-done", finished || i < index);
+      mark.classList.toggle("is-current", !finished && i === index);
+    });
+  }
+
   function setStage(index) {
+    paintStageMarks(index);
     state.stage = index;
     const steps = $$(".timeline__step", el.timeline);
     steps.forEach((step, i) => {
@@ -103,7 +122,7 @@
       const meta = $("[data-meta]", step);
 
       if (i < index) {
-        step.classList.add(index === BUILD_STAGES.length - 1 ? "is-done" : "is-done");
+        step.classList.add(index === BUILD_STAGES.length - 1 ? "is-visited" : "is-done");
         if (meta) meta.textContent = "Done";
       } else if (i === index) {
         step.classList.add(index === BUILD_STAGES.length - 1 ? "is-complete" : "is-active");
@@ -127,6 +146,11 @@
     window.setTimeout(() => node.classList.remove("is-changing"), 340);
   }
 
+  function setHint(title, note) {
+    if (el.hintTitle) el.hintTitle.textContent = title;
+    if (el.hintNote) el.hintNote.textContent = note;
+  }
+
   function updateBuildStatus(text) {
     setStatus(el.workspaceStatus, text, toneFor(text));
     setStatus(el.buildStatus, text, toneFor(text));
@@ -135,7 +159,7 @@
   function toneFor(text) {
     const t = String(text).toLowerCase();
     if (t === "complete") return "ready";
-    if (t === "ready") return "idle";
+    if (t === "ready" || t === "stopped") return "idle";
     if (t === "failed" || t === "error") return "error";
     if (t === "fixing") return "warn";
     return "active";
@@ -203,17 +227,11 @@
      API key field — UI placeholder only, never sent anywhere
      ------------------------------------------------------------------------ */
   function initApiField() {
-    if (!el.apiKey || !el.apiKeyToggle) return;
+    if (!el.apiKey) return;
 
-    el.apiKeyToggle.addEventListener("click", () => {
-      const showing = el.apiKey.type === "text";
-      el.apiKey.type = showing ? "password" : "text";
-      el.apiKeyToggle.setAttribute("aria-pressed", String(!showing));
-      el.apiKeyToggle.setAttribute("aria-label", showing ? "Show API key" : "Hide API key");
-      el.apiKey.focus({ preventScroll: true });
-    });
+    BM.bindKeyReveal(el.apiKey, el.apiKeyToggle);
 
-    // Nothing is persisted: a key typed in Phase 1 stays in the field only.
+    // Nothing is persisted: a typed key stays in the field only.
     el.apiKey.addEventListener("input", () => {
       el.apiKey.dataset.dirty = "true";
     });
@@ -297,12 +315,16 @@
     }
     if (el.robloxSub) {
       el.robloxSub.textContent = conns.roblox.connected
-        ? "Account linked in this session"
-        : "Account not connected";
+        ? "Simulated · this session"
+        : "Account";
     }
     if (el.connectRobloxBtn) {
       el.connectRobloxBtn.textContent = conns.roblox.connected ? "Disconnect" : "Connect";
       el.connectRobloxBtn.dataset.connected = String(conns.roblox.connected);
+      el.connectRobloxBtn.setAttribute(
+        "aria-label",
+        conns.roblox.connected ? "Disconnect Roblox account" : "Connect Roblox account"
+      );
     }
 
     if (el.studioStatus) {
@@ -311,12 +333,16 @@
     }
     if (el.studioSub) {
       el.studioSub.textContent = conns.studio.connected
-        ? "Bridge linked in this session"
-        : "Bridge not detected";
+        ? "Simulated · this session"
+        : "Local bridge";
     }
     if (el.connectStudioBtn) {
-      el.connectStudioBtn.textContent = conns.studio.connected ? "Disconnect" : "Connect Studio";
+      el.connectStudioBtn.textContent = conns.studio.connected ? "Disconnect" : "Connect";
       el.connectStudioBtn.dataset.connected = String(conns.studio.connected);
+      el.connectStudioBtn.setAttribute(
+        "aria-label",
+        conns.studio.connected ? "Disconnect Roblox Studio" : "Connect Roblox Studio"
+      );
     }
   }
 
@@ -393,13 +419,16 @@
     state.startedAt = 0;
     state.stage = -1;
 
+    if (el.progressStageMarks) {
+      el.progressStageMarks.forEach((mark) => mark.classList.remove("is-done", "is-current"));
+    }
     if (el.progress) el.progress.classList.remove("is-running", "is-complete");
     if (el.progressTime) el.progressTime.textContent = "—";
     updateBuildProgress(0, "Ready");
-    updateBuildStatus("Ready");
     setStage(-1);
     if (el.timeline) {
       $$(".timeline__step", el.timeline).forEach((step) => {
+        step.classList.remove("is-done", "is-active", "is-complete", "is-visited");
         step.classList.add("is-pending");
       });
     }
@@ -408,7 +437,7 @@
 
   /**
    * startBuild — the single entry point for a build.
-   * Phase 2 replaces the body of runSimulation with the agent call.
+   * The agent call will replace the body of runSimulation later.
    */
   async function startBuild(prompt, config) {
     if (state.running) return;
@@ -436,22 +465,29 @@
     state.startedAt = Date.now();
 
     if (config.hasKey) {
-      // Deliberately never stored or transmitted in Phase 1.
+      // Deliberately never stored or transmitted.
       el.apiKey.value = "";
       el.apiKey.type = "password";
       el.apiKeyToggle?.setAttribute("aria-pressed", "false");
       el.apiKeyToggle?.setAttribute("aria-label", "Show API key");
+      el.apiKeyToggle?.querySelectorAll(".icon-eye").forEach((n) => n.removeAttribute("hidden"));
+      const eyeOff = el.apiKeyToggle?.querySelector(".icon-eye-off");
+      if (eyeOff) eyeOff.classList.add("is-off");
     }
 
     setBuildingUi(true);
 
-    await runSimulation();
+    const outcome = await runSimulation();
 
-    setBuildingUi(false);
+    setBuildingUi(false, outcome);
   }
 
-  /** Swap the primary action between "Build Game" and "Stop". */
-  function setBuildingUi(building) {
+  /**
+   * Swap the primary action between "Build Game" and "Stop".
+   * @param {boolean} building
+   * @param {"idle"|"complete"|"stopped"} outcome used for the hint once the run ends
+   */
+  function setBuildingUi(building, outcome = "idle") {
     if (!el.buildButton) return;
 
     el.buildButton.classList.toggle("btn--primary", !building);
@@ -466,17 +502,27 @@
     );
 
     if (building) {
-      el.buildNote.textContent = "Building. This is a simulated run.";
+      setHint("Building", "Simulated run — stop any time");
       el.prompt.setAttribute("readonly", "");
+      el.buildBar?.classList.add("is-running");
+      return;
+    }
+
+    el.prompt.removeAttribute("readonly");
+    el.buildBar?.classList.remove("is-running");
+
+    if (outcome === "complete") {
+      setHint("Build complete", "Simulated result — nothing was published");
+    } else if (outcome === "stopped") {
+      setHint("Stopped", "Nothing was published");
     } else {
-      el.buildNote.textContent = "Phase 1 runs a simulated build in your browser.";
-      el.prompt.removeAttribute("readonly");
+      setHint("Ready to build", "Simulated — nothing leaves your browser");
     }
   }
 
   async function runSimulation() {
     for (let i = 0; i < SCRIPT.length; i += 1) {
-      if (state.cancelled) return;
+      if (state.cancelled) return "stopped";
 
       const step = SCRIPT[i];
       setStage(step.stage);
@@ -500,7 +546,7 @@
       await sleep(140);
     }
 
-    if (state.cancelled) return;
+    if (state.cancelled) return "stopped";
 
     state.running = false;
     updateBuildStatus("Complete");
@@ -511,6 +557,7 @@
     }
     updateWorld(el.world, { state: "complete", progress: 100 });
     toast("Build complete — simulated");
+    return "complete";
   }
 
   function initBuildButton() {
@@ -521,8 +568,8 @@
       if (state.running) {
         state.cancelled = true;
         state.running = false;
-        setBuildingUi(false);
-        updateBuildStatus("Ready");
+        setBuildingUi(false, "stopped");
+        updateBuildStatus("Stopped");
         if (el.progressState) el.progressState.textContent = "Stopped";
         if (el.progress) el.progress.classList.remove("is-running");
         toast("Build stopped");
@@ -538,16 +585,20 @@
   function init() {
     cacheElements();
     renderTimeline();
+    buildStageMarks();
     mountWorld(el.world);
     resetBuildUI();
     initProviderControls();
     initApiField();
     initPrompt();
+    BM.restoreConnections(BM.readStore("buildmind.connections.v1", {}));
     paintConnections();
     initBuildButton();
 
     onStateChange((type) => {
-      if (type === "connection") paintConnections();
+      if (type !== "connection") return;
+      paintConnections();
+      BM.writeStore("buildmind.connections.v1", BM.snapshotConnections());
     });
 
     el.connectRobloxBtn?.addEventListener("click", handleConnectRoblox);

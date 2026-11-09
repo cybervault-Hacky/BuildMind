@@ -26,6 +26,20 @@
         link.removeAttribute("aria-current");
       }
     });
+
+    // The mobile sheet is mounted at boot; mirror the state onto its toggle.
+    const active = document.querySelector('.nav__link[aria-current="page"]');
+    document.querySelectorAll(".menu-toggle").forEach((toggle) => {
+      const expanded = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute(
+        "aria-label",
+        expanded
+          ? "Close menu"
+          : active
+          ? `Open menu, ${active.textContent.trim()} is current`
+          : "Open menu"
+      );
+    });
   }
 
   function initIndicator() {
@@ -83,6 +97,11 @@
   function init() {
     initActiveState();
     initIndicator();
+    // The sheet opens/closes with layout changes; re-measure after it settles.
+    const sheet = document.querySelector(".mobile-nav");
+    if (sheet) {
+      sheet.addEventListener("transitionend", () => initActiveState());
+    }
   }
 
   if (document.readyState === "loading") {

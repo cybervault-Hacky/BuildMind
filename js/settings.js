@@ -3,7 +3,7 @@
    Provider/model selection, simulated connections, motion preference and
    the two general switches. Everything is stored in this browser only.
 
-   Phase 1 note: connectRoblox() / connectStudio() are simulated. They never
+   connectRoblox() / connectStudio() are simulated here. They never
    touch the network, and the API key field is a placeholder that is never
    persisted.
    ========================================================================== */
@@ -94,12 +94,7 @@
       toast("Model saved");
     });
 
-    el.apiKeyToggle?.addEventListener("click", () => {
-      const showing = el.apiKey.type === "text";
-      el.apiKey.type = showing ? "password" : "text";
-      el.apiKeyToggle.setAttribute("aria-pressed", String(!showing));
-      el.apiKeyToggle.setAttribute("aria-label", showing ? "Show API key" : "Hide API key");
-    });
+    BM.bindKeyReveal(el.apiKey, el.apiKeyToggle);
   }
 
   /* ------------------------------------------------------------------------
@@ -114,15 +109,21 @@
       conns.roblox.connected ? "ready" : "idle"
     );
     el.connectRoblox.textContent = conns.roblox.connected ? "Disconnect" : "Connect";
+    el.connectRoblox.setAttribute(
+      "aria-label",
+      conns.roblox.connected ? "Disconnect Roblox account" : "Connect Roblox account"
+    );
 
     setStatus(
       el.studioStatus,
       conns.studio.connected ? "Connected" : "Not connected",
       conns.studio.connected ? "ready" : "idle"
     );
-    el.connectStudio.textContent = conns.studio.connected
-      ? "Disconnect"
-      : "Connect Studio";
+    el.connectStudio.textContent = conns.studio.connected ? "Disconnect" : "Connect";
+    el.connectStudio.setAttribute(
+      "aria-label",
+      conns.studio.connected ? "Disconnect Roblox Studio" : "Connect Roblox Studio"
+    );
   }
 
   async function toggleRoblox() {
@@ -181,7 +182,7 @@
     const settings = loadSettings();
 
     el.autoFix.setAttribute("aria-checked", String(settings.autoFix !== false));
-    el.hints.setAttribute("aria-checked", String(settings.robuxHints !== false));
+    el.hints.setAttribute("aria-checked", String(settings.hints !== false));
 
     el.autoFix.addEventListener("click", () => {
       const next = el.autoFix.getAttribute("aria-checked") !== "true";
@@ -193,7 +194,7 @@
     el.hints.addEventListener("click", () => {
       const next = el.hints.getAttribute("aria-checked") !== "true";
       el.hints.setAttribute("aria-checked", String(next));
-      saveSettings({ robuxHints: next });
+      saveSettings({ hints: next });
       toast(next ? "Hints on" : "Hints off");
     });
   }
@@ -210,7 +211,7 @@
       el.provider.value = findProvider(settings.provider).id;
       fillModels(el.provider.value, settings.model);
       el.autoFix.setAttribute("aria-checked", String(settings.autoFix !== false));
-      el.hints.setAttribute("aria-checked", String(settings.robuxHints !== false));
+      el.hints.setAttribute("aria-checked", String(settings.hints !== false));
       paintMotion("full");
       el.apiKey.value = "";
 
@@ -223,6 +224,7 @@
      ------------------------------------------------------------------------ */
   function init() {
     cache();
+    BM.restoreConnections(BM.readStore("buildmind.connections.v1", {}));
     initAi();
     paintConnections();
     initAppearance();
@@ -233,7 +235,9 @@
     el.connectStudio.addEventListener("click", toggleStudio);
 
     onStateChange((type) => {
-      if (type === "connection") paintConnections();
+      if (type !== "connection") return;
+      paintConnections();
+      BM.writeStore("buildmind.connections.v1", BM.snapshotConnections());
     });
 
     // Deep links from the header / home page (#ai, #roblox)
@@ -241,7 +245,10 @@
       const target = document.querySelector(window.location.hash);
       if (target) {
         window.setTimeout(() => {
-          target.scrollIntoView({ behavior: BM.prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+          target.scrollIntoView({
+            behavior: BM.prefersReducedMotion() ? "auto" : "smooth",
+            block: "start",
+          });
           const heading = HEADINGS[target.id] ? $(HEADINGS[target.id]) : null;
           heading?.focus({ preventScroll: true });
         }, 220);

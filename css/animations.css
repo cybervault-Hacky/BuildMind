@@ -59,16 +59,6 @@
   }
 }
 
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.25;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 @keyframes glow-drift {
   0% {
     transform: translate3d(-2%, 0, 0) scale(1);
@@ -318,6 +308,12 @@ body.is-entering .site-header {
   animation: wv-scan 6.5s var(--ease-in-out) infinite;
 }
 
+/* On the home hero the visual is a preview: hold the scan so it never distracts */
+.worldviz[data-ambient] .worldviz__scan {
+  animation: none;
+  opacity: 0;
+}
+
 /* Build page: states on the worldviz */
 .worldviz[data-state="idle"] .worldviz__orbit,
 .worldviz[data-state="idle"] .worldviz__float {
@@ -326,11 +322,6 @@ body.is-entering .site-header {
 
 .worldviz[data-state="building"] .wv-cell {
   animation: fade-in var(--dur-4) var(--ease-out) both;
-}
-
-/* Hero chip cycling */
-.hero__badge-text {
-  display: inline-block;
 }
 
 /* Project card entrance */
@@ -366,11 +357,6 @@ body.is-entering .site-header {
 /* Status change flash — a calm tint, never a flash */
 .status.is-changing {
   animation: scale-in var(--dur-3) var(--ease-out);
-}
-
-/* Saving pulse for settings rows */
-.setting-row.is-saving .setting-row__title {
-  color: var(--accent);
 }
 
 /* --------------------------------------------------------------------------

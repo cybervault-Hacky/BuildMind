@@ -7,27 +7,26 @@ playable. The first target platform is Roblox.
 BuildMind has its own visual identity. It is not a Roblox client, a Roblox fan
 site, and it uses no Roblox artwork.
 
-## Phase 1 scope
+## Scope
 
-Phase 1 is the frontend foundation only.
+This is the frontend. There is no backend, no AI call, no Roblox integration
+and no credential handling.
 
-- Premium dark UI, original BuildMind brand mark and visual system
+- Premium dark UI, original BuildMind mark and a generated SVG/CSS visual system
 - Four separate pages: Home, Build, Projects, Settings
-- Animated, responsive layout for desktop, tablet and mobile
-- Reduced-motion support, keyboard navigation and visible focus states
-- No backend, no AI calls, no Roblox integration, no credentials
-
-Anything that looks like a connection, a build or a progress run is a
-simulated frontend state. The UI says so where it matters.
+- Responsive from 320px to 1920px, dark-only by design
+- Motion honours `prefers-reduced-motion` and a stored motion preference
+- Simulated states only: anything that looks like a connection or a build run
+  is a frontend simulation, and the UI says so where it matters
 
 ## Pages
 
 | Page | Purpose |
 | --- | --- |
-| `index.html` | First impression. Positioning, two entry actions, how a build runs. |
-| `build.html` | The workspace. Game idea, AI configuration, connections, build activity and progress. |
-| `projects.html` | Created games. Name, status, last activity, open. |
-| `settings.html` | AI provider and model, Roblox and Studio connection state, motion, general preferences. |
+| `index.html` | First impression. Positioning, two entry actions, how a build runs, one shortcut to projects. |
+| `build.html` | The workspace. Game idea, AI configuration, connections, build activity, progress. |
+| `projects.html` | Started games. Preview, name, status, last activity, open. |
+| `settings.html` | AI provider and model, Roblox and Studio connection state, appearance, general preferences. |
 
 No other pages exist by design.
 
@@ -76,23 +75,39 @@ Then open `http://localhost:8080`.
 Opening `index.html` directly with `file://` mostly works too, but a local
 server is recommended.
 
-## Current frontend capabilities
+## Design system
 
-- Shared header with active-page indicator and animated mobile sheet
-- Cursor-following ambient light, generated world-construction visualizer,
-  scroll reveals, page fade transitions, button micro-interactions
-- Build workspace: prompt composer with examples, provider/model selectors,
-  masked API-key field, connection rows, activity timeline, progress component
-- Simulated build run: Understanding → Planning → Building → Testing →
-  Fixing → Validating → Complete, with a stoppable run
-- Projects: sample projects, status filters, generated abstract thumbnails
-- Settings: provider/model, motion preference, switches, local reset
-- Preferences persist in `localStorage` (settings and motion only)
+Tokens live at the top of `css/main.css` and nothing outside them should be
+invented locally.
+
+- **Surfaces** `--bg` → `--surface-3`, borders from `--line` to `--line-strong`
+- **Text** `--text`, `--text-soft`, `--text-muted`, `--text-faint`
+  (all ≥ 4.5:1 on every surface)
+- **Accent** one family (`--accent*`); mint, amber and rose are status only
+- **Space** `--s-1` … `--s-12` on a 4px base
+- **Radius** `--r-xs` … `--r-pill`
+- **Motion** `--ease-out`, `--ease-in-out`, `--ease-soft`, `--dur-1` … `--dur-5`
+- **Type** Inter with a system fallback stack, JetBrains Mono for numbers
+
+## Frontend behaviour
+
+- Shared header with active-page indicator and an animated, focus-trapped
+  mobile sheet
+- Cursor-following ambient light (desktop pointers only), generated
+  world-construction visualizer, scroll reveals, page fade transitions
+- Build workspace: prompt composer with examples and a counter, provider and
+  model selectors, masked API-key field, connection rows, activity timeline,
+  progress with stage markers, and a stoppable simulated run
+- Projects: sample projects, status filters, CSS-generated previews, empty
+  states
+- Settings: provider and model, motion preference, switches, local reset
+- Stored in `localStorage`: settings, motion preference, and the simulated
+  connection state. The API key is never stored.
 
 ## Intentionally not implemented
 
 - Backend, database, accounts, authentication
-- Real AI providers or API-key storage (fields are UI only; keys are never saved)
+- Real AI providers or API-key handling
 - Real Roblox OAuth or Studio bridge
 - AI agent, code generation, testing, automatic fixing
 - Project persistence beyond the local sample data

@@ -48,6 +48,16 @@
 }
 
 /* --------------------------------------------------------------------------
+   Grid min-tracks — every width the product supports, including 320px
+   -------------------------------------------------------------------------- */
+@media (max-width: 700px) {
+  /* A 280px track plus gutters would overflow a 320px viewport */
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
    Tablet — collapse header nav into the sheet
    -------------------------------------------------------------------------- */
 @media (max-width: 860px) {
@@ -102,11 +112,11 @@
 
   .hero__visual {
     order: 2;
-    min-height: 300px;
+    min-height: 0;
   }
 
   .worldviz {
-    max-width: 340px;
+    max-width: 320px;
   }
 
   .pipeline {
@@ -116,17 +126,8 @@
     gap: 20px;
   }
 
-  .start-row {
-    grid-template-columns: 1fr;
-  }
-
-  .start-card + .start-card {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
-
   .start-card {
-    padding: 20px var(--s-2);
+    padding: var(--s-5) 0 var(--s-7);
   }
 
   .workspace {
@@ -137,6 +138,21 @@
 
   .activity-col {
     position: static;
+  }
+
+  /* Activity sits under the composer once the two columns collapse:
+     timeline + progress side by side while there is tablet width, stacked on phones */
+  .activity-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+  }
+
+  .build-bar {
+    position: static;
+    background: none;
+    padding-bottom: 0;
   }
 
   .page-head {
@@ -172,6 +188,21 @@
     font-size: 14.5px;
   }
 
+  .site-header__actions {
+    gap: 6px;
+  }
+
+  .site-header__actions .btn--sm {
+    height: 34px;
+    padding-inline: 12px;
+    font-size: 12px;
+  }
+
+  .menu-toggle {
+    width: 40px;
+    height: 40px;
+  }
+
   /* Hero */
   .hero {
     gap: 36px;
@@ -187,10 +218,6 @@
     margin-top: 14px;
     font-size: 14.5px;
     max-width: 34ch;
-  }
-
-  .hero__badge {
-    margin-bottom: 18px;
   }
 
   .hero__actions {
@@ -302,6 +329,19 @@
     gap: 6px;
   }
 
+  /* No physical keyboard hint on touch devices */
+  .group-hint--keys {
+    display: none;
+  }
+
+  .group-hint {
+    font-size: 10.5px;
+  }
+
+  .group-link {
+    font-size: 11px;
+  }
+
   .chip {
     height: 30px;
     font-size: 11.5px;
@@ -318,25 +358,29 @@
     font-size: 15px; /* avoid iOS zoom */
   }
 
-  .textarea {
-    font-size: 15px;
-  }
-
-  .build-action {
-    flex-direction: column;
-    align-items: stretch;
+  /* One column on phones: activity timeline, then progress */
+  .activity-col {
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
 
-  .build-action .btn {
+  /* The primary action owns the thumb zone on phones */
+  .build-bar {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 0;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .build-bar .btn {
     width: 100%;
-    height: 50px;
+    min-width: 0;
+    height: 52px;
     font-size: 15px;
   }
 
-  .build-action__note {
-    order: 2;
-    justify-content: center;
+  .build-bar__hint {
     text-align: center;
   }
 
@@ -349,22 +393,31 @@
     padding: 16px;
   }
 
-  /* Connections stack their action under the label */
+  /* Connections: label + status left, full-height action right */
   .connection {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    align-items: center;
     gap: 12px;
-    padding: 14px 0;
+    padding: 12px 0;
   }
 
   .connection__actions {
-    width: 100%;
-    justify-content: space-between;
-    padding-left: 46px;
+    width: auto;
+    padding-left: 0;
   }
 
   .connection__actions .btn {
-    height: 36px;
+    height: 38px;
+    padding-inline: 14px;
+    border-color: var(--line-strong);
+    color: var(--text-soft);
+  }
+
+  .connection__title-row {
+    gap: 8px;
+  }
+
+  .progress__stages {
+    gap: 3px;
   }
 
   /* Timeline */
@@ -384,8 +437,16 @@
     padding-bottom: 56px;
   }
 
+  .project-card__thumb {
+    aspect-ratio: 2 / 1;
+  }
+
   .project-new {
-    min-height: 132px;
+    min-height: 120px;
+  }
+
+  .project-card__body {
+    padding: 13px 14px;
   }
 
   .filter-row {
@@ -474,15 +535,28 @@
 }
 
 /* --------------------------------------------------------------------------
-   Very small phones
+   Very small phones (320–380px) — 320px must stay usable, not merely survive
    -------------------------------------------------------------------------- */
 @media (max-width: 380px) {
+  :root {
+    --gutter: 16px;
+    --header-h: 56px;
+  }
+
   .hero__title {
     font-size: 27px;
   }
 
+  .hero__lede {
+    font-size: 14px;
+  }
+
   .worldviz {
     max-width: 240px;
+  }
+
+  .hero__visual {
+    min-height: 216px;
   }
 
   .pipeline__steps {
@@ -493,9 +567,93 @@
     font-size: 11.5px;
   }
 
+  .pipeline__step-num {
+    width: 18px;
+    height: 18px;
+  }
+
+  .start-card {
+    gap: 12px;
+    padding-bottom: var(--s-6);
+  }
+
+  .start-card__title {
+    font-size: 13px;
+  }
+
+  .start-card__note {
+    font-size: 12px;
+  }
+
   .btn--lg {
     padding-inline: 16px;
     font-size: 13.5px;
+  }
+
+  /* Composer chrome drops the secondary action first */
+  .prompt-block__bar {
+    padding: 8px 8px 8px 14px;
+  }
+
+  #prompt-idea {
+    font-size: 11.5px;
+    padding-inline: 10px;
+  }
+
+  .prompt-block__count {
+    font-size: 11px;
+  }
+
+  .chip {
+    font-size: 11px;
+    padding-inline: 9px;
+  }
+
+  /* Timelines and progress stay compact but readable */
+  .timeline__label {
+    font-size: 13px;
+  }
+
+  .timeline__step {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .panel__head,
+  .panel__body {
+    padding-inline: 14px;
+  }
+
+  .connection__icon {
+    display: none;
+  }
+
+  .connection__actions .btn {
+    height: 36px;
+    padding-inline: 12px;
+    font-size: 12px;
+  }
+
+  .segmented {
+    width: 100%;
+  }
+
+  .segmented__option {
+    flex: 1 1 0;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  /* Settings rows: control sits full width and never overflows */
+  .setting-row__control .segmented {
+    width: 100%;
+  }
+
+  .toast {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    font-size: 12px;
   }
 }
 
