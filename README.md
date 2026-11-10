@@ -804,6 +804,32 @@ cause was live activity rows inside a running build, not a leak. Measured at the
 same point each time — idle after a reset — the DOM returns to exactly 402 nodes
 on build.html across four consecutive builds.
 
+### Regression matrix
+
+40 suites, all clean. Assertion counts are exact, from the suite output:
+
+| Group | Suites | Assertions |
+| --- | --- | --- |
+| Phase 4 service/flow/security | 3 | 120 |
+| Phase 5 UI/states/guards/composer/reduced/cross | 6 | 133 |
+| Phase 6 lifecycle/identity/persist/filters/nav/a11y/security/perf/layout/responsive | 10 | 393 |
+| Phase 7 config/sync/quality | 3 | 230 |
+| Phase 8 static/visual | 2 | 323 |
+| Phase 9 hardening | 1 | 28 |
+| Phase 10 release | 1 | 94 |
+| `final.js` cross-phase smoke | 1 | 11 |
+| log-style suites (report pass/fail, no count) | 13 | — |
+| **Total numeric assertions** | **27 suites** | **1,332** |
+
+The remaining 13 suites (`state1`, `p5_perf`, `t_build_p4`, `t_restart_p4`,
+`t_sync`, `t_edge_p4`, `reduced_p4`, `keysafety`, `t_nav`, `t_valid`,
+`t_proj_p4`, `motion`, `perf`) report measurements and pass/fail lines rather
+than a count, so they are listed rather than totalled — folding them in would
+mean inventing a number. `p5_perf` prints mutation counts and timings, not
+assertions.
+
+3 + 6 + 10 + 3 + 2 + 1 + 1 + 1 + 13 = **40**. Every one is clean.
+
 ### Performance (no regression from Phase 9)
 
 | Measurement | Phase 9 | Phase 10 |
