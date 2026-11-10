@@ -85,6 +85,10 @@ export class TestClient {
     return this.cookie;
   }
 
+  get csrfToken(): string {
+    return this.csrf;
+  }
+
   private capture(headers: Record<string, unknown>): void {
     const setCookie = headers['set-cookie'];
     if (typeof setCookie === 'string') {

@@ -23,6 +23,7 @@ import { loadEnv, type Env } from './config/env.js';
 import { createPool } from './db/pool.js';
 import { Logger } from './utils/logger.js';
 import { registerErrorHandler } from './middleware/errorHandler.js';
+import { AppError } from './errors/AppError.js';
 import { registerRoutes } from './routes/index.js';
 import { AuthService } from './services/auth/authService.js';
 import { ProjectService } from './services/projects/projectService.js';
@@ -119,10 +120,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<BuiltApp>
     timeWindow: '1 minute',
     // A per-IP bucket: no shared global counter that one client can exhaust.
     keyGenerator: (request) => request.ip,
-    errorResponseBuilder: () => ({
-      ok: false,
-      error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again shortly.' },
-    }),
+    // The plugin *throws* whatever this returns, so it must be an AppError for
+    // the central error handler to see a status code. Returning a plain object
+    // here produced a 500 instead of a 429.
+    errorResponseBuilder: () => new AppError('RATE_LIMITED'),
   });
 
   /* ------------------------------------------------------------- context -- */

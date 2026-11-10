@@ -110,36 +110,42 @@ export async function buildRoutes(app: FastifyInstance, ctx: AppContext): Promis
       return reply;
     }
 
-    const unsubscribe = ctx.bus.subscribe(id, runId, (event) => {
-      if (closed) return;
-      if (event.seq <= seq) return;
-      seq = event.seq;
-      send(event);
-      if (isTerminal(event.status as never)) {
-        send({ status: event.status, terminal: true, progress: event.progress });
-        closed = true;
-        unsubscribe();
-        reply.raw.end();
-      }
-    });
-
-    // A heartbeat keeps intermediaries from closing an idle stream.
-    const heartbeat = setInterval(() => {
-      if (closed) return;
-      reply.raw.write(': keep-alive\n\n');
-    }, 15_000);
+    // Declared before the subscriber so the terminal path can stop the
+    // heartbeat. Without this, a completed stream left a 15s interval running
+    // for the lifetime of the process.
+    let heartbeat: NodeJS.Timeout | null = null;
+    let detach: (() => void) | null = null;
 
     const cleanup = (): void => {
       if (closed) return;
       closed = true;
-      clearInterval(heartbeat);
-      unsubscribe();
+      if (heartbeat) clearInterval(heartbeat);
+      heartbeat = null;
+      detach?.();
+      detach = null;
       try {
         reply.raw.end();
       } catch {
         // Already ended: nothing to do.
       }
     };
+
+    detach = ctx.bus.subscribe(id, runId, (event) => {
+      if (closed) return;
+      if (event.seq <= seq) return;
+      seq = event.seq;
+      send(event);
+      if (isTerminal(event.status as never)) {
+        send({ status: event.status, terminal: true, progress: event.progress });
+        cleanup();
+      }
+    });
+
+    // A heartbeat keeps intermediaries from closing an idle stream.
+    heartbeat = setInterval(() => {
+      if (closed) return;
+      reply.raw.write(': keep-alive\n\n');
+    }, 15_000);
 
     request.raw.on('close', cleanup);
     request.raw.on('error', cleanup);
