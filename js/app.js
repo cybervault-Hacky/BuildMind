@@ -165,15 +165,30 @@
     }
 
     targets.forEach((el) => {
-      // Anything already above the fold reveals immediately on the next frame
-      // so the first paint is never empty.
+      // Anything already above the fold reveals immediately, so the first paint
+      // is never empty. Everything else waits for the observer.
+      //
+      // The fold is measured generously (full viewport + a margin) because the
+      // observer's own rootMargin is negative: an element between 90% and 100%
+      // of the viewport used to be handed to an observer that could not fire
+      // for it yet, leaving a visible block at opacity 0 on tall pages.
       const rect = el.getBoundingClientRect();
-      if (rect.top < window.innerHeight * 0.9) {
+      if (rect.top < window.innerHeight + 120) {
         requestAnimationFrame(() => el.classList.add("is-revealed"));
       } else {
         revealObserver.observe(el);
       }
     });
+
+    // Safety net: a reveal that can never fire (layout settled off-screen after
+    // the observer was created, or a scroll container the observer cannot see)
+    // must not hide content forever. One late pass, not a loop.
+    window.setTimeout(() => {
+      $$("[data-reveal]:not(.is-revealed), [data-stagger]:not(.is-revealed)").forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight * 1.5) el.classList.add("is-revealed");
+      });
+    }, 1200);
   }
 
   /* ------------------------------------------------------------------------
@@ -214,6 +229,9 @@
       if (supportInert) sheet.inert = !open;
       else sheet.setAttribute("aria-hidden", String(!open));
       document.body.classList.toggle("is-sheet-open", open);
+      // The scrim lives on .page: .page is its own stacking context, so a
+      // body-level overlay would paint underneath the sheet.
+      $(".page")?.classList.toggle("is-sheet-open", open);
       if (!open) {
         BM.updateActiveNav?.();
         if (restoreFocus) toggle.focus({ preventScroll: true });

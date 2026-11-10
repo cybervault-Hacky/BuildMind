@@ -459,6 +459,15 @@ body.is-entering .site-header {
   transform: none;
 }
 
+/* Print and forced-colours must never drop content, whatever the JS did. */
+@media print, (forced-colors: active) {
+  [data-reveal],
+  [data-stagger] > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -6,6 +6,37 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
+   0. Typefaces — self-hosted, so the page never depends on a third party
+
+   The CSP on every page is `default-src 'self'`, which blocks the hosted
+   Google Fonts stylesheet: the page used to fall back to a system font and log
+   a console error on every load. Both families ship here as variable web fonts
+   (weight range in the file), latin subset only, under the SIL OFL — the
+   licence text sits beside them in assets/fonts.
+   -------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../assets/fonts/inter-variable-latin.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-variable-latin.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --------------------------------------------------------------------------
    1. Design tokens
    -------------------------------------------------------------------------- */
 :root {
@@ -35,6 +66,7 @@
 
   /* Secondary accent, used only for status (never decoration) */
   --mint: #5fe0bf;
+  --mint-deep: #46c9a8;
   --mint-soft: rgba(95, 224, 191, 0.12);
   --amber: #e0b072;
   --amber-soft: rgba(224, 176, 114, 0.12);
@@ -551,11 +583,42 @@ body.is-sheet-open {
   inset: var(--header-h) 0 auto;
   z-index: 95;
   padding: var(--s-4) var(--gutter) var(--s-6);
-  background: rgba(8, 8, 11, 0.96);
+  background: rgba(8, 8, 11, 0.97);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--line);
+  /* The sheet floats over the page; a shadow and a dimmed scrim make that
+     read as a layer instead of a hard cut through the content behind it. */
+  box-shadow: 0 24px 48px -20px rgba(0, 0, 0, 0.9);
   display: none;
+}
+
+/* While the sheet is open the page behind it is a dimmed, inert surface.
+   Without this the sheet's bottom edge looked like a hard cut through the
+   content it floats over. */
+.page.is-sheet-open::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(4, 4, 6, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  animation: scrim-in var(--dur-3) var(--ease-out) forwards;
+}
+
+@keyframes scrim-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page.is-sheet-open::after {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .mobile-nav__list {
@@ -896,10 +959,21 @@ body.is-sheet-open {
 
 .input:focus,
 .select:focus {
-  outline: none;
-  border-color: var(--accent-line);
+  border-color: var(--accent-hover);
   background: var(--surface-2);
-  box-shadow: 0 0 0 3.5px rgba(139, 147, 255, 0.12);
+  /* A field is a control: it gets the same visible ring as every other
+     control, not just a tint. The inner 1px keeps the border crisp, the
+     outer ring does the signalling. */
+  box-shadow: 0 0 0 1px var(--accent-hover), 0 0 0 4px rgba(139, 147, 255, 0.22);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+/* Search sits on a raised toolbar, so it keeps its pill shape but shares the
+   focus language. It previously had no focus affordance at all. */
+.project-search__input:focus {
+  border-color: var(--accent-hover);
+  box-shadow: 0 0 0 1px var(--accent-hover), 0 0 0 4px rgba(139, 147, 255, 0.22);
 }
 
 .select {
@@ -945,6 +1019,14 @@ body.is-sheet-open {
   height: 15px;
 }
 
+/* Comfortable target for a small icon control, without resizing the field. */
+.input-group__action::before {
+  content: "";
+  position: absolute;
+  inset: -8px -7px;
+  border-radius: var(--r-sm);
+}
+
 .icon-eye-off.is-off {
   display: none;
 }
@@ -954,7 +1036,9 @@ body.is-sheet-open {
   background: var(--surface-3);
 }
 
-/* Toggle switch */
+/* Toggle switch — the track is small on purpose, but the control must be
+   comfortable to hit: ::before extends the hit area to 44px without moving a
+   single pixel of the design. */
 .switch {
   position: relative;
   display: inline-flex;
@@ -966,6 +1050,18 @@ body.is-sheet-open {
   border: 1px solid var(--line-strong);
   background: var(--surface-3);
   transition: background var(--dur-3) var(--ease-out), border-color var(--dur-3) var(--ease-out);
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  inset: -13px -10px;
+  border-radius: var(--r-pill);
+}
+
+/* The surrounding row must not clip that halo. */
+.setting-row__control {
+  align-items: center;
 }
 
 .switch::after {
@@ -1713,6 +1809,10 @@ body.is-sheet-open {
 }
 
 /* Build action — the single dominant control on the page */
+/* The one action that must always be reachable while the workspace scrolls.
+   It is opaque with a blurred backdrop, the same treatment the header uses:
+   a see-through bar let the Connections section show through it and the
+   Connect button underneath was unreachable at 1280-1440px. */
 .build-bar {
   position: sticky;
   bottom: 0;
@@ -1723,7 +1823,10 @@ body.is-sheet-open {
   gap: var(--s-5);
   margin-top: calc(var(--s-4) * -1);
   padding: 14px 0;
-  background: linear-gradient(to top, var(--bg) 58%, rgba(6, 6, 8, 0));
+  background: rgba(9, 9, 13, 0.88);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-top: 1px solid var(--line);
 }
 
 .build-bar__hint {
@@ -1998,7 +2101,7 @@ body.is-sheet-open {
 }
 
 .progress.is-complete .progress__fill {
-  background: linear-gradient(90deg, #46c9a8, var(--mint));
+  background: linear-gradient(90deg, var(--mint-deep), var(--mint));
 }
 
 .progress.is-complete .progress__value {
@@ -2338,7 +2441,14 @@ body.is-sheet-open {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--s-5);
   padding-bottom: var(--s-11);
-  align-items: start;
+  /* Rows are equal height, so cards in a row share one baseline and one
+     footer line instead of ending at different y positions. */
+  align-items: stretch;
+}
+
+.projects-grid > .project-card,
+.projects-grid > .project-new {
+  min-height: 100%;
 }
 
 /* --------------------------------------------------------------------------
@@ -2469,8 +2579,13 @@ body.is-sheet-open {
   align-items: center;
   justify-content: space-between;
   gap: var(--s-3);
-  margin-top: 4px;
+  margin-top: auto;
+  padding-top: 4px;
   min-width: 0;
+}
+
+.project-card__body {
+  grid-template-rows: auto auto 1fr auto;
 }
 
 .project-card__build {
@@ -2510,22 +2625,289 @@ body.is-sheet-open {
   color: var(--text);
 }
 
-/* Generated thumbnail art — one CSS scene per project, no images */
+/* --------------------------------------------------------------------------
+   Generated thumbnail art — one CSS scene per project, no images
+
+   Six abstract scenes (lattice, terrain, graph, plates, dots, arcs), picked
+   deterministically from the project name. They share one language: a faint
+   construction grid, thin strokes in the accent family, and a single soft
+   light source. They read as a *concept*, never as a game screenshot.
+
+   Everything is drawn with gradients on ::before/::after plus one .art-planes
+   child, so a card costs no extra DOM beyond a single empty span and there is
+   nothing to load, decode or paint off the main thread.
+   -------------------------------------------------------------------------- */
 .project-card__art {
+  --scene-glow: rgba(139, 147, 255, 0.24);
+  --scene-line: rgba(255, 255, 255, 0.08);
+  --scene-ink: rgba(139, 147, 255, 0.5);
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  background-color: var(--surface-2);
   transition: transform var(--dur-5) var(--ease-out);
-}
-
-.project-card:hover .project-card__art {
-  transform: scale(1.04);
 }
 
 .project-card__art::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 70% 80% at 50% 118%, var(--scene-glow, rgba(139, 147, 255, 0.22)), transparent 70%);
+  background: radial-gradient(ellipse 70% 80% at 50% 118%, var(--scene-glow), transparent 70%);
+}
+
+/* Shared construction grid — the "world being measured" layer. */
+.project-card__art::after {
+  content: "";
+  position: absolute;
+  inset: -15% -10%;
+  background-image: linear-gradient(to right, var(--scene-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--scene-line) 1px, transparent 1px);
+  background-size: 34px 34px;
+  transform: perspective(340px) rotateX(52deg) scale(1.5);
+  transform-origin: 50% 100%;
+  opacity: 0.5;
+  -webkit-mask-image: radial-gradient(ellipse 62% 78% at 50% 88%, #000 12%, transparent 72%);
+  mask-image: radial-gradient(ellipse 62% 78% at 50% 88%, #000 12%, transparent 72%);
+  transition: transform var(--dur-5) var(--ease-out), opacity var(--dur-5) var(--ease-out);
+}
+
+.project-card:hover .project-card__art {
+  transform: scale(1.03);
+}
+
+.project-card:hover .project-card__art::after {
+  opacity: 0.72;
+  transform: perspective(340px) rotateX(48deg) scale(1.56);
+}
+
+/* A stack of translucent slabs — reused by the structural scenes. */
+.project-card__art .art-planes {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: 46%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  display: block;
+}
+
+/* --- lattice: an isometric plot, buildings rising from its cells ------- */
+.art-lattice {
+  --scene-glow: rgba(139, 147, 255, 0.26);
+}
+
+.art-lattice::after {
+  transform: perspective(300px) rotateX(56deg) rotateZ(45deg) scale(1.35);
+}
+
+/* The plot itself: a rhombus split into cells, some of them filled. */
+.art-lattice .art-planes {
+  width: 44%;
+  background-image: linear-gradient(
+      45deg,
+      transparent 48.6%,
+      rgba(139, 147, 255, 0.3) 48.6% 51.4%,
+      transparent 51.4%
+    ),
+    linear-gradient(-45deg, transparent 48.6%, rgba(139, 147, 255, 0.3) 48.6% 51.4%, transparent 51.4%),
+    conic-gradient(
+      from 180deg at 50% 50%,
+      rgba(139, 147, 255, 0.16) 0deg 90deg,
+      rgba(139, 147, 255, 0.06) 90deg 180deg,
+      rgba(139, 147, 255, 0.16) 180deg 270deg,
+      rgba(139, 147, 255, 0.06) 270deg 360deg
+    );
+  background-size: 33.4% 33.4%, 33.4% 33.4%, 100% 100%;
+  background-repeat: repeat, repeat, no-repeat;
+  border-radius: 2px;
+  transform: rotateX(52deg) rotateZ(45deg);
+  opacity: 0.9;
+  box-shadow: 0 0 0 1px rgba(139, 147, 255, 0.22);
+}
+
+/* --- terrain: layered contour bands, a ridge line, low light ---------- */
+.art-terrain {
+  --scene-glow: rgba(95, 224, 191, 0.18);
+  --scene-line: rgba(255, 255, 255, 0.06);
+}
+
+.art-terrain::after {
+  background-image: repeating-linear-gradient(
+      112deg,
+      rgba(255, 255, 255, 0.055) 0 1px,
+      transparent 1px 22px
+    ),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: auto, 100% 26px;
+  transform: none;
+  opacity: 1;
+  -webkit-mask-image: linear-gradient(to top, #000 4%, transparent 78%);
+  mask-image: linear-gradient(to top, #000 4%, transparent 78%);
+}
+
+/* Contour strata: four clipped planes receding into the haze. */
+.art-terrain .art-planes {
+  width: 116%;
+  top: auto;
+  bottom: -14%;
+  left: 50%;
+  aspect-ratio: 2.6 / 1;
+  translate: -50% 0;
+  background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(95, 224, 191, 0.34) 0 1px,
+      transparent 1px 13px
+    ),
+    linear-gradient(to top, rgba(95, 224, 191, 0.14), transparent 58%);
+  border-top: 1px solid rgba(95, 224, 191, 0.55);
+  transform: perspective(300px) rotateX(46deg);
+  transform-origin: 50% 100%;
+  -webkit-mask-image: linear-gradient(to top, #000 6%, transparent 92%);
+  mask-image: linear-gradient(to top, #000 6%, transparent 92%);
+  opacity: 0.9;
+}
+
+/* --- graph: nodes and links, one node lit ----------------------------- */
+.art-graph {
+  --scene-glow: rgba(139, 147, 255, 0.2);
+}
+
+.art-graph::after {
+  background-image: radial-gradient(circle, rgba(139, 147, 255, 0.5) 1.1px, transparent 1.2px),
+    linear-gradient(rgba(139, 147, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 147, 255, 0.12) 1px, transparent 1px);
+  background-size: 30px 30px, 60px 60px, 60px 60px;
+  transform: none;
+  opacity: 0.9;
+  -webkit-mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 8%, transparent 74%);
+  mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 8%, transparent 74%);
+}
+
+.art-graph .art-planes {
+  width: 13%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 147, 255, 0.95), rgba(139, 147, 255, 0.2) 46%, transparent 64%);
+  box-shadow: 0 0 0 1px rgba(139, 147, 255, 0.45), 0 0 26px 6px rgba(139, 147, 255, 0.14);
+  transform: none;
+}
+
+/* --- plates: stacked strata, seen edge-on ----------------------------- */
+.art-plates {
+  --scene-glow: rgba(224, 176, 114, 0.16);
+}
+
+.art-plates::after {
+  transform: perspective(300px) rotateX(64deg) scale(1.4);
+}
+
+/* Four stacked slabs, edge-lit from below-left. */
+.art-plates .art-planes {
+  width: 54%;
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.3) 0 1px,
+      rgba(255, 255, 255, 0.02) 1px 21px
+    ),
+    linear-gradient(102deg, rgba(224, 176, 114, 0.22), rgba(224, 176, 114, 0.04) 58%, transparent 84%);
+  background-size: 100% 22px, 100% 100%;
+  background-repeat: repeat-y, no-repeat;
+  border-radius: 3px;
+  transform: rotateX(56deg) rotateZ(-12deg);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 40px -22px rgba(0, 0, 0, 0.9);
+}
+
+/* --- dots: a field of plotted points, densest at the horizon ---------- */
+.art-dots {
+  --scene-glow: rgba(139, 147, 255, 0.18);
+}
+
+.art-dots::after {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.22) 1px, transparent 1.3px);
+  background-size: 13px 13px;
+  transform: perspective(260px) rotateX(60deg) scale(1.45);
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(ellipse 66% 84% at 50% 96%, #000 6%, transparent 70%);
+  mask-image: radial-gradient(ellipse 66% 84% at 50% 96%, #000 6%, transparent 70%);
+}
+
+.art-dots .art-planes {
+  /* No disc here: this scene is the field itself. */
+  display: none;
+}
+
+.art-dots::before {
+  background: radial-gradient(ellipse 70% 40% at 50% 94%, rgba(139, 147, 255, 0.26), transparent 66%),
+    radial-gradient(ellipse 70% 80% at 50% 118%, var(--scene-glow), transparent 70%);
+}
+
+/* Denser, darker points with a horizon fade so the field reads as a survey. */
+.art-dots::after {
+  background-image: radial-gradient(circle, rgba(210, 214, 240, 0.5) 1.1px, transparent 1.5px);
+  background-size: 13px 13px;
+  opacity: 0.72;
+  -webkit-mask-image: linear-gradient(to top, #000 6%, rgba(0, 0, 0, 0.5) 52%, transparent 88%);
+  mask-image: linear-gradient(to top, #000 6%, rgba(0, 0, 0, 0.5) 52%, transparent 88%);
+}
+
+/* A single marker standing in the field, so the scene has a subject. */
+.art-dots .art-planes {
+  display: block;
+  width: 12%;
+  aspect-ratio: 1;
+  top: 46%;
+  left: 62%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 147, 255, 0.75), rgba(139, 147, 255, 0.12) 50%, transparent 66%);
+}
+
+/* --- arcs: concentric rings, a build in orbit ------------------------- */
+.art-arcs {
+  --scene-glow: rgba(139, 147, 255, 0.22);
+}
+
+.art-arcs::after {
+  background-image: radial-gradient(
+      ellipse 46% 46% at 50% 48%,
+      transparent 49.4%,
+      rgba(139, 147, 255, 0.3) 49.6%,
+      rgba(139, 147, 255, 0.06) 50%,
+      transparent 50.6%
+    ),
+    radial-gradient(
+      ellipse 33% 33% at 50% 48%,
+      transparent 49%,
+      rgba(139, 147, 255, 0.22) 49.4%,
+      transparent 50.2%
+    ),
+    radial-gradient(ellipse 19% 19% at 50% 48%, transparent 48%, rgba(139, 147, 255, 0.16) 49%, transparent 50%);
+  /* One image, drawn once — never tiled. */
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  transform: none;
+  opacity: 1;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.art-arcs .art-planes {
+  width: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 147, 255, 0.95), rgba(139, 147, 255, 0.18) 50%, transparent 66%);
+  /* Sits on the outermost ring, at roughly one o'clock. */
+  top: 30%;
+  left: 66%;
+  translate: -50% -50%;
+  transform: none;
+}
+
+/* Motion: the construction layer drifts a few pixels, nothing more. */
+.project-card:hover .art-lattice .art-planes,
+.project-card:hover .art-plates .art-planes {
+  transform: rotateX(56deg) rotateZ(45deg) translateY(-3px);
+}
+
+.project-card:hover .art-plates .art-planes {
+  transform: rotateX(62deg) rotateZ(-8deg) skewX(-14deg) translateY(-3px);
 }
 
 /* New project tile */
@@ -2705,6 +3087,15 @@ body.is-sheet-open {
    Confirmation dialog — native <dialog>, one consequence, two actions
    -------------------------------------------------------------------------- */
 .confirm {
+  /* The universal `* { margin: 0 }` reset above also zeroes the UA's
+     `dialog { margin: auto }`, which is what centres a native dialog. Put the
+     centring back explicitly, and keep tall dialogs inside short viewports. */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   width: min(420px, calc(100vw - 32px));
   padding: 0;
   border-radius: var(--r-lg);

@@ -125,6 +125,27 @@ studio: boolean }` can only express "connected" or "not connected"; the
 transient `connecting` status lives in state and is never persisted, so a reload
 cannot land on a stuck transition.
 
+## Where the scenes come from
+
+`SCENE_ARTS = ["lattice", "terrain", "graph", "plates", "dots", "arcs"]` in
+`localProjectService` is the contract for project artwork:
+
+- `art` picks a scene, `scene` (0–5) picks it too, and both are derived from a
+  deterministic hash of the project name. The same project always renders the
+  same scene, and nothing is random per render.
+- Both values are **normalised on read**: an unknown `art` falls back to the
+  name-derived scene and an out-of-range `scene` is coerced, so a hand-edited
+  record cannot produce an unstyled card.
+- A scene is a CSS class (`art-<name>`) on an empty, `aria-hidden` span plus one
+  empty child (`.art-planes`). The service knows only the six names — it does no
+  drawing, loads no image and holds no palette. The renderer applies the class.
+- The renderer writes those class names itself; no user-controlled string ever
+  reaches a `className` or `innerHTML`.
+
+Replacing the artwork means adding a CSS rule per scene. Replacing it with real
+generated art means changing what `recordBuild`/`createProject` store here, not
+rewriting the card.
+
 ## Replacing a mock
 
 Implement the same method names with the same envelopes, then swap the script

@@ -105,11 +105,91 @@ invented locally.
 - **Surfaces** `--bg` → `--surface-3`, borders from `--line` to `--line-strong`
 - **Text** `--text`, `--text-soft`, `--text-muted`, `--text-faint`
   (all ≥ 4.5:1 on every surface)
-- **Accent** one family (`--accent*`); mint, amber and rose are status only
+- **Accent** one family (`--accent*`); mint (`--mint`, `--mint-deep`), amber and
+  rose are status only
 - **Space** `--s-1` … `--s-12` on a 4px base
 - **Radius** `--r-xs` … `--r-pill`
 - **Motion** `--ease-out`, `--ease-in-out`, `--ease-soft`, `--dur-1` … `--dur-5`
 - **Type** Inter with a system fallback stack, JetBrains Mono for numbers
+
+### Typography
+
+Both families are **self-hosted** as variable-weight WOFF2 in `assets/fonts/`
+(latin subset, ~112 KB total, SIL OFL — licence beside the files). They are not
+fetched from a third party: every page's CSP is `default-src 'self'`, which
+blocked the old Google Fonts stylesheet, so the product used to render in a
+system font and log a console error on every load. Because the files are
+variable, every weight the design uses (400, 500, 540, 560, 600) is a real
+instance rather than a browser-synthesised faux weight.
+
+The fallback stack is unchanged, so a missing font file degrades to the system
+sans-serif with no layout break.
+
+### Visual system
+
+- **One control language.** Every input, select, textarea and button shares a
+  height, radius, border, focus treatment and disabled treatment. Fields and
+  selects are 42px; small buttons are 34px on pointer devices and 44px at touch
+  widths.
+- **One focus language.** Every interactive element shows a visible ring —
+  2px accent outline with an offset, or a 1px accent border plus a 4px halo on
+  fields. Focus never relies on a subtle tint alone, and never changes layout.
+- **One status language.** A dot plus text, never colour alone; the dot is
+  `aria-hidden` and the text is the state.
+- **One elevation language.** Panels use a 1px border plus a soft, low-contrast
+  gradient; shadows are reserved for things that genuinely float (the sticky
+  build bar, the mobile sheet, dialogs).
+- **Project art.** Six abstract CSS scenes (`lattice`, `terrain`, `graph`,
+  `plates`, `dots`, `arcs`) picked deterministically from the project name. They
+  share one palette and one light source so a grid of cards reads as a family.
+  Each is gradients on `::before`/`::after` plus one empty child span: no
+  images, no canvas, no WebGL, nothing to decode.
+
+### Responsive strategy
+
+One column at ≤620px, two comfortable columns from 768px, and three only when
+each card can hold its name, status, date and actions on one line (≥1280px). The
+grid floor is `minmax(min(320px, 100%), 1fr)` at tablet sizes so cards never get
+narrower than their content needs; at ≤700px the floor falls to
+`minmax(min(280px, 100%), 1fr)` so a 320px viewport cannot overflow.
+
+Breakpoints are declared in `css/responsive.css`, in one place, at 380, 620, 700,
+860 and 1024px. Mobile is composed deliberately rather than shrunk: the header
+nav collapses into a sheet, the workspace stacks composer → action → activity,
+rows become full-width, and touch targets grow to 44px.
+
+### Animation system
+
+Motion is opacity, transform and clip-path only — never width, height, top or
+margin. The `@keyframes` in `css/animations.css` are checked for that in
+`p8_static`. Entrances are choreographed (a 14px rise over 520ms on
+`--ease-out`), interactions are 120–320ms, and only three ambient loops exist —
+two slow glows and the world visualiser, all decorative and all stopped under
+reduced motion.
+
+Reduced motion is honoured two ways and both are tested:
+
+| Source | Effect |
+| --- | --- |
+| `prefers-reduced-motion: reduce` | every animation and transition collapses to ~0ms, all looping decoration stops, reveals show immediately |
+| the stored preference (`html[data-motion-mode="reduced"]`) | the same, applied live by `settings.html` → `settingsController.setMotion` |
+
+Functional state changes — a stage advancing, a status changing, a toast — stay
+visible in both modes. `@media print` and `forced-colors: active` force every
+revealed element visible, so no content can hide behind an animation that never
+ran.
+
+### Verified in a real browser
+
+Phase 8 is the first phase with a rendering browser available (a vendored
+headless Chromium, no network access needed). `p8_visual.js` drives it and
+measures pixels: horizontal overflow at six widths on four pages, loaded font
+faces, heading hierarchy, painted project art, equal-height cards, one primary
+action per screen, control geometry, a focus ring on **every** control (84 of
+them), WCAG AA contrast on every text run, 44px touch targets by real
+hit-testing, the mobile sheet, both dialogs at three viewports, reduced motion,
+compositor-friendly keyframes, and whether the sticky build bar ever covers a
+control. It skips loudly if the browser is absent rather than claiming success.
 
 ## Architecture
 
@@ -429,8 +509,8 @@ accepts only the four known preference keys.
   model selectors, masked API-key field, connection rows, a current-stage card,
   a described seven-step timeline, a simulated activity log, progress with
   stage markers, and a stoppable simulated run with a result summary
-- Projects: sample projects, status filters, CSS-generated previews, empty
-  states
+- Projects: sample projects, status filters, six CSS-generated abstract
+  preview scenes, equal-height cards, empty states
 - Settings: provider and model with a live configuration status, a session-only
   API key with a reveal control, two separate simulated connections, motion and
   preference switches, and a scoped, confirmed reset
@@ -508,8 +588,31 @@ active run:
 { type: "cancel",   runId, run }
 ```
 
+## Known limitations
+
+- **Everything is simulated.** No provider is contacted, no key is verified, no
+  Roblox account is signed in, no Studio bridge exists.
+- **Fonts are latin-subset only.** Latin-extended, Cyrillic and CJK text falls
+  back to the system sans-serif. Adding a subset means adding a file and a
+  `unicode-range` at the top of `css/main.css`.
+- **The browser used for visual verification is headless Chromium** (153) on
+  Linux with no GPU. It measures layout, colour, contrast and hit areas
+  accurately, but it cannot tell you how the page feels to scroll, and it is not
+  Safari or Firefox: `backdrop-filter`, `100dvh` and `dialog` centring are
+  verified there, not everywhere. Where a browser does not support `dialog`,
+  the modal falls back to the `open` attribute (focus handling then depends on
+  the page code rather than the UA).
+- **Compositor cost is not profiled.** Animations use transform/opacity only and
+  no animation loops exist while idle, but no frame-timing trace has been
+  collected on real hardware.
+- **Contrast is measured on rendered pairs**, not against every possible state
+  combination (for example a hovered disabled button on the amber surface).
+
 ## Notes
 
-- Fonts load from Google Fonts with a system-font fallback stack.
-- All visuals are original SVG or CSS generated in this repository.
-- No third-party JavaScript libraries are used.
+- Inter and JetBrains Mono are vendored in `assets/fonts/` under the SIL OFL and
+  served from this origin, with a system-font fallback stack. No request leaves
+  the page — the CSP forbids it.
+- All visuals are original SVG or CSS generated in this repository. No stock
+  photography, no game artwork, no Roblox assets.
+- No third-party JavaScript libraries are used, and there is no build step.

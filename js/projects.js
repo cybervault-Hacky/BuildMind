@@ -43,7 +43,9 @@
      descriptions and times are written with textContent below. */
   const CARD_HTML = `
     <div class="project-card__thumb">
-      <span class="project-card__art" aria-hidden="true"></span>
+      <span class="project-card__art" aria-hidden="true">
+        <span class="art-planes"></span>
+      </span>
       <span class="project-card__flag" data-flag hidden>In Build</span>
     </div>
     <div class="project-card__body">

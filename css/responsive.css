@@ -46,9 +46,12 @@
     padding-inline: 12px;
   }
 
-  /* Tablet: two comfortable card columns rather than a squeezed three */
+  /* Tablet and small desktop: two comfortable card columns rather than a
+     squeezed three. The floor is set high enough that a card keeps its name,
+     status, date and actions on one line — at 260px the name and the
+     "Last build" line both truncated at 900-1024px. */
   .projects-grid {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   }
 }
 
@@ -163,6 +166,9 @@
   .build-bar {
     position: static;
     background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-top: 0;
     padding-bottom: 0;
   }
 
@@ -179,6 +185,64 @@
    Mobile
    -------------------------------------------------------------------------- */
 @media (max-width: 620px) {
+  /* Touch widths: every tappable control gets a comfortable height. The
+     visuals stay compact because the extra size is padding, not type. */
+  .chip,
+  .segmented__option,
+  .menu-toggle,
+  .icon-btn,
+  .btn--sm,
+  #prompt-idea {
+    min-height: 44px;
+  }
+
+  .icon-btn {
+    min-width: 44px;
+  }
+
+  /* Inline links that act as controls need a target, not just a text baseline. */
+  .group-link,
+  .link-arrow {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .segmented {
+    padding: 3px;
+  }
+
+  /* The brand is a home link: give it a full-height tap band. */
+  .brand {
+    min-height: 44px;
+  }
+
+  .site-footer__links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 2px;
+  }
+
+  .segmented__option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .project-card__open,
+  .project-card__delete,
+  .project-card__actions .btn {
+    min-height: 44px;
+    height: auto;
+  }
+
+  .confirm__actions .btn,
+  .build-bar .btn,
+  .page-head__actions .btn {
+    min-height: 44px;
+  }
+
   :root {
     --header-h: 58px;
     --gutter: 18px;
@@ -480,6 +544,7 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     padding-bottom: 56px;
+    align-items: start;
   }
 
   .project-card__thumb {
@@ -791,6 +856,7 @@
   .setting-row__control .segmented {
     width: 100%;
   }
+
 
   .toast {
     left: 14px;
