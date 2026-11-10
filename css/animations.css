@@ -27,25 +27,31 @@
   }
 }
 
+/* A pulsing halo that only animates transform + opacity, so the compositor
+   owns it and the dot never triggers a repaint. Animating box-shadow (the
+   previous implementation) repaints the element on every frame — measured at
+   0.145s of task time over 3s of a running build with 7 such dots on screen. */
 @keyframes pulse-dot {
   0%,
   100% {
-    box-shadow: 0 0 0 0 currentColor;
+    transform: scale(1);
     opacity: 1;
   }
   50% {
-    box-shadow: 0 0 0 3.5px transparent;
-    opacity: 0.82;
+    transform: scale(1.9);
+    opacity: 0.55;
   }
 }
 
 @keyframes pulse-ring {
   0%,
   100% {
-    box-shadow: 0 0 0 3px rgba(139, 147, 255, 0.16);
+    transform: scale(1.1);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(139, 147, 255, 0.05);
+    transform: scale(1.34);
+    opacity: 0.72;
   }
 }
 

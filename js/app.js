@@ -359,6 +359,9 @@
   let toastEl = null;
   let toastTimer = 0;
 
+  /** Last painted visual state per mount point, so repeat ticks are free. */
+  const localWorld = { state: "", progress: -1, scanHidden: null };
+
   function toast(message) {
     if (!toastEl) {
       toastEl = document.createElement("div");
@@ -515,14 +518,30 @@
 
     const state = options.state || "idle";
     const progress = clamp(Number(options.progress) || 0, 0, 100);
-    el.dataset.state = state;
+
+    // The preview loop calls this ~11x a second. Writing an attribute that has
+    // not changed still queues a mutation record and a style recalc, so the
+    // tick becomes a no-op when nothing about the visual state actually moved.
+    // (Measured before this guard: 33 redundant data-state writes per 3s.)
+    const scan = el.querySelector(".worldviz__scan");
+    const scanHidden = state === "idle" || state === "complete";
+
+    if (el.dataset.state === state && localWorld.scanHidden === scanHidden &&
+        localWorld.progress === progress && localWorld.state === state) {
+      return;
+    }
+
+    if (el.dataset.state !== state) el.dataset.state = state;
+    if (localWorld.scanHidden !== scanHidden) {
+      // When the run stops, drop the scan band so it does not sit on screen.
+      if (scan) scan.style.display = scanHidden ? "none" : "";
+      localWorld.scanHidden = scanHidden;
+    }
+    localWorld.state = state;
+    localWorld.progress = progress;
 
     const cells = el.querySelectorAll(".wv-cell");
     const total = cells.length;
-
-    // When the run stops, drop the scan band so it does not sit on screen
-    const scan = el.querySelector(".worldviz__scan");
-    if (scan) scan.style.display = state === "idle" || state === "complete" ? "none" : "";
 
     // idle shows a light preview ring of cells, never a "built" claim
     if (state === "idle") {
@@ -535,18 +554,27 @@
 
     const built = Math.round((progress / 100) * total);
     const fixedFrom = state === "fixing" || state === "complete" ? Math.round(total * 0.32) : -1;
+    const fixedTo = fixedFrom > -1 ? Math.min(total, fixedFrom + Math.round(total * 0.26)) : -1;
 
     cells.forEach((cell, index) => {
-      cell.style.opacity = "";
-      cell.classList.toggle("is-built", index < built);
-      cell.classList.toggle(
-        "is-fixed",
-        fixedFrom > -1 && index >= fixedFrom && index < Math.min(total, fixedFrom + Math.round(total * 0.26))
-      );
+      if (cell.style.opacity) cell.style.opacity = "";
+      const isBuilt = index < built;
+      const isFixed = fixedFrom > -1 && index >= fixedFrom && index < fixedTo;
+      // toggle() is a write even when the class already matches, so compare
+      // first: the visible state only changes when a cell crosses a boundary.
+      if (cell.classList.contains("is-built") !== isBuilt) cell.classList.toggle("is-built", isBuilt);
+      if (cell.classList.contains("is-fixed") !== isFixed) cell.classList.toggle("is-fixed", isFixed);
     });
   }
 
-  /** Gentle preview loop for the home hero. */
+  /**
+   * Gentle preview loop for the home hero.
+   *
+   * The loop pauses while the tab is hidden or the visualizer is scrolled out of
+   * view, and resumes when it comes back — an off-screen element measures zero
+   * mutations per second. It tears itself down for good when its element leaves
+   * the document. Returns a stopper, which is idempotent.
+   */
   function startWorldPreview(el, speed = 1) {
     if (!el) return () => {};
     mountWorld(el);
@@ -560,19 +588,38 @@
     let direction = 1;
     let timer = 0;
     let halted = false;
+    let onscreen = true;
+
+    const stop = () => {
+      halted = true;
+      window.clearTimeout(timer);
+      timer = 0;
+      if (observer) observer.disconnect();
+    };
+
+    const schedule = (ms) => {
+      if (halted) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(tick, ms);
+    };
 
     const tick = () => {
       if (halted) return;
-      if (document.hidden) {
-        timer = window.setTimeout(tick, 400);
+      if (!el.isConnected) {
+        stop();
+        return;
+      }
+      // Nothing to draw: try again in a moment rather than animating offscreen.
+      if (document.hidden || !onscreen) {
+        schedule(400);
         return;
       }
       progress += direction * (0.9 * speed);
       if (progress >= 100) {
         progress = 100;
         direction = -1;
-        window.setTimeout(tick, 1400);
         updateWorld(el, { state: "complete", progress: 100 });
+        schedule(1400);
         return;
       }
       if (progress <= 0) {
@@ -583,16 +630,29 @@
         state: progress > 0 ? (progress > 88 ? "validating" : "building") : "idle",
         progress,
       });
-      timer = window.setTimeout(tick, 90);
+      schedule(90);
     };
+
+    // Pause while offscreen. Kept as a lifecycle observer rather than a scroll
+    // handler so it costs nothing while scrolling.
+    // Visibility watching is an optimisation, not a requirement: where
+    // IntersectionObserver is unavailable the preview simply keeps its simple
+    // timer behaviour instead of throwing on load.
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(
+            (entries) => {
+              onscreen = entries.some((entry) => entry.isIntersecting);
+            },
+            { rootMargin: "80px" }
+          )
+        : null;
+    if (observer) observer.observe(el);
 
     updateWorld(el, { state: "idle", progress: 0 });
     timer = window.setTimeout(tick, 700);
 
-    return () => {
-      halted = true;
-      window.clearTimeout(timer);
-    };
+    return stop;
   }
 
   /* ------------------------------------------------------------------------
@@ -617,7 +677,14 @@
     BM.projectController?.load();
   }
 
+  // The shell boots once per document. Guards against a re-dispatched
+  // DOMContentLoaded re-running the header/reveal/transition wiring.
+  let booted = false;
+
   function boot() {
+    if (booted) return;
+    booted = true;
+
     document.documentElement.classList.add("js");
 
     // Motion is the one preference the shell needs before paint. Reading it is

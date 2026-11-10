@@ -42,11 +42,9 @@
 :root {
   /* Surfaces — deep black to graphite */
   --bg: #060608;
-  --bg-elevated: #0a0a0d;
   --surface-1: #0e0e12;
   --surface-2: #121217;
   --surface-3: #17171e;
-  --surface-hover: #1a1a21;
   --line: rgba(255, 255, 255, 0.07);
   --line-strong: rgba(255, 255, 255, 0.12);
 
@@ -73,7 +71,8 @@
   --rose: #f08a8a;
   --rose-soft: rgba(240, 138, 138, 0.12);
 
-  /* Space scale (4px base) */
+  /* Space scale (4px base) — the first step is what the scale is derived from,
+     so it is declared even though no rule reads it directly. */
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
@@ -85,7 +84,6 @@
   --s-9: 48px;
   --s-10: 64px;
   --s-11: 88px;
-  --s-12: 120px;
 
   /* Radius */
   --r-xs: 6px;
@@ -636,6 +634,8 @@ body.is-sheet-open {
   font-size: 15px;
   font-weight: 500;
   color: var(--text-soft);
+  /* Anchors the current-page dot below. */
+  position: relative;
   transition: background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 
@@ -643,10 +643,6 @@ body.is-sheet-open {
 .mobile-nav__link:active {
   background: var(--surface-2);
   color: var(--text);
-}
-
-.mobile-nav__link {
-  position: relative;
 }
 
 .mobile-nav__link[aria-current="page"] {
@@ -2522,6 +2518,8 @@ body.is-sheet-open {
 
 .project-card__body {
   display: grid;
+  /* name / description / build line / actions, in that order */
+  grid-template-rows: auto auto 1fr auto;
   gap: 6px;
   padding: 14px 16px 15px;
   min-width: 0;
@@ -2584,10 +2582,6 @@ body.is-sheet-open {
   min-width: 0;
 }
 
-.project-card__body {
-  grid-template-rows: auto auto 1fr auto;
-}
-
 .project-card__build {
   font-size: 11.5px;
   color: var(--text-faint);
@@ -2640,7 +2634,6 @@ body.is-sheet-open {
 .project-card__art {
   --scene-glow: rgba(139, 147, 255, 0.24);
   --scene-line: rgba(255, 255, 255, 0.08);
-  --scene-ink: rgba(139, 147, 255, 0.5);
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -2821,29 +2814,16 @@ body.is-sheet-open {
   --scene-glow: rgba(139, 147, 255, 0.18);
 }
 
-.art-dots::after {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.22) 1px, transparent 1.3px);
-  background-size: 13px 13px;
-  transform: perspective(260px) rotateX(60deg) scale(1.45);
-  opacity: 0.55;
-  -webkit-mask-image: radial-gradient(ellipse 66% 84% at 50% 96%, #000 6%, transparent 70%);
-  mask-image: radial-gradient(ellipse 66% 84% at 50% 96%, #000 6%, transparent 70%);
-}
-
-.art-dots .art-planes {
-  /* No disc here: this scene is the field itself. */
-  display: none;
-}
-
 .art-dots::before {
   background: radial-gradient(ellipse 70% 40% at 50% 94%, rgba(139, 147, 255, 0.26), transparent 66%),
     radial-gradient(ellipse 70% 80% at 50% 118%, var(--scene-glow), transparent 70%);
 }
 
-/* Denser, darker points with a horizon fade so the field reads as a survey. */
+/* A field of plotted points, densest at the horizon, fading into the scene. */
 .art-dots::after {
   background-image: radial-gradient(circle, rgba(210, 214, 240, 0.5) 1.1px, transparent 1.5px);
   background-size: 13px 13px;
+  transform: perspective(260px) rotateX(60deg) scale(1.45);
   opacity: 0.72;
   -webkit-mask-image: linear-gradient(to top, #000 6%, rgba(0, 0, 0, 0.5) 52%, transparent 88%);
   mask-image: linear-gradient(to top, #000 6%, rgba(0, 0, 0, 0.5) 52%, transparent 88%);
@@ -2900,9 +2880,9 @@ body.is-sheet-open {
   transform: none;
 }
 
-/* Motion: the construction layer drifts a few pixels, nothing more. */
-.project-card:hover .art-lattice .art-planes,
-.project-card:hover .art-plates .art-planes {
+/* Motion: the construction layer drifts a few pixels, nothing more.
+   Plates carry their own geometry, so they get the next rule instead. */
+.project-card:hover .art-lattice .art-planes {
   transform: rotateX(56deg) rotateZ(45deg) translateY(-3px);
 }
 

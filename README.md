@@ -499,6 +499,30 @@ accepts only the four known preference keys.
   source, and each page declares `connect-src 'none'` in its CSP.
 - No endpoints, no frameworks, no dependencies.
 
+### Content Security Policy
+
+All four pages ship the same policy as a `<meta http-equiv>` tag:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none';
+object-src 'none'; base-uri 'self'; form-action 'none'
+```
+
+`script-src` carries no `unsafe-inline` and no `unsafe-eval`. The single inline
+script this app used to need (adding the `.js` class before first paint) now
+lives in `js/boot-class.js` so the exception could be dropped. `style-src` keeps
+`'unsafe-inline'` deliberately: the renderers set a handful of computed values
+via the `style` property (progress width, visualizer cell opacity, the nav
+indicator offset), which the CSP treats as inline style. There are no inline
+`<style>` blocks outside a `<noscript>` fallback, and no inline event-handler
+attributes anywhere in the markup.
+
+Verified behaviour in Chromium: an injected inline script does not execute, an
+`onerror` attribute does not run, `eval` and `new Function` throw `EvalError`
+from page code, and `fetch`, `XMLHttpRequest`, `WebSocket` and image beacons to
+another origin are all refused before a request leaves the browser.
+
 ## Frontend behaviour
 
 - Shared header with active-page indicator and an animated, focus-trapped
@@ -588,6 +612,87 @@ active run:
 { type: "cancel",   runId, run }
 ```
 
+## Engineering hardening (Phase 9)
+
+Phase 9 changed no features and no visual design. It audited the existing
+frontend for reliability, security, performance and test quality, and fixed
+what was actually wrong.
+
+### Defects found and fixed
+
+| Area | Defect | Fix |
+| --- | --- | --- |
+| Idle work | The home visualizer repainted 47 DOM mutations per 3s while nothing changed: `dataset.state` was rewritten every tick, and every cell got an unconditional `classList.toggle` + `style.opacity` write | Compare before writing (a memo of state/progress plus per-attribute guards). Measured **47 → 14** mutations per 3s |
+| Lifecycle | The home preview loop ran forever: a bare `setTimeout` at the 100% turnaround leaked a second timer, and nothing paused it off-screen | One timer handle reused by `schedule()`, an idempotent `stop()`, `IntersectionObserver` pause, `isConnected` self-teardown, `pagehide` teardown. Off-screen now measures **0** mutations per 3s and resumes correctly on return |
+| Idle work | The build page ran a permanent 200ms interval that only did work during a run, and rewrote the same four progress nodes on every tick | Timer starts only when a run is in flight and retires itself when it ends; every write is guarded. Progress writes per tick **4 → 0** when values are unchanged |
+| Async | `paintResult` re-wrote the result card on every tick of the clock | Filled once per run, keyed on run + project |
+| Parsimony | `home.js` never cleared its pipeline interval and wrote classes unconditionally | Interval owned and cleared on `pagehide`, pauses off-screen, compare-before-write |
+| Duplicate listeners | Re-dispatching `DOMContentLoaded` (or any future re-init) doubled every listener — measured 36 → 69 on the build page | Each module boots once behind an idempotence guard; re-init now measures 36 → 36 |
+| Validation | A non-string project `name` was stringified to the literal `"[object Object]"` and displayed on a card; an empty `{}` record became a phantom "Untitled game" | `safeText` accepts only strings and numbers; records with no id, name or prompt are dropped as corruption |
+| Data integrity | Projects created by a completed build got a positional placeholder id (`recovered-4-0`) instead of a real generated id, so deep links were tied to array order | `recordBuild` now assigns a generated (or requested) id before normalising |
+| Performance | The Projects render was O(n²): `indexOf` inside the retire loop plus a `join()` comparison per render | A `Set` for membership and a cached order key. 200-card full re-filter measures **2.6–13.6ms** of script |
+| Robustness | `IntersectionObserver` was used unguarded, so an environment without it threw on load | Feature-detected; the preview degrades to its timer behaviour |
+| CSS | Five tokens declared and never read, one superseded `.art-dots` rule fully overridden by a later one, two single-property rules that should have been part of their main rule, one dead selector in a shared hover rule | Removed after proving each was unreferenced. `--s-1` was **kept**: it anchors the 4px space scale the static suite asserts |
+| Animation | `pulse-dot` and `pulse-ring` animated `box-shadow`, repainting on every frame | Rewritten to animate `transform`/`opacity` only |
+
+### Security posture
+
+- **API key**: never in `localStorage`, `sessionStorage`, IndexedDB, a URL, a
+  `data-*` attribute, the DOM, the store, a cookie or the console. Verified by
+  entering a marked key, running a build, revealing the field and scanning every
+  sink. Only `apiKeyPresent: true` survives, in memory.
+- **Hostile storage**: 17 malformed payloads (invalid JSON, `null`, primitives,
+  wrong shapes, non-string names, 50 000-character values, duplicate ids,
+  script tags) × 4 pages — no crash, no injection, no dialog, graceful
+  normalisation.
+- **Error envelopes** never leak internals: a service that throws or rejects
+  returns `{ ok: false, error: { type: "unknown", message: "Something went
+  wrong." } }`, and no stack text escapes. Zero unhandled rejections.
+- **No network**: with every non-local origin blocked at the request layer, all
+  four pages, both fonts, a full build, settings persistence and the project
+  list still work. **Zero** external requests were attempted.
+
+### Measured performance
+
+Headless Chromium 1440×900, `--disable-gpu`, `Performance.getMetrics`.
+These are main-thread numbers only.
+
+| Measurement | Result |
+| --- | --- |
+| Idle DOM mutations / 3s (home) | 47 → **14** (bottom of the page 0) |
+| Idle DOM mutations / 3s (build, projects, settings) | **0** |
+| Build page mutations / 3s during a run | 202 → **121** |
+| Mutations / 3s with the visualizer scrolled off-screen | **0** |
+| `DOMContentLoaded` (index / build / projects / settings) | 175 / 145 / 83 / 103 ms |
+| Full-page scroll style cost (worst page) | **12 ms** total |
+| 3s of a running build, 7 pulsing dots (median of 5) | task **0.143 s**, style 0.029 s, layout 0.015 s |
+| Full 200-card projects re-filter | **2.6–13.6 ms** script |
+| Heap after GC across 8 build cycles and 12 navigations | **9.54 MB, unchanged** |
+| DOM node count across 5 consecutive builds | 423, **unchanged** |
+| Responsive matrix (7 widths × 4 pages) | zero horizontal overflow, zero console errors |
+
+Not measured: composite/raster cost, real-hardware frame timing, Safari and
+Firefox rendering, and time-to-interactive on a cold network cache (the app is
+served from `localhost` with no network at all).
+
+### Test quality
+
+The regression matrix is 39 suites, all behaviour- or invariant-based. Two
+assertions needed updating during Phase 9, and neither was weakened:
+
+1. `reduced.js` called `BM.stopBuild()`, a Phase 3 state API that Phase 4
+   replaced with `buildController.stop()`. The test now calls the current API
+   and still asserts the invariant (stop settles the machine under reduced
+   motion).
+2. `p8_static.js` caught a real regression: removing the `--s-1` token broke
+   the assertion that the space scale is one arithmetic family. The token was
+   restored — the test was right and the cleanup was wrong.
+
+A new suite, `p9_hardening.js` (28 assertions), covers the paths this phase
+touched: storage disabled, empty list not re-seeded, name normalisation,
+generated project ids, listener idempotence, the build clock's lifecycle, the
+CSP posture, and the session-only API key.
+
 ## Known limitations
 
 - **Everything is simulated.** No provider is contacted, no key is verified, no
@@ -602,9 +707,11 @@ active run:
   verified there, not everywhere. Where a browser does not support `dialog`,
   the modal falls back to the `open` attribute (focus handling then depends on
   the page code rather than the UA).
-- **Compositor cost is not profiled.** Animations use transform/opacity only and
-  no animation loops exist while idle, but no frame-timing trace has been
-  collected on real hardware.
+- **Compositor cost is measured only as DevTools-style main-thread metrics**,
+  not as a frame-timing trace on real hardware with a GPU. The numbers in
+  "Engineering hardening" below come from `Performance.getMetrics` in headless
+  Chromium with `--disable-gpu`, which is honest about task/style/layout time
+  but cannot report composite or raster cost.
 - **Contrast is measured on rendered pairs**, not against every possible state
   combination (for example a hovered disabled button on the amber surface).
 

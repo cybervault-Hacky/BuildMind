@@ -53,6 +53,8 @@
     contextKey: "",
     deepLinked: "",
     restoring: false,
+    clock: 0,
+    resultKey: "",
   };
 
   const LAST_INDEX = BUILD_STAGES.length - 1;
@@ -311,9 +313,9 @@
     const activity = build.activity || [];
     const total = activity.length;
 
-    if (el.feedPanel) el.feedPanel.hidden = total === 0;
-    if (el.feedEmpty) el.feedEmpty.hidden = total > 0;
-    if (el.feedCount) el.feedCount.textContent = total ? String(total) : "";
+    setHidden(el.feedPanel, total === 0);
+    setHidden(el.feedEmpty, total > 0);
+    setText(el.feedCount, total ? String(total) : "");
 
     // A new run resets the list rather than diffing it.
     if (total < local.feedCount) {
@@ -363,20 +365,26 @@
     const result = build.result;
     const show = build.status === BUILD.COMPLETE && Boolean(result);
 
-    el.result.hidden = !show;
+    setHidden(el.result, !show);
     if (!show) return;
 
-    if (el.resultName) el.resultName.textContent = result.name || "—";
-    if (el.resultBuild) el.resultBuild.textContent = "Complete";
-    if (el.resultValidation) {
-      el.resultValidation.textContent = result.validation === "passed" ? "Passed" : "Pending";
-    }
-    if (el.resultCreated) el.resultCreated.textContent = "Just now";
+    // The result card is filled once per run, not once per tick: `render` also
+    // runs on the elapsed-time clock, and re-writing the same text there is
+    // pure layout churn.
+    const key = `${build.runId}:${result.projectId || ""}:${result.name || ""}:${result.validation || ""}`;
+    if (key === local.resultKey) return;
+    local.resultKey = key;
+
+    setText(el.resultName, result.name || "—");
+    setText(el.resultBuild, "Complete");
+    setText(el.resultValidation, result.validation === "passed" ? "Passed" : "Pending");
+    setText(el.resultCreated, "Just now");
     if (el.resultOpen) {
       // "Open project" belongs in Projects, where the record lives.
-      el.resultOpen.href = result.projectId
+      const href = result.projectId
         ? `projects.html?project=${encodeURIComponent(result.projectId)}`
         : "projects.html";
+      if (el.resultOpen.getAttribute("href") !== href) el.resultOpen.href = href;
     }
   }
 
@@ -398,24 +406,70 @@
   /* ------------------------------------------------------------------------
      Progress
      ------------------------------------------------------------------------ */
+  /**
+   * The elapsed-time readout is the only thing that needs a clock, and only
+   * while a run is in flight. Starting is idempotent, and the tick retires
+   * itself as soon as the build leaves a running status — so a finished page
+   * holds no timer, and a retry cannot stack a second one on top of the first.
+   */
+  function stopProgressClock() {
+    if (local.clock) window.clearInterval(local.clock);
+    local.clock = 0;
+  }
+
+  function startProgressClock() {
+    if (local.clock) return;
+    local.clock = window.setInterval(() => {
+      const build = getState().build;
+      if (!RUNNING_STATUSES.includes(build.status)) {
+        stopProgressClock();
+        paintProgress(build);
+        return;
+      }
+      paintProgress(build);
+    }, 200);
+  }
+
+  /**
+   * Write text only when it differs. Assigning the same string still queues a
+   * mutation record and a text layout, and this panel is repainted on a 200ms
+   * clock for the elapsed-time readout. (Measured before this guard: 4 writes
+   * per tick, 88 mutations per 3s of a run.)
+   */
+  function setText(node, value) {
+    if (node && node.textContent !== value) node.textContent = value;
+  }
+
+  /** Same idea for `hidden`: a redundant write still invalidates style. */
+  function setHidden(node, hidden) {
+    if (node && node.hidden !== hidden) node.hidden = hidden;
+  }
+
   function paintProgress(build) {
     const pct = Math.max(0, Math.min(100, Math.round(build.progress)));
 
-    if (el.progressFill) el.progressFill.style.width = `${pct}%`;
-    if (el.progressValue) el.progressValue.textContent = `${pct}%`;
-    if (el.progressBar) el.progressBar.setAttribute("aria-valuenow", String(pct));
+    if (el.progressFill) {
+      const width = `${pct}%`;
+      if (el.progressFill.style.width !== width) el.progressFill.style.width = width;
+    }
+    setText(el.progressValue, `${pct}%`);
+    if (el.progressBar && el.progressBar.getAttribute("aria-valuenow") !== String(pct)) {
+      el.progressBar.setAttribute("aria-valuenow", String(pct));
+    }
 
     const running = RUNNING_STATUSES.includes(build.status);
-    if (el.progress) el.progress.classList.toggle("is-running", running);
+    if (el.progress && el.progress.classList.contains("is-running") !== running) {
+      el.progress.classList.toggle("is-running", running);
+    }
 
-    if (el.progressState) el.progressState.textContent = STATUS_LABEL[build.status];
+    setText(el.progressState, STATUS_LABEL[build.status]);
 
     if (el.progressTime) {
-      if (build.status === BUILD.READY) el.progressTime.textContent = "—";
+      if (build.status === BUILD.READY) setText(el.progressTime, "—");
       else if (build.endedAt && build.startedAt) {
-        el.progressTime.textContent = `${((build.endedAt - build.startedAt) / 1000).toFixed(1)}s`;
+        setText(el.progressTime, `${((build.endedAt - build.startedAt) / 1000).toFixed(1)}s`);
       } else if (build.startedAt) {
-        el.progressTime.textContent = `${((Date.now() - build.startedAt) / 1000).toFixed(1)}s`;
+        setText(el.progressTime, `${((Date.now() - build.startedAt) / 1000).toFixed(1)}s`);
       }
     }
   }
@@ -830,6 +884,10 @@
       paintActivity(build);
       paintResult(build);
 
+      // Elapsed-time readout: on only while something is actually running.
+      if (RUNNING_STATUSES.includes(build.status)) startProgressClock();
+      else stopProgressClock();
+
       // The visualizer only moves while a run is in flight.
       updateWorld(el.world, {
         state: RUNNING_STATUSES.includes(build.status)
@@ -1121,7 +1179,16 @@
     }
   }
 
+  // Every page module boots once. The DOMContentLoaded guard means a second
+  // dispatch (or any future re-entrant call) cannot double-register the
+  // listeners and interval below — measured before this guard: a repeated
+  // init on build.html took the live listener count from 36 to 69.
+  let booted = false;
+
   function init() {
+    if (booted) return;
+    booted = true;
+
     cacheElements();
 
     mountWorld(el.world);
@@ -1136,11 +1203,10 @@
     paintContext(getState());
     mirrorProjectStatus(getState());
 
-    // A ticking clock is the only thing that needs its own timer while running.
-    window.setInterval(() => {
-      const build = getState().build;
-      if (RUNNING_STATUSES.includes(build.status)) paintProgress(build);
-    }, 200);
+    // A ticking clock is the only thing that needs its own timer, and only
+    // while a run is actually in flight: the tick stops itself the moment the
+    // build leaves a running status, so an idle page carries no timer at all.
+    startProgressClock();
 
     // Intent helper kept for manual testing and later integration.
     Object.assign(BM, { requestBuild, handleBuildClick });

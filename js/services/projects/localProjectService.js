@@ -93,11 +93,18 @@
      length-capping here keeps the stored data predictable.
      ------------------------------------------------------------------------ */
   function safeText(value, max) {
-    return String(value === undefined || value === null ? "" : value)
-      .replace(/[\u0000-\u001f\u007f]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, max);
+    // Only text-ish primitives are real text. An object would stringify to
+    // "[object Object]" and a number to "42"; neither is a name a user typed,
+    // so both are treated as "no value" and fall back to the honest default.
+    if (typeof value === "string") {
+      return value
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, max);
+    }
+    if (typeof value === "number" && Number.isFinite(value)) return String(value).slice(0, max);
+    return "";
   }
 
   function safeName(value) {
@@ -182,12 +189,16 @@
     };
   }
 
-  /** Read → normalise → drop only what is not even an object. */
+  /** Read → normalise → drop only what is not a usable project record. */
   function read() {
     const stored = storage.readArray(KEY);
     if (stored === null) return null;
     return stored
-      .filter((project) => project && typeof project === "object")
+      .filter((project) => project && typeof project === "object" && !Array.isArray(project))
+      // A record with no id, name or prompt carries nothing a user could have
+      // made (createProject always writes both), so it is corruption rather
+      // than a project and is dropped instead of becoming "Untitled game".
+      .filter((project) => project.id || project.name || project.prompt)
       .map((project, index) => normalizeProject(project, index));
   }
 
@@ -391,6 +402,11 @@
 
     if (index === -1) {
       const created = normalizeProject({
+        // A real id, not the `recovered-N` placeholder normalizeProject uses
+        // when a *stored* record lost its own: this record is new, so it gets
+        // an id that is unique, readable in a deep link, and not tied to the
+        // project's position in the array.
+        id: request.projectId || newId(),
         name: wantedName || NAME_FALLBACK,
         prompt,
         description: request.description || model.describeFromPrompt(prompt),

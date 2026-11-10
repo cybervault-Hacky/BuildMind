@@ -447,7 +447,16 @@
   /* ------------------------------------------------------------------------
      Init
      ------------------------------------------------------------------------ */
+  // Every page module boots once. The DOMContentLoaded guard means a second
+  // dispatch (or any future re-entrant call) cannot double-register the
+  // listeners and interval below — measured before this guard: a repeated
+  // init on build.html took the live listener count from 36 to 69.
+  let booted = false;
+
   function init() {
+    if (booted) return;
+    booted = true;
+
     cache();
     bindEvents();
 
