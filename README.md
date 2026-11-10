@@ -28,7 +28,7 @@ buildmind/
 ├── build.html
 ├── projects.html
 ├── settings.html
-├── 404.html               styled not-found page for static hosting
+├── 404.html               self-contained not-found page (works at any depth)
 ├── robots.txt             disallows indexing (nothing here to index)
 ├── DEPLOYMENT.md          host setup, security headers, post-deploy checklist
 ├── assets/
@@ -103,7 +103,7 @@ headers, the 404 page, MIME types, caching, HTTPS and a post-deploy checklist.
 | `build.html` | The workspace — composer, provider/model, connection rows, a stoppable simulated run |
 | `projects.html` | Local project records with search, status filters and six generated scenes |
 | `settings.html` | Provider/model, session-only key, two simulated connections, motion, scoped reset |
-| `404.html` | Served for an unknown path; reuses the shell so a mistyped URL still looks like BuildMind |
+| `404.html` | Served for an unknown path at any depth; self-contained (inline styles, no external assets) so it can never render unstyled |
 
 All five are static HTML. Deep links use a query string
 (`build.html?project=<id>`), never a path segment, so no server rewrite rules
@@ -737,14 +737,28 @@ python3 -m http.server 8099
 | Blocker | Why it mattered | Fix |
 | --- | --- | --- |
 | The font licence named only JetBrains Mono | Inter is vendored and served, but carried no attribution — an OFL clause 2 violation for a shipped font | `assets/fonts/LICENSE.txt` now attributes both families, with the upstream copyright lines |
-| No `404.html` | A static host served bare browser chrome for any mistyped URL, breaking the shell | Added a styled 404 that reuses the real header, footer and design tokens; verified at 320–1920px, AA contrast, one `h1`, keyboard reachable |
+| No `404.html` | A static host served bare browser chrome for any mistyped URL | Added a 404 that is deliberately **self-contained** — see below |
 | No `robots.txt` | A demo with no backend was inviting crawlers | Added `Disallow: /` |
 | No deployment documentation | The README said nothing about headers, MIME types, caching or the 404 contract | Added `DEPLOYMENT.md` with a post-deploy checklist |
 
-A fifth defect was found in my own work during this phase: the first 404 draft
-omitted the shared boot chain, so `app.js` threw `BM.getState is not a function`.
-The full chain (minus page-specific behaviour) is now included, and the release
-suite asserts no console errors on that page.
+Two further defects were found in my own work, both while testing rather than
+assuming:
+
+1. The first 404 draft omitted the shared boot chain, so `app.js` threw
+   `BM.getState is not a function`.
+2. Fixing that exposed the real problem. A static host serves the error document
+   at whatever depth the bad URL had, so `/a/b/c` received `404.html` and its
+   relative `<link href="css/main.css">` resolved to `/a/b/c/css/main.css` —
+   an unstyled error page, and its buttons pointed into `/a/b/c/`.
+
+The final 404 therefore carries its styles **inline** and loads no CSS, JS or
+fonts: there is nothing left that can 404. One small inline script corrects the
+link depth, allowed by an exact `sha256-` hash in that page's own CSP rather than
+by `'unsafe-inline'`. Verified at `/nope`, `/this/does/not/exist` and
+`/a/b/c/d`: styled at every depth, links resolving to `/index.html` and
+`/projects.html`, zero CSP violations, and the only request is the document
+itself. A tampered copy of the script is blocked, which proves the hash is what
+allows it.
 
 ### Security headers
 
@@ -764,7 +778,8 @@ renderers set computed values through the `style` property.
 
 Honest scope, not a compatibility claim:
 
-- **Tested:** Chromium 153 (headless, Linux, no GPU), 9 widths × 5 pages.
+- **Tested:** Chromium 153 (headless, Linux, no GPU), 9 widths × 5 primary pages
+  plus the 404 at four widths.
 - **Structurally compatible, unverified:** current Chrome, Edge, Firefox and
   Safari. The feature surface is small and guarded — no CSS nesting, no
   `:has()`, no module scripts, no optional-chaining-free syntax, and both

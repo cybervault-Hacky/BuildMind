@@ -57,8 +57,9 @@ root (`https://example.com/`) and equally well from a subdirectory
 
 ### 4.1 The 404 page
 
-`404.html` is a real, styled page that matches the app shell. Most static hosts
-pick it up automatically. If your host requires it, configure it explicitly:
+`404.html` is a real, styled page that matches the app's design tokens. Most
+static hosts pick it up automatically. If your host requires it, configure it
+explicitly:
 
 - **Netlify** — automatic (`/404.html` is the default).
 - **GitHub Pages** — automatic for project and user sites.
@@ -69,6 +70,20 @@ pick it up automatically. If your host requires it, configure it explicitly:
 
 If you serve from a subdirectory, point the error document at
 `/subdir/404.html`.
+
+**Why `404.html` is self-contained.** A static host serves the error document at
+whatever depth the bad URL had — `/a/b/c` gets the same file. Any relative
+`<link href="css/main.css">` inside it would resolve to
+`/a/b/c/css/main.css` and fail, leaving an unstyled error page. So `404.html`
+carries its styles inline and loads no CSS, no JS and no fonts: **there is
+nothing left that can 404.** Its two links are corrected for the real depth by
+one small inline script, allowed by an exact CSP `sha256-...` hash in that
+page's own policy — not by `'unsafe-inline'`.
+
+Verify it after deploying: request a deliberately deep path such as
+`/a/b/c/does-not-exist`. You should get a styled page with a dark background and
+a white "That page is not here" heading, and the buttons should lead to
+`/index.html` and `/projects.html`, not to `/a/b/c/index.html`.
 
 ### 4.2 MIME types
 
@@ -109,8 +124,12 @@ Notes on each choice, so nobody "helpfully" loosens them:
   through the `style` property (progress width, visualizer cell opacity, nav
   indicator offset). CSP counts those as inline style. There is no inline
   `<style>` block outside a `<noscript>` fallback and no inline event handler.
-- **`script-src` carries no `unsafe-inline` and no `unsafe-eval`.** Keep it that
-  way; the app has no inline scripts.
+- **`script-src` carries no `unsafe-inline` and no `unsafe-eval`.** The app's
+  pages have no inline scripts at all. The single exception is `404.html`, whose
+  own policy allows exactly one inline script by `sha256-` hash so it can correct
+  its links at depth. A hash allow-lists one specific byte sequence, not inline
+  script in general; if you edit that script you must recompute the hash, which
+  is the intended safety property.
 - **`connect-src 'none'`** is correct and intentional: the frontend makes no
   network calls at all. If a future phase adds a real backend, this directive
   must be widened to exactly that origin and nothing else.
@@ -170,7 +189,9 @@ Run these against the deployed URL, not localhost:
 1. Open `/`, `/index.html`, `/build.html`, `/projects.html`, `/settings.html`
    directly. All five should render.
 2. Open a path that does not exist; confirm you get the styled BuildMind 404,
-   not the host's default page.
+   not the host's default page. Then open a **deep** path such as
+   `/a/b/c/nope` — it must still be styled, and its buttons must point at
+   `/index.html` / `/projects.html` rather than into `/a/b/c/`.
 3. Open a deep link: `build.html?project=<a-real-id>`. The project context bar
    should appear. Try `?project=nope`; the UI should stay neutral, not error.
 4. DevTools → Network: reload with "Disable cache". Every request must be
