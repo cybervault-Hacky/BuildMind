@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Page not found — BuildMind</title>
+  <meta name="theme-color" content="#060608">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <script src="js/boot-class.js"></script>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient__grid"></div>
+    <div class="ambient__glow ambient__glow--top"></div>
+    <div class="ambient__glow ambient__glow--left"></div>
+    <div class="ambient__noise"></div>
+  </div>
+
+  <div class="page">
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="brand" href="index.html" aria-label="BuildMind home">
+          <span class="brand__mark" data-brand-mark aria-hidden="true"></span>
+          <span class="brand__name">BuildMind</span>
+        </a>
+        <nav class="nav" aria-label="Primary">
+          <a class="nav__link" href="index.html">Home</a>
+          <a class="nav__link" href="build.html">Build</a>
+          <a class="nav__link" href="projects.html">Projects</a>
+          <a class="nav__link" href="settings.html">Settings</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="shell">
+        <div class="notfound">
+          <p class="notfound__code" aria-hidden="true">404</p>
+          <h1 class="notfound__title">That page is not here</h1>
+          <p class="notfound__note">
+            BuildMind has four pages: Home, Build, Projects and Settings. Nothing
+            was lost — your projects live in this browser, not on a server.
+          </p>
+          <div class="notfound__actions">
+            <a class="btn btn--primary" href="index.html">Back to Home</a>
+            <a class="btn btn--ghost" href="projects.html">Open Projects</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <span class="site-footer__brand">
+          <span data-brand-mark="sm" aria-hidden="true"></span>
+          BuildMind
+        </span>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="build.html">Build</a>
+          <a href="projects.html">Projects</a>
+          <a href="settings.html">Settings</a>
+        </nav>
+        <span class="site-footer__tag">Simulated in your browser</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- The same shared boot chain every page uses. `app.js` reads the store and
+       service modes, and navigation.js renders the header, so the whole chain
+       is required even on a page with no page-specific behaviour of its own. -->
+  <script src="js/app.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/services/contracts.js"></script>
+  <script src="js/services/storage.js"></script>
+  <script src="js/services/ai/providers.js"></script>
+  <script src="js/services/ai/stages.js"></script>
+  <script src="js/services/ai/mockAIService.js"></script>
+  <script src="js/services/connections/mockRobloxService.js"></script>
+  <script src="js/services/connections/mockStudioService.js"></script>
+  <script src="js/services/projects/projectModel.js"></script>
+  <script src="js/services/projects/localProjectService.js"></script>
+  <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/controllers/buildController.js"></script>
+  <script src="js/controllers/connectionController.js"></script>
+  <script src="js/controllers/projectController.js"></script>
+  <script src="js/controllers/settingsController.js"></script>
+  <script src="js/navigation.js"></script>
+</body>
+</html>

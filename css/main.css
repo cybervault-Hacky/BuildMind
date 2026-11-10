@@ -3292,7 +3292,47 @@ body.is-sheet-open {
 }
 
 /* --------------------------------------------------------------------------
-   19. Footer
+   19. Not found
+   A static host serves 404.html for an unknown path. It reuses the shell,
+   header and footer so a mistyped URL still looks like BuildMind.
+   -------------------------------------------------------------------------- */
+.notfound {
+  max-width: 44ch;
+  margin-inline: auto;
+  padding: clamp(var(--s-11), 16vh, 160px) 0 var(--s-10);
+  text-align: center;
+}
+
+.notfound__code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: var(--text-faint);
+  margin-bottom: var(--s-5);
+}
+
+.notfound__title {
+  font-size: clamp(26px, 4vw, 38px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--s-4);
+}
+
+.notfound__note {
+  color: var(--text-soft);
+  line-height: 1.6;
+  margin-bottom: var(--s-7);
+}
+
+.notfound__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   20. Footer
    -------------------------------------------------------------------------- */
 .site-footer {
   border-top: 1px solid var(--line);

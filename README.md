@@ -20,17 +20,6 @@ exist and are documented below.
 - Simulated states only: anything that looks like a connection or a build run
   is a frontend simulation, and the UI says so where it matters
 
-## Pages
-
-| Page | Purpose |
-| --- | --- |
-| `index.html` | First impression. Positioning, two entry actions, how a build runs, one shortcut to projects. |
-| `build.html` | The workspace. Game idea, AI configuration, connections, build activity, progress. |
-| `projects.html` | Your games. Preview, name, lifecycle status, description, last build, open / delete, filters and search. |
-| `settings.html` | AI provider and model, Roblox and Studio connection state, appearance, general preferences. |
-
-No other pages exist by design.
-
 ## Project structure
 
 ```
@@ -39,6 +28,9 @@ buildmind/
 ├── build.html
 ├── projects.html
 ├── settings.html
+├── 404.html               styled not-found page for static hosting
+├── robots.txt             disallows indexing (nothing here to index)
+├── DEPLOYMENT.md          host setup, security headers, post-deploy checklist
 ├── assets/
 │   ├── icons/favicon.svg
 │   ├── images/logo.svg
@@ -48,6 +40,7 @@ buildmind/
 │   ├── animations.css    keyframes, entrance choreography, reduced motion
 │   └── responsive.css    tablet and mobile composition
 ├── js/
+│   ├── boot-class.js     adds the .js class before first paint (no inline script)
 │   ├── app.js            shell + boot: ambient, header, reveals, helpers
 │   ├── state.js          the single state store and the build state machine
 │   ├── navigation.js     active page + sliding nav indicator
@@ -81,21 +74,40 @@ buildmind/
 
 ## Run locally
 
-No build step and no dependencies. Serve the folder over HTTP so relative
-paths and the page-transition layer behave like production.
+No build step, no dependencies, no package manager. There is no `npm install`
+and no `package.json` — serve the folder over HTTP so relative paths, fonts and
+the page-transition layer behave like production.
 
 ```bash
-# Python
+# Python 3 — no dependencies
 python3 -m http.server 8080
 
-# or Node
+# or Node.js
 npx serve .
 ```
 
-Then open `http://localhost:8080`.
+Then open <http://localhost:8080>. Serve over HTTP rather than opening a
+`file://` URL; only the HTTP path is verified.
 
-Opening `index.html` directly with `file://` mostly works too, but a local
-server is recommended.
+A fresh clone contains everything needed to run: 37 tracked files, all assets
+committed. Nothing is generated, so there is nothing to build first.
+
+**Deployment lives in [DEPLOYMENT.md](DEPLOYMENT.md)** — required security
+headers, the 404 page, MIME types, caching, HTTPS and a post-deploy checklist.
+
+## Pages
+
+| Path | What it is |
+| --- | --- |
+| `index.html` | Home — the pitch, a live preview visualizer, the Idea → Build → Test → Play strip |
+| `build.html` | The workspace — composer, provider/model, connection rows, a stoppable simulated run |
+| `projects.html` | Local project records with search, status filters and six generated scenes |
+| `settings.html` | Provider/model, session-only key, two simulated connections, motion, scoped reset |
+| `404.html` | Served for an unknown path; reuses the shell so a mistyped URL still looks like BuildMind |
+
+All five are static HTML. Deep links use a query string
+(`build.html?project=<id>`), never a path segment, so no server rewrite rules
+are needed.
 
 ## Design system
 
@@ -692,6 +704,114 @@ A new suite, `p9_hardening.js` (28 assertions), covers the paths this phase
 touched: storage disabled, empty list not re-seeded, name normalisation,
 generated project ids, listener idempotence, the build clock's lifecycle, the
 CSP posture, and the session-only API key.
+
+## Production readiness (Phase 10)
+
+Phase 10 asked one question: could another developer take a fresh clone of this
+repository to a working, deployable frontend without hitting hidden breakage?
+The answer is yes, and here is the evidence.
+
+### Fresh clone → running app
+
+Verified by cloning the repository into a clean directory and serving *that*
+copy, not the working tree:
+
+```bash
+git clone <repo> /tmp/freshclone && cd /tmp/freshclone
+python3 -m http.server 8099
+```
+
+| Check | Result |
+| --- | --- |
+| Files in a fresh clone | 37 tracked files, all assets present, nothing generated |
+| Install step | none — no `package.json`, no dependencies, no lockfile |
+| Build step | none — and none was invented to look production-shaped |
+| Documented commands | `python3 -m http.server` works; this is the only command documented |
+| Assets reference-checked | 31 HTML `src`/`href` references + every CSS `url()` → all 200 |
+| All four pages + 404 via direct URL | 200, rendered, one `h1` each |
+| Path independence | served from `/` and from `/site/`; zero requests escaping the root |
+| Browser | clean Chromium profile (new user-data-dir, no storage, cache or cookies) |
+
+### Release blockers found and fixed
+
+| Blocker | Why it mattered | Fix |
+| --- | --- | --- |
+| The font licence named only JetBrains Mono | Inter is vendored and served, but carried no attribution — an OFL clause 2 violation for a shipped font | `assets/fonts/LICENSE.txt` now attributes both families, with the upstream copyright lines |
+| No `404.html` | A static host served bare browser chrome for any mistyped URL, breaking the shell | Added a styled 404 that reuses the real header, footer and design tokens; verified at 320–1920px, AA contrast, one `h1`, keyboard reachable |
+| No `robots.txt` | A demo with no backend was inviting crawlers | Added `Disallow: /` |
+| No deployment documentation | The README said nothing about headers, MIME types, caching or the 404 contract | Added `DEPLOYMENT.md` with a post-deploy checklist |
+
+A fifth defect was found in my own work during this phase: the first 404 draft
+omitted the shared boot chain, so `app.js` threw `BM.getState is not a function`.
+The full chain (minus page-specific behaviour) is now included, and the release
+suite asserts no console errors on that page.
+
+### Security headers
+
+The CSP lives in a `<meta http-equiv>` tag on every page, and the markers are
+real: `script-src 'self'` with no `unsafe-inline` or `unsafe-eval`,
+`connect-src 'none'`, `object-src 'none'`, `base-uri 'self'`,
+`form-action 'none'`.
+
+**Headers cannot be shipped from this repository.** `DEPLOYMENT.md` documents
+the recommended set — including `frame-ancestors 'none'`,
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and
+`Permissions-Policy` — and states plainly that they require host configuration.
+`style-src 'unsafe-inline'` is required and documented as required, because the
+renderers set computed values through the `style` property.
+
+### Browser compatibility
+
+Honest scope, not a compatibility claim:
+
+- **Tested:** Chromium 153 (headless, Linux, no GPU), 9 widths × 5 pages.
+- **Structurally compatible, unverified:** current Chrome, Edge, Firefox and
+  Safari. The feature surface is small and guarded — no CSS nesting, no
+  `:has()`, no module scripts, no optional-chaining-free syntax, and both
+  `dialog.showModal` and `inert` are feature-detected with fallbacks.
+- **Not tested at all:** any browser other than the Chromium above, and any real
+  mobile device.
+
+### Repeat-use and memory
+
+Four full cycles of Home → Build → stop → Projects → search → filter →
+Settings → provider change → reset, measured after forced GC:
+
+| Cycle | Listeners | DOM nodes | Heap |
+| --- | --- | --- | --- |
+| 1 | 33 | 226 | 9.54 MB |
+| 2 | 33 | 226 | 9.54 MB |
+| 3 | 33 | 226 | 9.54 MB |
+| 4 | 33 | 226 | 9.54 MB |
+
+Zero growth. An earlier Phase 9 probe appeared to show node-count drift; the
+cause was live activity rows inside a running build, not a leak. Measured at the
+same point each time — idle after a reset — the DOM returns to exactly 402 nodes
+on build.html across four consecutive builds.
+
+### Performance (no regression from Phase 9)
+
+| Measurement | Phase 9 | Phase 10 |
+| --- | --- | --- |
+| Idle mutations / 3s, Home | 14 | **14** |
+| Idle mutations / 3s, Build / Projects / Settings | 0 | **0** |
+| `DOMContentLoaded` (index / build / projects / settings) | 175 / 145 / 83 / 103 ms | 182–200 / 155–192 / 94–106 / 104–120 ms (3 runs) |
+
+The load figures are quoted as a range across three runs because that is what
+they do: the same page on the same machine moves by up to ~40 ms run to run.
+That is measurement noise on a localhost server, not a regression — idle
+mutations and the fully-flat repeat-use numbers above are the meaningful
+before/after evidence.
+
+### Verdict
+
+Release-ready as a **static, local-first, fully simulated frontend**. The five
+pages load, render and stay usable offline; every asset is committed and
+same-origin; the CSP is restrictive and real; API keys never leave the field;
+storage recovers from hostile input; and repeat use is flat.
+
+It is not, and does not claim to be, ready as a product with real AI, real
+Roblox integration, accounts, a database or a backend — none of which exist.
 
 ## Known limitations
 
