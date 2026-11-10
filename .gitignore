@@ -1,32 +1,21 @@
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Editors
-.vscode/
-.idea/
-*.swp
-
-# Logs
-*.log
-npm-debug.log*
-
-# Dependencies (not used in Phase 1, ignored for later)
+# --- dependencies & build output ---
 node_modules/
-package-lock.json
-yarn.lock
+backend/node_modules/
+backend/dist/
+dist-tests/
 
-# Build output / local preview
-dist/
-build/
-.cache/
-
-# Environment and secrets — never commit real keys
+# --- secrets ---
 .env
 .env.*
-*.pem
-*.key
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
 
-# Local scratch
-.tmp/
+# --- local runtime state ---
+backend/.workspaces/
+*.log
+
+# --- browser/test artifacts ---
+coverage/
+.arena/
