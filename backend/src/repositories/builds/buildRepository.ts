@@ -14,6 +14,7 @@
    Every read is scoped by user_id.
    ========================================================================== */
 
+import { randomUUID } from 'node:crypto';
 import type { Queryable } from '../../db/pool.js';
 import type { BuildStatus, BuildStage } from '../../services/builds/stateMachine.js';
 import { canTransition } from '../../services/builds/stateMachine.js';
@@ -146,11 +147,20 @@ export class BuildRepository {
     model: string;
     retryOf?: string;
   }): Promise<Build> {
+    /*
+      The run id is generated here, not left to a column default. Every event
+      this build emits is stamped with it, and a stale callback must be
+      rejected by comparing against it, so it has to exist the moment the row
+      does — and it must exist even on a database provisioned before that
+      default was added.
+    */
+    const runId = randomUUID();
+
     const res = await this.db.query<BuildRow>(
-      `INSERT INTO builds (project_id, user_id, provider, model, retry_of, status)
-            VALUES ($1, $2, $3, $4, $5, 'queued')
+      `INSERT INTO builds (project_id, user_id, provider, model, retry_of, status, run_id)
+            VALUES ($1, $2, $3, $4, $5, 'queued', $6)
          RETURNING ${COLUMNS}`,
-      [input.projectId, input.userId, input.provider, input.model, input.retryOf ?? null],
+      [input.projectId, input.userId, input.provider, input.model, input.retryOf ?? null, runId],
     );
     const row = res.rows[0];
     if (!row) throw new Error('build insert returned no row');

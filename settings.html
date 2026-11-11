@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings — BuildMind</title>
   <meta name="description" content="Configure your AI provider, Roblox connections and appearance.">
@@ -255,6 +255,95 @@
           </section>
 
           <!-- ================= Stored data ================= -->
+          <section class="settings-section" id="account" aria-labelledby="account-title" data-reveal>
+            <div class="settings-section__head">
+              <div class="settings-section__titles">
+                <h2 class="settings-section__title" id="account-title" tabindex="-1">Account</h2>
+                <p class="settings-section__note" id="account-note">
+                  Sign in to store projects on the BuildMind server instead of this browser.
+                  Signed out, everything stays local and nothing is uploaded.
+                </p>
+              </div>
+              <span class="status-pill" id="account-mode" data-mode="local">Local only</span>
+            </div>
+
+            <!-- Signed out -->
+            <div id="account-signed-out">
+              <div class="setting-row">
+                <span class="setting-row__copy">
+                  <span class="setting-row__title">Sign in or create an account</span>
+                  <span class="setting-row__note">
+                    Uses an HTTP-only session cookie. Your password is never stored in this browser.
+                  </span>
+                </span>
+                <span class="setting-row__control">
+                  <button class="btn btn--ghost btn--sm" type="button" id="account-open-auth">
+                    Sign in…
+                  </button>
+                </span>
+              </div>
+
+              <form class="account-form" id="account-form" novalidate hidden>
+                <div class="field">
+                  <label class="field__label" for="account-email">Email</label>
+                  <input class="input" id="account-email" name="email" type="email"
+                         autocomplete="username" spellcheck="false" required>
+                  <p class="field__error" id="email-error" hidden></p>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="account-password">Password</label>
+                  <input class="input" id="account-password" name="password" type="password"
+                         autocomplete="current-password" minlength="12" required
+                         aria-describedby="password-hint">
+                  <span class="field__hint" id="password-hint">At least 12 characters.</span>
+                  <p class="field__error" id="password-error" hidden></p>
+                </div>
+                <p class="field__error" id="account-error" hidden></p>
+                <div class="account-form__actions">
+                  <button class="btn btn--primary btn--sm" type="submit" id="account-submit">
+                    Sign in
+                  </button>
+                  <button class="btn btn--ghost btn--sm" type="button" id="account-toggle-mode">
+                    Create an account instead
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Signed in -->
+            <div id="account-signed-in" hidden>
+              <div class="setting-row">
+                <span class="setting-row__copy">
+                  <span class="setting-row__title" id="account-identity">Signed in</span>
+                  <span class="setting-row__note" id="account-storage-note">
+                    Projects are stored on the BuildMind server.
+                  </span>
+                </span>
+                <span class="setting-row__control">
+                  <button class="btn btn--ghost btn--sm" type="button" id="account-sign-out">
+                    Sign out
+                  </button>
+                </span>
+              </div>
+            </div>
+
+            <!-- Migration of local projects -->
+            <div class="setting-row" id="account-migration" hidden>
+              <span class="setting-row__copy">
+                <span class="setting-row__title">Bring your local projects across</span>
+                <span class="setting-row__note" id="migration-note">
+                  Projects created in this browser can be copied to your account. Provider keys are
+                  never included.
+                </span>
+              </span>
+              <span class="setting-row__control">
+                <button class="btn btn--ghost btn--sm" type="button" id="account-migrate">
+                  Move projects…
+                </button>
+              </span>
+            </div>
+          </section>
+
           <section class="settings-section" aria-labelledby="data-title" data-reveal>
             <div class="settings-section__head">
               <div class="settings-section__titles">
@@ -329,11 +418,16 @@
   <script src="js/services/projects/projectModel.js"></script>
   <script src="js/services/projects/localProjectService.js"></script>
   <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/services/api/apiClient.js"></script>
+  <script src="js/services/projects/remoteProjectService.js"></script>
+  <script src="js/services/ai/remoteAIService.js"></script>
+  <script src="js/services/mode.js"></script>
   <script src="js/controllers/buildController.js"></script>
   <script src="js/controllers/connectionController.js"></script>
   <script src="js/controllers/projectController.js"></script>
   <script src="js/controllers/settingsController.js"></script>
   <script src="js/navigation.js"></script>
   <script src="js/settings.js"></script>
+  <script src="js/account.js"></script>
 </body>
 </html>

@@ -29,6 +29,12 @@ export interface FakeOpenAIOptions {
    * index, and may return content, or a status code to fail with.
    */
   onChat?: (system: string, callIndex: number) => { content?: string; status?: number } | null;
+  /**
+   * When set, only a Bearer token matching this pattern is accepted by
+   * /models; anything else gets 401. Off by default, because the backend
+   * suites exercise other concerns and always send a well-formed key.
+   */
+  acceptKeyPattern?: RegExp;
 }
 
 interface Recorded {
@@ -74,6 +80,15 @@ export class FakeOpenAI {
           if (this.modelsStatus !== 200) {
             respond(this.modelsStatus, { error: { message: 'unauthorized' } });
             return;
+          }
+          // A rejection path for tests that need a key to be refused.
+          const pattern = this.options.acceptKeyPattern;
+          if (pattern) {
+            const token = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+            if (!pattern.test(token)) {
+              respond(401, { error: { message: 'Incorrect API key provided' } });
+              return;
+            }
           }
           respond(200, {
             data: [

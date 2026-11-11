@@ -1,19 +1,43 @@
 # Service layer
 
-The boundary between the UI and every future integration. Read top to bottom:
+The boundary between the UI and every implementation behind it. Read top to
+bottom:
 
 ```
 contracts.js   result envelope + error model + createService() wrapper
 storage.js     the only localStorage access; refuses sensitive key names
+mode.js        picks one implementation per boundary, once, at boot
+api/           apiClient.js — the only fetch() in the frontend
 ai/            providers.js (single catalog), stages.js (7 stages),
-               mockAIService.js (simulated builds, timed stages)
+               mockAIService.js (simulated), remoteAIService.js (real API,
+               SSE with a polling fallback)
 connections/   mockRobloxService.js, mockStudioService.js — deliberately separate
 projects/      projectModel.js (pure helpers) +
-               localProjectService.js (list/get/create/update/recordBuild/
-               markRun/delete)
+               localProjectService.js (localStorage) +
+               remoteProjectService.js (the API, same contract)
 settings/      localSettingsService.js (load/save/reset + prompt draft +
                reset scope)
 ```
+
+## Two implementations, one contract
+
+Each boundary the backend owns now has a local and a remote implementation, and
+both satisfy the same surface. `mode.js` decides which one is live:
+
+- `simulated` — the default. The local implementations run, and **no network
+  call is made at all**.
+- `remote` — chosen by `?mode=remote`, `window.BM_CONFIG.mode`, or
+  `__BUILDMIND_MODE__`. The remote implementations run.
+
+The choice is captured once at load (the local implementations are held in a
+closure before anything can replace them) and it is never revisited per
+request. A remote failure is reported as a failure. There is no path from a
+remote error to a simulated success — that would be the exact dishonesty this
+layer exists to prevent.
+
+`apiClient.js` is the only file that calls `fetch`, and `remoteAIService.js` is
+the only file that opens an `EventSource`. Both facts are enforced by the
+frontend security suite.
 
 ## Rules
 
@@ -25,7 +49,11 @@ settings/      localSettingsService.js (load/save/reset + prompt draft +
    the controllers in `js/controllers/`.
 4. Services never call each other's storage directly; persistence goes through
    `storage.js`.
-5. No network calls. No keys. No provider SDKs.
+5. No keys, no provider SDKs, and — in the local implementations — no network
+   calls at all. `fetch` lives in `apiClient.js` and nowhere else; `EventSource`
+   lives in `remoteAIService.js` and nowhere else. A provider key is only ever
+   passed *through* to the API for a single request; it is never stored, logged
+   or put in a URL.
 6. `aiService` events follow one schema and always carry a `runId`; consumers
    ignore events from a run that is no longer active.
 7. Persisted records are normalised on read, not trusted: anything malformed is

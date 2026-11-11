@@ -666,6 +666,14 @@
   function initServices() {
     BM.getState(); // touches state before any service does
 
+    // Pick the implementation explicitly before anything asks for one. The
+    // simulation is the default because the static frontend must work with no
+    // backend; `BM_CONFIG.mode = "remote"` (or an API base) opts into the real
+    // one, and the choice is never made silently at request time.
+    if (typeof BM.installServices === "function") {
+      BM.installServices(BM.requestedServiceMode());
+    }
+
     const ai = BM.aiService;
     ai?.initialize().then((result) => {
       const mode = BM.isOk(result) && result.data ? result.data.mode : "unknown";

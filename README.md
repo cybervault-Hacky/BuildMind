@@ -7,18 +7,74 @@ playable. The first target platform is Roblox.
 BuildMind has its own visual identity. It is not a Roblox client, a Roblox fan
 site, and it uses no Roblox artwork.
 
-## Scope
+## What this is
 
-This is the frontend. There is no backend, no AI call, no Roblox integration
-and no credential handling — but the integration boundaries for all of them
-exist and are documented below.
+Two things live in this repository:
+
+- **The frontend** — four static pages with a design system of their own. It
+  runs with no server at all, and says so honestly when it does.
+- **The backend** — a real Node + TypeScript API in `backend/` that owns
+  authentication, projects, the build engine, provider credentials and the
+  Roblox/Studio boundaries.
+
+The frontend runs in one of two explicit modes, and never switches between them
+on its own:
+
+| Mode | Selected by | What happens |
+| --- | --- | --- |
+| `simulated` | nothing (the default) | Every service is the original frontend simulation. No network calls are made. |
+| `remote` | `?mode=remote`, `window.BM_CONFIG.mode`, or `__BUILDMIND_MODE__` | Every service talks to the API. A failure is a failure — it never falls back to the simulation. |
+
+Opening the static pages without configuration therefore gives you the same
+self-contained demo as before, with no hidden requests. Pointing them at the
+backend gives you the real product. Nothing in between.
+
+## Status: what is real, what is not
+
+This list is deliberately blunt. A capability is only "real" here if there is
+an implementation *and* a test that exercises it end to end.
+
+**Real, tested, running:**
+
+- Authentication: register, login, logout, session lookup. scrypt password
+  hashing, server-side sessions, `HttpOnly`/`SameSite` cookies, logout that
+  actually invalidates the row.
+- Authorization on every owned resource. Another user's project or build is a
+  `404`, not a `403`, and ownership is enforced in the SQL predicate as well.
+- Projects CRUD, backed by PostgreSQL, consumed by the Projects page.
+- The build engine: a DB-backed queue, seven real stages, a central state
+  machine that rejects invalid transitions, per-build isolated workspaces,
+  validated structured outputs at every stage, real test gates, bounded fix
+  attempts, and cancellation that a late provider response cannot overwrite.
+- Live build events over SSE, with `runId` on every event and stale events
+  rejected.
+- BYOK credential handling: keys live in memory or an encrypted column, never
+  in a log line, URL, event, error or API response. A secret-leak suite asserts
+  this across six separate sinks.
+- The `AIProvider` interface with real OpenAI and Google adapters, timeouts and
+  normalised errors — exercised against local stand-in endpoints.
+- The Roblox adapter boundary and the Studio bridge protocol, including nonce
+  replay protection and version pinning.
+
+**Not real, and labelled as such in the UI:**
+
+- **Live calls to OpenAI and Google.** The adapters are complete and tested
+  against local endpoints, but this development environment has no outbound
+  network. `EXTERNAL ENVIRONMENT REQUIRED`.
+- **Roblox OAuth and Studio connectivity.** Same reason. The boundary, the
+  protocol and the validation are implemented; the external services are not
+  reachable from here. `EXTERNAL ENVIRONMENT REQUIRED`.
+- **Publishing a game to Roblox.** Not implemented, and nothing in the UI
+  claims otherwise.
+
+## Frontend highlights
 
 - Premium dark UI, original BuildMind mark and a generated SVG/CSS visual system
 - Four separate pages: Home, Build, Projects, Settings
 - Responsive from 320px to 1920px, dark-only by design
 - Motion honours `prefers-reduced-motion` and a stored motion preference
-- Simulated states only: anything that looks like a connection or a build run
-  is a frontend simulation, and the UI says so where it matters
+- In simulated mode every connection and build state is a frontend
+  simulation, and the UI says so where it matters
 
 ## Project structure
 
@@ -63,37 +119,112 @@ buildmind/
 │   │   │   │                          relative times, descriptions, matching
 │   │   │   └── localProjectService.js the project boundary
 │   │   └── settings/localSettingsService.js
+│   ├── account.js        sign in/register/sign out + local-project migration
+│   ├── services/api/apiClient.js            the only fetch() in the frontend
+│   ├── services/mode.js                     chooses simulated or remote, once
+│   ├── services/ai/remoteAIService.js       SSE + polling against the API
+│   ├── services/projects/remoteProjectService.js
 │   └── controllers/
 │       ├── buildController.js       orchestration: validate → AI → state
 │       ├── connectionController.js  one connection path for both pages
 │       ├── projectController.js     the only writer of the project slice
 │       └── settingsController.js    the only settings path
+├── backend/                       the real API (see below)
 ├── README.md
 └── .gitignore
 ```
 
+### Backend layout
+
+```
+backend/
+├── package.json
+├── tsconfig.json
+├── .env.example                   placeholders only; .env is never committed
+├── migrations/
+│   ├── 001_init.sql               nine tables, indexes, constraints
+│   └── 001_init.down.sql          reverse migration
+├── scripts/
+│   └── run-tests.ts               sequential suite runner
+├── src/
+│   ├── server.ts                  process entry
+│   ├── app.ts                     Fastify assembly
+│   ├── config/env.ts              Zod-validated startup configuration
+│   ├── routes/                    HTTP surface, one file per resource
+│   ├── controllers/               request → service, no SQL
+│   ├── services/                  business rules, one directory per domain
+│   ├── repositories/              the only place SQL appears
+│   ├── providers/                 openai/, google/, roblox/ adapters + registry
+│   ├── jobs/                      the DB-backed build queue
+│   ├── workspace/                 per-build isolated paths, retention
+│   ├── validation/                Zod schemas for every payload and every
+│   │                              structured model output
+│   ├── db/migrate.ts              forward/backward migration runner
+│   ├── security/                  crypto, sessions, credential encryption
+│   ├── middleware/                errors, CSRF, request context
+│   └── events/                    SSE fan-out
+└── tests/                         ten suites + browser E2E
+```
+
 ## Run locally
 
-No build step, no dependencies, no package manager. There is no `npm install`
-and no `package.json` — serve the folder over HTTP so relative paths, fonts and
-the page-transition layer behave like production.
+### Just the frontend (no server)
+
+The frontend has no build step and no dependencies. Serve the folder over HTTP
+so relative paths and the page-transition layer behave like production:
 
 ```bash
-# Python 3 — no dependencies
 python3 -m http.server 8080
-
-# or Node.js
+# or
 npx serve .
 ```
 
-Then open <http://localhost:8080>. Serve over HTTP rather than opening a
-`file://` URL; only the HTTP path is verified.
+Then open <http://localhost:8080>. It runs in `simulated` mode and makes no
+network requests. Serve over HTTP rather than opening a `file://` URL.
 
-A fresh clone contains everything needed to run: 37 tracked files, all assets
-committed. Nothing is generated, so there is nothing to build first.
+### The full product
+
+Requires Node 20 or newer and PostgreSQL 14 or newer.
+
+```bash
+# 1. Backend dependencies
+cd backend
+npm install
+
+# 2. Configuration — copy the template and fill in real values
+cp .env.example .env
+#    DATABASE_URL, SESSION_SECRET (32+ random bytes), ENCRYPTION_KEY (base64,
+#    32 bytes), APP_ORIGIN. Generate the secrets, do not invent them:
+#      node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+#      node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# 3. Database
+npm run migrate          # applies migrations/*.up.sql in order
+
+# 4. Start the API
+npm run dev              # http://localhost:3000
+
+# 5. Serve the frontend on the origin you configured as APP_ORIGIN
+cd .. && python3 -m http.server 8080
+```
+
+Open <http://localhost:8080/settings.html?mode=remote>, create an account, add
+a provider key, then run a build. That is the whole loop.
+
+To verify the checkout before trusting it:
+
+```bash
+cd backend
+npm run typecheck        # tsc --noEmit, zero errors expected
+npm test                 # ten suites; needs a PostgreSQL test database
+```
+
+`npm test` needs `TEST_DATABASE_URL` and refuses to run without one rather than
+silently skipping the database work.
 
 **Deployment lives in [DEPLOYMENT.md](DEPLOYMENT.md)** — required security
-headers, the 404 page, MIME types, caching, HTTPS and a post-deploy checklist.
+headers, the reverse-proxy layout, migrations, backups, the 404 page, MIME
+types, caching, HTTPS and a post-deploy checklist.
 
 ## Pages
 
@@ -475,14 +606,19 @@ Cancel or Discard anywhere, and the page says so.
 
 ### Service status
 
-| Service | Mode | Notes |
+Each boundary has two implementations. Which one runs is decided once, at boot,
+by configuration — never per request.
+
+| Boundary | `simulated` mode | `remote` mode |
 | --- | --- | --- |
-| `aiService` | **simulated** | Timed stages, activity lines, no model, no request |
-| `robloxService` | **simulated** | No OAuth, no account, no request |
-| `studioService` | **simulated** | No bridge, no plugin, no request |
-| `projectService` | **local** | localStorage, no backend |
-| `settingsService` | **local** | localStorage, no backend |
-| real providers / backend | **future** | Not implemented, not stubbed |
+| `aiService` | timed stages, no request | seven real stages via `POST /api/v1/builds`, live over SSE |
+| `projectService` | localStorage | `GET/POST/PATCH/DELETE /api/v1/projects` |
+| `robloxService` | no OAuth, no request | real adapter; reports `ROBLOX_NOT_CONFIGURED` unless configured |
+| `studioService` | no bridge, no request | versioned bridge protocol with nonce replay protection |
+| `settingsService` | localStorage | localStorage; provider state comes from `GET /api/v1/ai/providers` |
+
+`remote` never degrades to `simulated`. If the API is unreachable the UI says
+so; it does not quietly produce simulated results.
 
 ### Persisted data
 
@@ -555,18 +691,67 @@ another origin are all refused before a request leaves the browser.
 
 ## Intentionally not implemented
 
-- Backend, database, accounts, authentication
-- Real AI providers or API-key handling
-- Real Roblox OAuth or Studio bridge
-- AI agent, code generation, testing, automatic fixing
-- Server-side project storage or sync
-- Pricing, subscriptions, credits, analytics, marketing pages
+Out of scope by product decision, not by omission:
+
+- Pricing, subscriptions, credits, billing
+- A marketplace, ads, analytics dashboards, social features
+- Publishing a generated game to Roblox, or any claim that a build is "live"
+- Multi-tenant organisations, teams, roles beyond the owning user
+
+## Known limitations
+
+- **Live provider calls are unverified in this environment.** The OpenAI and
+  Google adapters are complete, and are exercised against local endpoints that
+  speak the real wire format — request shape, headers, streaming, timeouts and
+  every error path. But this development sandbox has no outbound network, so no
+  request has ever reached `api.openai.com` or Google's endpoint from here.
+  `EXTERNAL ENVIRONMENT REQUIRED` before anyone claims a live integration.
+- **Roblox OAuth and the Studio bridge are likewise unverified externally.** The
+  adapter, the OAuth state check, the versioned bridge protocol, nonce replay
+  protection and schema validation are implemented and tested against stand-ins.
+  No real Roblox account has been connected and no real Studio session has
+  spoken to it. `EXTERNAL ENVIRONMENT REQUIRED`.
+- **A build produces validated structured artifacts, not a playable game.**
+  Nothing is uploaded anywhere and the Roblox runtime has not executed the
+  output.
+- **Fonts are latin-subset only.** Latin-extended, Cyrillic and CJK text falls
+  back to the system sans-serif. Adding a subset means adding a file and a
+  `unicode-range` at the top of `css/main.css`.
+- **The browser used for verification is headless Chromium** (153) on Linux with
+  no GPU. It measures layout, colour, contrast and hit areas accurately, but it
+  cannot tell you how the page feels to scroll, and it is not Safari or Firefox:
+  `backdrop-filter`, `100dvh` and `dialog` centring are verified there, not
+  everywhere. Where a browser does not support `dialog`, the modal falls back to
+  the `open` attribute (focus handling then depends on the page code rather than
+  the UA).
+- **Compositor cost is measured only as DevTools-style main-thread metrics**,
+  not as a frame-timing trace on real hardware with a GPU. The numbers in
+  "Engineering hardening" below come from `Performance.getMetrics` in headless
+  Chromium with `--disable-gpu`, which is honest about task/style/layout time
+  but cannot report composite or raster cost.
+- **Contrast is measured on rendered pairs**, not against every possible state
+  combination (for example a hovered disabled button on the amber surface).
+- **The build queue is the database, not a broker.** It is deliberately simple:
+  one process, `FOR UPDATE SKIP LOCKED` claiming, and a recovery sweep for jobs
+  abandoned by a crash. It is correct for a single API instance. Running several
+  instances is supported by the same claim query; running at a scale that needs
+  a real broker is out of scope for this phase.
 
 ## Integration points
 
-The UI is already written against the service interfaces, so a real integration
-replaces one file and leaves the pages untouched. `js/services/README.md`
-documents the layer's rules for whoever writes that file.
+The UI is written against service interfaces, and Phase 11 added a second
+implementation behind each one rather than changing the pages. `js/services/mode.js`
+picks an implementation once at boot; every controller above it is untouched.
+`js/services/README.md` documents the layer's rules for whoever touches it next.
+
+```js
+// The surface both implementations satisfy.
+aiService.initialize()      // → { ready, mode, providers }
+aiService.getProviders()    // → providers
+aiService.validateConfiguration({ … })  // → { valid, errors } — remote: a real request
+aiService.startBuild({ … }) // → { runId, … }
+aiService.subscribe(listener)
+```
 
 ```js
 // AI — replace the implementation, keep the surface
@@ -623,6 +808,107 @@ active run:
 { type: "error",    runId, error }
 { type: "cancel",   runId, run }
 ```
+
+## Backend architecture
+
+### Request path
+
+```
+HTTP → route (Zod validation) → controller → service → repository → PostgreSQL
+```
+
+Each layer has exactly one job, and the boundaries are enforced by convention
+that the tests check:
+
+- **Routes** parse and validate. A malformed body, path or query is a `422`
+  with field-level detail, produced before any service code runs.
+- **Controllers** translate HTTP into a service call and back. They contain no
+  SQL and no business rules.
+- **Services** hold the rules: ownership, state transitions, quotas, provider
+  selection, credential resolution.
+- **Repositories** are the only place SQL appears. Ownership is part of the
+  `WHERE` clause, not a check performed afterwards, so a missing authorization
+  check upstream still cannot return another user's row.
+
+### Error model
+
+One `AppError` type, one code per failure, one JSON shape:
+
+```json
+{ "ok": false, "error": { "code": "VALIDATION_ERROR", "message": "...", "fields": { "prompt": "..." }, "requestId": "..." } }
+```
+
+Codes are stable strings (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`,
+`VALIDATION_ERROR`, `CONFLICT`, `RATE_LIMITED`, `PROVIDER_UNAVAILABLE`,
+`PROVIDER_OUTPUT_INVALID`, `BUILD_CONFLICT`, …). The message is written for a
+human and never contains a stack trace, a SQL fragment, a file path or a
+secret. An unexpected exception becomes `INTERNAL_ERROR` with a generic message;
+the detail goes to the log, tagged with the same `requestId` the client got.
+
+### The build engine
+
+A build is a row, not an in-memory promise, so a restart loses nothing that was
+already persisted.
+
+1. `POST /api/v1/builds` validates the project, resolves a credential, creates a
+   row with a fresh `runId`, returns `202` with `{ buildId, runId }`, and starts
+   the run without blocking the response.
+2. The orchestrator walks seven stages — understanding, planning, building,
+   testing, validating, fixing, completing — each a real operation with a real
+   provider call and a real artifact.
+3. Every structured output is validated against a Zod schema before it is used.
+   Malformed model output is `PROVIDER_OUTPUT_INVALID`, never "close enough".
+4. Every event carries the `runId`. A callback whose `runId` no longer matches
+   the row is dropped, so a retry cannot be overwritten by the run it replaced.
+5. Transitions go through a central state machine. An invalid transition throws
+   rather than silently coercing.
+6. Cancellation authenticates, authorizes, invalidates the `runId`, aborts the
+   in-flight provider request, persists `cancelled` and emits the terminal
+   event — in that order, so a late provider response finds a dead run.
+7. `complete` requires validation evidence. A build that could not be validated
+   cannot reach `complete`.
+
+Artifacts are written into a per-build workspace directory whose name is a
+server-generated id. Paths are resolved and then checked against the workspace
+root, so a model that emits `../../etc/passwd` as an artifact name is rejected.
+Generated code is never executed on the API host.
+
+### Credentials (BYOK)
+
+Two separate paths, never merged:
+
+- **BYOK** — the user's own key, supplied per request. It lives in memory for
+  the life of the request, or in an encrypted column if the user asks to keep
+  it. Never logged, never returned, never in a URL, never in an event, never in
+  an error, never in the browser's storage.
+- **Managed** — an operator's key from the environment, used only when the user
+  supplies none. It never reaches the browser in any form.
+
+At-rest encryption is AES-256-GCM with per-user, per-provider additional
+authenticated data (`bm:cred:<userId>:<provider>`). Ciphertext moved to another
+user's row fails to decrypt rather than quietly working. The secret-leak suite
+asserts all of this across six sinks: responses, headers, the credential
+listing, the database, the log buffer, the workspace and request URLs.
+
+### Authorization
+
+Every owned resource is fetched with `user_id = $n` in the query. Another user's
+project or build produces a `404`, not a `403`, so the API does not confirm
+which ids exist. This is tested for projects, builds, events and cancellation.
+
+### Roblox and Studio
+
+The Roblox adapter implements `connect`, `disconnect`, `getStatus` and metadata,
+and reports `ROBLOX_NOT_CONFIGURED` when its environment is incomplete rather
+than claiming a connection. OAuth state is validated on return; a callback that
+does not match its state is rejected.
+
+The Studio bridge is a separate, versioned protocol: a nonce with a TTL, a
+session with its own TTL, a pinned `STUDIO_PROTOCOL_VERSION`, allowlisted
+message types and schema-validated payloads. Backend validation, Studio
+validation and runtime validation are three different things and are reported
+separately — a build is never marked playable because a Studio check was
+skipped.
 
 ## Engineering hardening (Phase 9)
 
@@ -853,28 +1139,6 @@ storage recovers from hostile input; and repeat use is flat.
 
 It is not, and does not claim to be, ready as a product with real AI, real
 Roblox integration, accounts, a database or a backend — none of which exist.
-
-## Known limitations
-
-- **Everything is simulated.** No provider is contacted, no key is verified, no
-  Roblox account is signed in, no Studio bridge exists.
-- **Fonts are latin-subset only.** Latin-extended, Cyrillic and CJK text falls
-  back to the system sans-serif. Adding a subset means adding a file and a
-  `unicode-range` at the top of `css/main.css`.
-- **The browser used for visual verification is headless Chromium** (153) on
-  Linux with no GPU. It measures layout, colour, contrast and hit areas
-  accurately, but it cannot tell you how the page feels to scroll, and it is not
-  Safari or Firefox: `backdrop-filter`, `100dvh` and `dialog` centring are
-  verified there, not everywhere. Where a browser does not support `dialog`,
-  the modal falls back to the `open` attribute (focus handling then depends on
-  the page code rather than the UA).
-- **Compositor cost is measured only as DevTools-style main-thread metrics**,
-  not as a frame-timing trace on real hardware with a GPU. The numbers in
-  "Engineering hardening" below come from `Performance.getMetrics` in headless
-  Chromium with `--disable-gpu`, which is honest about task/style/layout time
-  but cannot report composite or raster cost.
-- **Contrast is measured on rendered pairs**, not against every possible state
-  combination (for example a hovered disabled button on the amber surface).
 
 ## Notes
 

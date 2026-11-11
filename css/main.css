@@ -3291,6 +3291,33 @@ body.is-sheet-open {
   color: var(--mint);
 }
 
+/* Account form — the sign-in block inside the Account settings section.
+   It is a plain stack of existing form primitives (.field, .input, .btn), so
+   it inherits their sizing and focus treatment rather than redefining them. */
+.account-form {
+  display: grid;
+  gap: var(--s-4);
+  margin-top: var(--s-4);
+  max-width: 420px;
+}
+
+.account-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+/* The status pill already exists; this only adds the two modes it reports. */
+.status-pill[data-mode="local"] {
+  color: var(--text-soft);
+}
+
+.status-pill[data-mode="remote"] {
+  color: var(--accent);
+  border-color: var(--accent-line, var(--line-strong));
+}
+
 /* --------------------------------------------------------------------------
    19. Footer
    -------------------------------------------------------------------------- */
