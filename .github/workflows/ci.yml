@@ -89,7 +89,11 @@ jobs:
           --health-retries 10
 
     env:
+      # The test suites read TEST_DATABASE_URL; the migration CLI reads
+      # DATABASE_URL. Both point at the same database here, and both have to
+      # be set or the migration step fails with "DATABASE_URL is required".
       TEST_DATABASE_URL: postgres://buildmind:buildmind@localhost:5432/buildmind_test
+      DATABASE_URL: postgres://buildmind:buildmind@localhost:5432/buildmind_test
 
     defaults:
       run:
@@ -110,8 +114,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Migrations are idempotent
+      - name: Migrations are idempotent and reversible
         run: |
+          set -euo pipefail
           npm run migrate
           npm run migrate          # a second run must be a clean no-op
           npm run migrate:down     # and the reverse must work
