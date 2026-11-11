@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="BuildMind — abstract world construction">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="18%" r="80%">
+      <stop offset="0" stop-color="#15151d"/>
+      <stop offset="100%" stop-color="#07070a"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#8b93ff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#8b93ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a8aeff"/>
+      <stop offset="1" stop-color="#737cf2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g stroke="rgba(255,255,255,0.03)" stroke-width="1">
+    <path d="M0 105h1200M0 210h1200M0 315h1200M0 420h1200M0 525h1200"/>
+    <path d="M150 0v630M300 0v630M450 0v630M600 0v630M750 0v630M900 0v630M1050 0v630"/>
+  </g>
+  <circle cx="600" cy="330" r="300" fill="url(#glow)"/>
+  <g>
+    <ellipse cx="600" cy="300" rx="330" ry="116" fill="none" stroke="rgba(139,147,255,0.14)"/>
+    <ellipse cx="600" cy="300" rx="250" ry="86" fill="none" stroke="rgba(139,147,255,0.10)"/>
+  </g>
+  <g>
+    <polygon points="600,296 632,312 600,328 568,312" fill="rgba(139,147,255,0.16)" stroke="rgba(139,147,255,0.34)"/>
+  </g>
+  <g fill="rgba(139,147,255,0.16)" stroke="rgba(139,147,255,0.32)">
+    <polygon points="568,312 600,328 568,344 536,328"/>
+    <polygon points="632,312 664,328 632,344 600,328"/>
+    <polygon points="536,328 568,344 536,360 504,344"/>
+    <polygon points="664,328 696,344 664,360 632,344"/>
+    <polygon points="600,328 632,344 600,360 568,344"/>
+  </g>
+  <g fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)">
+    <polygon points="504,344 536,360 504,376 472,360"/>
+    <polygon points="696,344 728,360 696,376 664,360"/>
+    <polygon points="472,360 504,376 472,392 440,376"/>
+    <polygon points="728,360 760,376 728,392 696,376"/>
+  </g>
+  <g stroke="rgba(139,147,255,0.20)" stroke-width="1" stroke-dasharray="3 6" fill="none">
+    <path d="M600 208 528 246M600 208 672 250M600 208 640 180"/>
+  </g>
+  <circle cx="600" cy="208" r="8" fill="rgba(139,147,255,0.30)" stroke="rgba(139,147,255,0.55)"/>
+  <circle cx="528" cy="246" r="5" fill="#14141a" stroke="rgba(255,255,255,0.22)"/>
+  <circle cx="672" cy="250" r="5" fill="#14141a" stroke="rgba(255,255,255,0.22)"/>
+  <circle cx="640" cy="180" r="3.5" fill="#14141a" stroke="rgba(255,255,255,0.18)"/>
+  <g transform="translate(60 56)">
+    <path d="M16 3.2 27.4 9.6v12.8L16 28.8 4.6 22.4V9.6L16 3.2Z" fill="none" stroke="url(#mark)" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M16 10.1 22 13.5v7L16 23.9l-6-3.4v-7L16 10.1Z" fill="url(#mark)" fill-opacity="0.34" stroke="url(#mark)" stroke-width="1.2" stroke-linejoin="round"/>
+    <text x="40" y="21" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17" font-weight="600" letter-spacing="-0.4" fill="#f2f3f6">BuildMind</text>
+  </g>
+  <text x="60" y="548" font-family="Inter, Helvetica, Arial, sans-serif" font-size="42" font-weight="600" letter-spacing="-1" fill="#f2f3f6">Turn your ideas into games.</text>
+  <text x="60" y="586" font-family="Inter, Helvetica, Arial, sans-serif" font-size="16" fill="#9a9db0">Describe a game. BuildMind plans it, builds it and tests it.</text>
+</svg>

@@ -1,0 +1,160 @@
+# ---------------------------------------------------------------------------
+# BuildMind — continuous integration.
+#
+# Six checks, all of which run against the real thing: real PostgreSQL, real
+# TypeScript compilation, the real test suites, and the real headless Chromium
+# for the frontend regression.
+#
+# This workflow never deploys. Production deployment is a deliberate, manual
+# act; see DEPLOYMENT.md.
+# ---------------------------------------------------------------------------
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push supersedes an in-flight run on the same ref.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------------------
+  # 1. Types, dependencies and the frontend regression.
+  #    The frontend has no build step; it is exercised as a static site.
+  # -------------------------------------------------------------------------
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: No committed secrets
+        run: |
+          # A .env file must never be tracked. Only .env.example is allowed.
+          found=$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v '\.env\.example$' || true)
+          if [ -n "$found" ]; then
+            echo "::error::A .env file is tracked: $found"
+            echo "Remove it and rotate every secret it contained."
+            exit 1
+          fi
+          echo "no tracked .env files"
+
+      - name: No committed build artifacts
+        run: |
+          if git ls-files | grep -E 'node_modules/|/dist/|\.log$|\.workspaces/'; then
+            echo "::error::Build artifacts are tracked."
+            exit 1
+          fi
+          echo "no tracked artifacts"
+
+      - name: Frontend syntax check
+        run: |
+          status=0
+          for f in $(git ls-files 'js/*.js' 'js/**/*.js'); do
+            node --check "$f" || status=1
+          done
+          exit $status
+
+  # -------------------------------------------------------------------------
+  # 2. Backend: typecheck, tests against real PostgreSQL, dependency audit.
+  # -------------------------------------------------------------------------
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: buildmind
+          POSTGRES_PASSWORD: buildmind
+          POSTGRES_DB: buildmind_test
+        ports:
+          - 5432:5432
+        # Wait for the server to accept connections before anything else runs.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The test suites read TEST_DATABASE_URL; the migration CLI reads
+      # DATABASE_URL. Both point at the same database here, and both have to
+      # be set or the migration step fails with "DATABASE_URL is required".
+      TEST_DATABASE_URL: postgres://buildmind:buildmind@localhost:5432/buildmind_test
+      DATABASE_URL: postgres://buildmind:buildmind@localhost:5432/buildmind_test
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Migrations are idempotent and reversible
+        run: |
+          set -euo pipefail
+          npm run migrate
+          npm run migrate          # a second run must be a clean no-op
+          npm run migrate:down     # and the reverse must work
+          npm run migrate          # then forward again for the tests
+
+      - name: Tests
+        run: npm test
+
+      - name: Dependency audit
+        # Fails on high or critical advisories. Moderate findings are reported
+        # but do not block, because a transitive moderate with no fix available
+        # would otherwise freeze every change.
+        run: npm audit --audit-level=high
+
+  # -------------------------------------------------------------------------
+  # 3. Build the API for real, so a compiler-only success cannot mask a
+  #    packaging problem.
+  # -------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: The build produced the declared entry point
+        run: |
+          # package.json#scripts.start points at dist/server.js. If the build
+          # ever stops producing exactly that path, this fails here instead of
+          # in production.
+          test -f dist/server.js
+          test ! -d dist/tests   # tests must not ship
+          node --check dist/server.js

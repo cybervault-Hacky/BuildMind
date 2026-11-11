@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Build a Game — BuildMind</title>
+  <meta name="description" content="Describe the game you want to build and let BuildMind plan, build and test it.">
+  <meta name="theme-color" content="#060608">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BuildMind">
+  <meta property="og:title" content="Build a Game — BuildMind">
+  <meta property="og:description" content="Describe the game you want to build and let BuildMind plan, build and test it.">
+  <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <script src="js/boot-class.js"></script>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <noscript>
+    <style>
+      /* Without JavaScript the workspace is a static preview: no dead actions. */
+      #build-button, #connect-roblox, #connect-studio, #prompt-idea, #prompt-clear { display: none !important; }
+    </style>
+  </noscript>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient__grid"></div>
+    <div class="ambient__glow ambient__glow--top"></div>
+    <div class="ambient__glow ambient__glow--left"></div>
+    <div class="ambient__cursor"></div>
+    <div class="ambient__noise"></div>
+  </div>
+
+  <div class="page">
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="index.html" aria-label="BuildMind home">
+          <span class="brand__mark" data-brand-mark></span>
+          <span class="brand__word">Build<span>Mind</span></span>
+        </a>
+        <nav class="nav" aria-label="Primary">
+          <a class="nav__link" href="index.html">Home</a>
+          <a class="nav__link" href="build.html">Build</a>
+          <a class="nav__link" href="projects.html">Projects</a>
+          <a class="nav__link" href="settings.html">Settings</a>
+        </nav>
+        <div class="site-header__actions">
+          <a class="btn btn--ghost btn--sm btn--header-cta" href="projects.html">Projects</a>
+          <button class="menu-toggle" type="button" aria-expanded="false"
+                  aria-controls="mobile-nav" aria-label="Open menu">
+            <span class="menu-toggle__bars" aria-hidden="true"><span></span><span></span><span></span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile">
+      <ul class="mobile-nav__list">
+        <li><a class="mobile-nav__link" href="index.html">Home</a></li>
+        <li><a class="mobile-nav__link" href="build.html">Build</a></li>
+        <li><a class="mobile-nav__link" href="projects.html">Projects</a></li>
+        <li><a class="mobile-nav__link" href="settings.html">Settings</a></li>
+      </ul>
+    </nav>
+
+    <main id="main">
+      <div class="shell">
+        <div class="page-head">
+          <div>
+            <h1 class="page-head__title" data-reveal>Build a Game</h1>
+            <p class="page-head__sub" data-reveal data-reveal-delay="50">
+              Describe the game, choose a model, then build.
+            </p>
+          </div>
+          <div class="page-head__actions" data-reveal="fade" data-reveal-delay="100">
+            <span class="status status--idle" id="workspace-status">
+              <span class="status__dot" aria-hidden="true"></span>
+              <span class="status__text">Ready</span>
+            </span>
+          </div>
+        </div>
+
+        <p class="sr-only" id="build-live" role="status" aria-live="polite"></p>
+
+        <div class="workspace">
+          <!-- ============ Composer ============ -->
+          <div class="composer">
+            <!-- Active project context. Hidden until a project is open, so a
+                 fresh Build never implies one is loaded. -->
+            <section class="project-context" id="project-context" aria-labelledby="project-context-label"
+                     data-reveal hidden>
+              <div class="project-context__body">
+                <h2 class="project-context__label" id="project-context-label">Building from project</h2>
+                <p class="project-context__title" id="project-context-title"></p>
+                <span class="project-context__meta" id="project-context-meta"></span>
+              </div>
+              <div class="project-context__actions">
+                <a class="btn btn--ghost btn--sm" href="projects.html">All projects</a>
+                <button class="btn btn--quiet btn--sm" type="button" id="project-context-close">
+                  Clear
+                </button>
+              </div>
+            </section>
+
+            <!-- Prompt -->
+            <section aria-labelledby="prompt-label" data-reveal>
+              <div class="group-head">
+                <h2 class="group-label" id="prompt-label">Game idea</h2>
+                <span class="group-hint group-hint--keys">⌘ + Enter to build</span>
+              </div>
+
+              <div class="field-errors field" data-field="prompt">
+              <div class="prompt-block">
+                <label class="sr-only" for="game-prompt">Describe the game you want to build</label>
+                <textarea class="prompt-block__textarea" id="game-prompt" name="prompt"
+                          maxlength="600" spellcheck="true"
+                          placeholder="Describe the game you want to build..."></textarea>
+
+                <div class="prompt-block__bar">
+                  <div class="prompt-block__bar-left">
+                    <span class="prompt-block__count"><span id="prompt-count">0</span> / 600</span>
+                  </div>
+                  <div class="prompt-block__bar-right">
+                    <button class="btn btn--quiet btn--sm" type="button" id="prompt-clear" hidden>Clear</button>
+                    <button class="btn btn--ghost btn--sm" type="button" id="prompt-idea">
+                      Use an example
+                    </button>
+                  </div>
+                </div>
+              </div>
+                <p class="field__error" id="prompt-error" hidden></p>
+              </div>
+
+              <div class="chips chips--spaced" role="group" aria-label="Example game ideas">
+                <button class="chip" type="button" data-idea="Create a multiplayer survival game on a floating island.">Floating island survival</button>
+                <button class="chip" type="button" data-idea="Make an obby with moving platforms, checkpoints and a timer.">Obby with checkpoints</button>
+                <button class="chip" type="button" data-idea="Build a tycoon where players buy droppers and expand a base.">Dropper tycoon</button>
+                <button class="chip" type="button" data-idea="Create a round-based arena with classes and a scoreboard.">Round-based arena</button>
+              </div>
+            </section>
+
+            <!-- AI configuration -->
+            <section aria-labelledby="ai-label" data-reveal data-reveal-delay="60">
+              <div class="group-head">
+                <h2 class="group-label" id="ai-label">AI configuration</h2>
+                <span class="group-head__aside">
+                  <span class="status status--idle" id="build-config-status">
+                    <span class="status__dot" aria-hidden="true"></span>
+                    <span class="status__text">Not configured</span>
+                  </span>
+                  <a class="group-link" href="settings.html#ai">Manage in Settings</a>
+                </span>
+              </div>
+
+              <div class="config-grid">
+                <div class="field" data-field="provider">
+                  <label class="field__label" for="provider">Provider</label>
+                  <select class="select" id="provider" name="provider">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="google">Google</option>
+                    <option value="xai">xAI</option>
+                  </select>
+                  <p class="field__error" id="provider-error" hidden></p>
+                </div>
+
+                <div class="field" data-field="model">
+                  <label class="field__label" for="model">
+                    Model
+                    <span class="field__hint" id="model-hint">OpenAI</span>
+                  </label>
+                  <select class="select" id="model" name="model"></select>
+                  <p class="field__error" id="model-error" hidden></p>
+                </div>
+
+                <div class="field config-grid__span" data-field="apiKey">
+                  <label class="field__label" for="api-key">
+                    API key
+                    <span class="field__hint" id="api-key-hint">Used for this session. Not saved.</span>
+                  </label>
+                  <div class="input-group">
+                    <input class="input" id="api-key" name="api-key" type="password"
+                           autocomplete="off" spellcheck="false" aria-describedby="api-key-hint">
+                    <button class="input-group__action" type="button" id="api-key-toggle"
+                            aria-label="Show API key" aria-pressed="false" data-icon="eye">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path class="icon-eye" d="M1.8 8S4.1 3.9 8 3.9 14.2 8 14.2 8s-2.3 4.1-6.2 4.1S1.8 8 1.8 8Z"/>
+                        <circle class="icon-eye" cx="8" cy="8" r="1.7"/>
+                        <g class="icon-eye-off is-off">
+                          <path d="M6.3 4.2A6.6 6.6 0 0 1 8 3.9c3.9 0 6.2 4.1 6.2 4.1a11 11 0 0 1-2 2.4M9.8 11.6A6.7 6.7 0 0 1 8 12.1C4.1 12.1 1.8 8 1.8 8a11 11 0 0 1 2.6-2.9M2.6 2.6l10.8 10.8"/>
+                        </g>
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="field__state" id="api-key-state"></p>
+                  <p class="field__error" id="apiKey-error" hidden></p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Connections -->
+            <section aria-labelledby="conn-label" data-reveal data-reveal-delay="120">
+              <div class="group-head">
+                <h2 class="group-label" id="conn-label">Connections</h2>
+                <span class="group-hint">Simulated</span>
+              </div>
+
+              <div class="panel">
+                <div class="panel__body panel__body--flush">
+                  <div class="connection" id="roblox-row" data-status="disconnected">
+                    <span class="connection__icon" aria-hidden="true">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5.6 2.5v3M10.4 2.5v3M3.6 5.5h8.8v1.6a4.4 4.4 0 0 1-8.8 0V5.5ZM8 11.5v2"/>
+                      </svg>
+                    </span>
+                    <div class="connection__body">
+                      <span class="connection__title-row">
+                        <span class="connection__title">Roblox</span>
+                        <span class="status status--idle" id="roblox-status">
+                          <span class="status__dot" aria-hidden="true"></span>
+                          <span class="status__text">Not connected</span>
+                        </span>
+                      </span>
+                      <span class="connection__sub" id="roblox-sub">Account</span>
+                    </div>
+                    <div class="connection__actions">
+                      <button class="btn btn--ghost btn--sm" type="button" id="connect-roblox">Connect</button>
+                    </div>
+                  </div>
+
+                  <div class="connection" id="studio-row" data-status="disconnected">
+                    <span class="connection__icon" aria-hidden="true">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="12" height="8" rx="1.4"/>
+                        <path d="M5.6 13.4h4.8M8 11v2.4"/>
+                      </svg>
+                    </span>
+                    <div class="connection__body">
+                      <span class="connection__title-row">
+                        <span class="connection__title">Roblox Studio</span>
+                        <span class="status status--idle" id="studio-status">
+                          <span class="status__dot" aria-hidden="true"></span>
+                          <span class="status__text">Not connected</span>
+                        </span>
+                      </span>
+                      <span class="connection__sub" id="studio-sub">Local bridge</span>
+                    </div>
+                    <div class="connection__actions">
+                      <button class="btn btn--ghost btn--sm" type="button" id="connect-studio">Connect</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Build action -->
+            <div class="build-bar" data-reveal="fade" data-reveal-delay="160">
+              <span class="build-bar__hint">
+                <strong id="build-hint-title">Ready to build</strong>
+                <span id="build-hint-note">Simulated — nothing leaves your browser</span>
+              </span>
+              <!-- Hidden until build.js wires it up: no dead primary action. -->
+              <button class="btn btn--primary" type="button" id="build-button" hidden>
+                Build Game
+              </button>
+            </div>
+          </div>
+
+          <!-- ============ Activity column ============ -->
+          <aside class="activity-col" aria-label="Build activity">
+            <div class="panel panel--raised" data-reveal="scale" data-reveal-delay="80">
+              <div class="panel__head">
+                <span class="panel__title">Activity</span>
+                <span class="status status--idle" id="build-status">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Ready</span>
+                </span>
+              </div>
+              <div class="panel__body">
+                <div class="worldviz worldviz--panel" data-world id="build-world"></div>
+
+                <!-- Current stage: title + description + index, never colour alone -->
+                <div class="stage-now" id="stage-now" data-status="ready">
+                  <span class="stage-now__top">
+                    <span class="stage-now__label" id="stage-now-label">Ready</span>
+                    <span class="stage-now__index" id="stage-now-index"></span>
+                  </span>
+                  <span class="stage-now__desc" id="stage-now-desc">Describe a game to begin</span>
+                </div>
+
+                <ol class="timeline" id="build-timeline"></ol>
+              </div>
+            </div>
+
+            <div class="panel" data-reveal="fade" data-reveal-delay="140">
+              <div class="panel__body">
+                <div class="progress" id="build-progress" role="group" aria-label="Build progress">
+                  <div class="progress__head">
+                    <span class="progress__label">Progress</span>
+                    <span class="progress__value" id="progress-value">0%</span>
+                  </div>
+                  <div class="progress__track" role="progressbar" id="progress-bar"
+                       aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                       aria-labelledby="progress-state">
+                    <div class="progress__fill" id="progress-fill"></div>
+                  </div>
+                  <div class="progress__stages" id="progress-stages" aria-hidden="true"></div>
+                  <div class="progress__foot">
+                    <span id="progress-state">Ready</span>
+                    <span id="progress-time">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Agent activity feed — simulated log lines, newest first -->
+            <div class="panel" id="activity-feed-panel" data-reveal="fade" data-reveal-delay="180" hidden>
+              <div class="panel__head">
+                <span class="panel__title">Log</span>
+                <span class="log__count" id="activity-count">0</span>
+              </div>
+              <div class="panel__body">
+                <ol class="log" id="activity-feed" aria-label="Simulated build log"
+                    aria-live="off"></ol>
+                <p class="log__empty" id="activity-empty">
+                  Activity appears here while a build runs.
+                </p>
+              </div>
+            </div>
+
+            <!-- Result summary — only after a completed run -->
+            <div class="panel panel--result" id="build-result" data-reveal="fade"
+                 data-reveal-delay="100" hidden aria-labelledby="result-title">
+              <div class="panel__head">
+                <span class="panel__title" id="result-title">Build complete</span>
+                <span class="status status--ready" id="result-status">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Complete</span>
+                </span>
+              </div>
+              <div class="panel__body">
+                <dl class="result">
+                  <div class="result__row">
+                    <dt>Game concept</dt>
+                    <dd id="result-name">—</dd>
+                  </div>
+                  <div class="result__row">
+                    <dt>Build status</dt>
+                    <dd id="result-build">Complete</dd>
+                  </div>
+                  <div class="result__row">
+                    <dt>Validation</dt>
+                    <dd id="result-validation">Passed</dd>
+                  </div>
+                  <div class="result__row">
+                    <dt>Created</dt>
+                    <dd id="result-created">Just now</dd>
+                  </div>
+                </dl>
+                <p class="result__note">Simulated result — nothing was published.</p>
+                <div class="result__actions">
+                  <a class="btn btn--primary btn--sm" id="result-open" href="projects.html">
+                    Open project
+                  </a>
+                  <button class="btn btn--ghost btn--sm" type="button" id="result-again">
+                    Build again
+                  </button>
+                </div>
+                <a class="result__link" href="projects.html">View all projects</a>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <span class="site-footer__brand">
+          <span data-brand-mark="sm" aria-hidden="true"></span>
+          BuildMind
+        </span>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="projects.html">Projects</a>
+          <a href="settings.html">Settings</a>
+        </nav>
+        <span class="site-footer__tag">Simulated build</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/services/contracts.js"></script>
+  <script src="js/services/storage.js"></script>
+  <script src="js/services/ai/providers.js"></script>
+  <script src="js/services/ai/stages.js"></script>
+  <script src="js/services/ai/mockAIService.js"></script>
+  <script src="js/services/connections/mockRobloxService.js"></script>
+  <script src="js/services/connections/mockStudioService.js"></script>
+  <script src="js/services/projects/projectModel.js"></script>
+  <script src="js/services/projects/localProjectService.js"></script>
+  <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/services/api/apiClient.js"></script>
+  <script src="js/services/projects/remoteProjectService.js"></script>
+  <script src="js/services/ai/remoteAIService.js"></script>
+  <script src="js/services/mode.js"></script>
+  <script src="js/controllers/buildController.js"></script>
+  <script src="js/controllers/connectionController.js"></script>
+  <script src="js/controllers/projectController.js"></script>
+  <script src="js/controllers/settingsController.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/build.js"></script>
+</body>
+</html>

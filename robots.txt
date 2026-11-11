@@ -1,0 +1,4 @@
+# BuildMind is a local-first frontend demo with no backend, no accounts and no
+# dynamic content. There is nothing here to index, so everything is disallowed.
+User-agent: *
+Disallow: /

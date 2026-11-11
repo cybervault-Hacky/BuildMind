@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BuildMind — Turn your ideas into games</title>
+  <meta name="description" content="BuildMind is an AI game development workspace. Describe a game, build it, test it and play it.">
+  <meta name="theme-color" content="#060608">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BuildMind">
+  <meta property="og:title" content="BuildMind — Turn your ideas into games">
+  <meta property="og:description" content="Describe a game. BuildMind plans it, builds it and tests it.">
+  <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <script src="js/boot-class.js"></script>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient__grid"></div>
+    <div class="ambient__glow ambient__glow--top"></div>
+    <div class="ambient__glow ambient__glow--left"></div>
+    <div class="ambient__cursor"></div>
+    <div class="ambient__noise"></div>
+  </div>
+
+  <div class="page">
+    <!-- ================= Header ================= -->
+    <header class="site-header">
+      <div class="shell site-header__inner">
+        <a class="brand" href="index.html" aria-label="BuildMind home">
+          <span class="brand__mark" data-brand-mark></span>
+          <span class="brand__word">Build<span>Mind</span></span>
+        </a>
+
+        <nav class="nav" aria-label="Primary">
+          <a class="nav__link" href="index.html">Home</a>
+          <a class="nav__link" href="build.html">Build</a>
+          <a class="nav__link" href="projects.html">Projects</a>
+          <a class="nav__link" href="settings.html">Settings</a>
+        </nav>
+
+        <div class="site-header__actions">
+          <a class="btn btn--ghost btn--sm btn--header-cta" href="build.html">Open workspace</a>
+          <button class="menu-toggle" type="button" aria-expanded="false"
+                  aria-controls="mobile-nav" aria-label="Open menu">
+            <span class="menu-toggle__bars" aria-hidden="true"><span></span><span></span><span></span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile">
+      <ul class="mobile-nav__list">
+        <li><a class="mobile-nav__link" href="index.html">Home</a></li>
+        <li><a class="mobile-nav__link" href="build.html">Build</a></li>
+        <li><a class="mobile-nav__link" href="projects.html">Projects</a></li>
+        <li><a class="mobile-nav__link" href="settings.html">Settings</a></li>
+      </ul>
+    </nav>
+
+    <!-- ================= Main ================= -->
+    <main id="main">
+      <section class="shell">
+        <div class="hero">
+          <div class="hero__copy">
+            <h1 class="hero__title" data-reveal data-reveal-delay="60" tabindex="-1">
+              Turn your ideas<br>into games.
+            </h1>
+
+            <p class="hero__lede" data-reveal data-reveal-delay="140">
+              Describe a game. BuildMind plans it, builds it and tests it.
+            </p>
+
+            <div class="hero__actions" data-reveal data-reveal-delay="220">
+              <a class="btn btn--primary btn--lg" href="build.html">
+                Build a Game
+              </a>
+              <a class="btn btn--ghost btn--lg" href="settings.html#roblox">
+                Connect Roblox
+              </a>
+            </div>
+
+            <p class="hero__meta" data-reveal="fade" data-reveal-delay="280">
+              Simulated preview · Roblox target · bring your own model
+            </p>
+          </div>
+
+          <div class="hero__visual" data-reveal="scale" data-reveal-delay="180">
+            <div class="worldviz" data-world id="hero-world"></div>
+            <span class="worldviz__caption" aria-hidden="true">world · assembling</span>
+          </div>
+        </div>
+
+        <!-- Idea → Build → Test → Play -->
+        <div class="pipeline" data-reveal="fade">
+          <div class="pipeline__steps" role="list" aria-label="How a build runs">
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">1</span> Idea
+            </div>
+            <span class="pipeline__arrow" aria-hidden="true"></span>
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">2</span> Build
+            </div>
+            <span class="pipeline__arrow" aria-hidden="true"></span>
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">3</span> Test
+            </div>
+            <span class="pipeline__arrow" aria-hidden="true"></span>
+            <div class="pipeline__step" role="listitem">
+              <span class="pipeline__step-num" aria-hidden="true">4</span> Play
+            </div>
+          </div>
+          <a class="link-arrow pipeline__link" href="projects.html">
+            View projects
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3.2 8h9.6M9 4.2 12.8 8 9 11.8"/>
+            </svg>
+          </a>
+        </div>
+
+        <!-- One quiet shortcut back into the workspace -->
+        <div class="start-row" data-reveal="fade">
+          <a class="start-card" href="projects.html">
+            <span class="start-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2.5" y="3.5" width="11" height="9" rx="1.6"/>
+                <path d="M5.5 7h2M5.5 9.3h4.5"/>
+              </svg>
+            </span>
+            <span>
+              <span class="start-card__title">Open your projects</span>
+              <span class="start-card__note">Return to a game you have started</span>
+            </span>
+            <span class="start-card__arrow" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3.2 8h9.6M9 4.2 12.8 8 9 11.8"/>
+              </svg>
+            </span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= Footer ================= -->
+    <footer class="site-footer">
+      <div class="shell site-footer__inner">
+        <span class="site-footer__brand">
+          <span data-brand-mark="sm" aria-hidden="true"></span>
+          BuildMind
+        </span>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="build.html">Build</a>
+          <a href="projects.html">Projects</a>
+          <a href="settings.html">Settings</a>
+        </nav>
+        <span class="site-footer__tag">Simulated in your browser</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/services/contracts.js"></script>
+  <script src="js/services/storage.js"></script>
+  <script src="js/services/ai/providers.js"></script>
+  <script src="js/services/ai/stages.js"></script>
+  <script src="js/services/ai/mockAIService.js"></script>
+  <script src="js/services/connections/mockRobloxService.js"></script>
+  <script src="js/services/connections/mockStudioService.js"></script>
+  <script src="js/services/projects/projectModel.js"></script>
+  <script src="js/services/projects/localProjectService.js"></script>
+  <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/services/api/apiClient.js"></script>
+  <script src="js/services/projects/remoteProjectService.js"></script>
+  <script src="js/services/ai/remoteAIService.js"></script>
+  <script src="js/services/mode.js"></script>
+  <script src="js/controllers/buildController.js"></script>
+  <script src="js/controllers/connectionController.js"></script>
+  <script src="js/controllers/projectController.js"></script>
+  <script src="js/controllers/settingsController.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/home.js"></script>
+</body>
+</html>

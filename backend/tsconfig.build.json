@@ -1,0 +1,22 @@
+{
+  /*
+    Production build configuration.
+
+    `tsconfig.json` covers the whole repository so `npm run typecheck` also
+    checks the tests. That is the right default for development, but shipping
+    it would put `tests/`, the fake providers and the E2E helpers into `dist/`,
+    and would produce `dist/src/server.js` rather than the entry point
+    `package.json` declares.
+
+    This config builds only `src/`, rooted at `src/`, so the output is
+    `dist/server.js` exactly as `npm start` expects.
+  */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests"]
+}

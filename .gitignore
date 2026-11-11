@@ -1,0 +1,21 @@
+# --- dependencies & build output ---
+node_modules/
+backend/node_modules/
+backend/dist/
+dist-tests/
+
+# --- secrets ---
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# --- local runtime state ---
+backend/.workspaces/
+*.log
+
+# --- browser/test artifacts ---
+coverage/
+.arena/

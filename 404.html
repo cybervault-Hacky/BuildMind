@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'sha256-XiPfkVW7Fv8Pu7Gvjl3IbaK7RiUrgPZzw54hCnaV/9g='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Page not found — BuildMind</title>
+  <meta name="theme-color" content="#060608">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <!--
+    This page is served for ANY unknown path, at ANY depth, from any deployment
+    root. A relative stylesheet or script would therefore resolve against the
+    bad path (e.g. /build.html/extra/css/main.css) and fail, leaving an unstyled
+    error page — which is exactly what a 404 must not be. It is fully
+    self-contained instead: inline styles, no external CSS, no JS, no fonts.
+    There is nothing left that can 404.
+
+    The two links ARE relative, and this page is served at whatever depth the
+    bad URL had, so on /a/b/c they would resolve to /a/b/c/index.html. The tiny
+    script at the end of this document rewrites them for the real depth. It is
+    allowed by a CSP script hash rather than 'unsafe-inline', so the policy stays
+    as tight as the rest of the app. style-src 'unsafe-inline' already covers this, and the colours below
+    are copied from the design tokens in css/main.css.
+  -->
+  <style>
+    :root { color-scheme: dark; }
+    * { margin: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: 32px 20px;
+      background: #060608;
+      color: #f2f3f6;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-align: center;
+    }
+    .mark {
+      width: 34px;
+      height: 34px;
+      margin-bottom: 26px;
+      border-radius: 9px;
+      border: 1px solid rgba(139, 147, 255, 0.34);
+      background: rgba(139, 147, 255, 0.12);
+      display: grid;
+      place-items: center;
+      color: #8b93ff;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      color: #7c8094;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-size: clamp(26px, 5vw, 38px);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      font-weight: 650;
+      margin-bottom: 14px;
+    }
+    p.note {
+      max-width: 42ch;
+      color: #b9bcc7;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    a.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 20px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 560;
+      text-decoration: none;
+      transition: background 180ms ease, border-color 180ms ease;
+    }
+    a.primary { background: #8b93ff; color: #0a0a14; }
+    a.primary:hover { background: #a2a9ff; }
+    a.ghost {
+      color: #f2f3f6;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    a.ghost:hover { border-color: rgba(139, 147, 255, 0.4); }
+    a.btn:focus-visible { outline: 2px solid #8b93ff; outline-offset: 2px; }
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 18px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #7c8094;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      a.btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <span class="mark" aria-hidden="true">B</span>
+  <p class="code" aria-hidden="true">404</p>
+  <h1>That page is not here</h1>
+  <p class="note">
+    BuildMind has four pages: Home, Build, Projects and Settings. Nothing was
+    lost — your projects live in this browser, not on a server.
+  </p>
+  <div class="actions">
+    <a class="btn primary" href="index.html">Back to Home</a>
+    <a class="btn ghost" href="projects.html">Open Projects</a>
+  </div>
+  <footer>Simulated in your browser</footer>
+  <script>
+(function(){var p=location.pathname;if(/\/$/.test(p))p=p.slice(0,-1);var d=p.split('/').length-2;if(d<0)d=0;var up=d?new Array(d+1).join('../'):'';var links=document.getElementsByTagName('a');for(var i=0;i<links.length;i++){var h=links[i].getAttribute('href');if(h&&h.indexOf('://')===-1&&h.charAt(0)!=='/'&&h.charAt(0)!=='#'&&h.indexOf('mailto:')!==0){links[i].setAttribute('href',up+h);}}})();
+  </script>
+</body>
+</html>

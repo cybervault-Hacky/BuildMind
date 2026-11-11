@@ -1,0 +1,897 @@
+/* ==========================================================================
+   BuildMind — responsive.css
+   Tablet and mobile recomposition. Mobile is laid out on purpose,
+   never just a shrunken desktop.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Large desktop refinements
+   -------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  :root {
+    --page-max: 1180px;
+  }
+
+  .hero {
+    min-height: min(74vh, 660px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Small desktop / large tablet
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 40px;
+    min-height: 0;
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .hero__visual {
+    min-height: 320px;
+  }
+
+  .worldviz {
+    max-width: 380px;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.88fr);
+    gap: 28px;
+  }
+
+  .nav__link {
+    padding-inline: 12px;
+  }
+
+  /* Tablet and small desktop: two comfortable card columns rather than a
+     squeezed three. The floor is set high enough that a card keeps its name,
+     status, date and actions on one line — at 260px the name and the
+     "Last build" line both truncated at 900-1024px. */
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Grid min-tracks — every width the product supports, including 320px
+   -------------------------------------------------------------------------- */
+@media (max-width: 700px) {
+  /* A 280px track plus gutters would overflow a 320px viewport */
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tablet — collapse header nav into the sheet
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  :root {
+    --header-h: 62px;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .site-header__actions .btn--header-cta {
+    display: none;
+  }
+
+  .menu-toggle {
+    display: grid;
+  }
+
+  .mobile-nav {
+    display: block;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out),
+      visibility var(--dur-3);
+  }
+
+  .mobile-nav.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .site-header__inner {
+    grid-template-columns: 1fr auto;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+    padding: 44px 0 40px;
+  }
+
+  .hero__copy {
+    max-width: 100%;
+  }
+
+  .hero__title {
+    font-size: clamp(32px, 7vw, 44px);
+  }
+
+  .hero__visual {
+    order: 2;
+    min-height: 0;
+  }
+
+  .worldviz {
+    max-width: 320px;
+  }
+
+  .pipeline {
+    padding-bottom: 48px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .start-card {
+    padding: var(--s-5) 0 var(--s-7);
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    padding-bottom: 72px;
+  }
+
+  .activity-col {
+    position: static;
+  }
+
+  /* Activity sits under the composer once the two columns collapse:
+     timeline + progress side by side while there is tablet width, stacked on phones */
+  .activity-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+  }
+
+  /* The log and result belong under the pair, spanning both columns */
+  .activity-col > #activity-feed-panel,
+  .activity-col > #build-result {
+    grid-column: 1 / -1;
+  }
+
+  .build-bar {
+    position: static;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-top: 0;
+    padding-bottom: 0;
+  }
+
+  .page-head {
+    padding: 44px 0 24px;
+  }
+
+  .settings {
+    max-width: 100%;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile
+   -------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  /* Touch widths: every tappable control gets a comfortable height. The
+     visuals stay compact because the extra size is padding, not type. */
+  .chip,
+  .segmented__option,
+  .menu-toggle,
+  .icon-btn,
+  .btn--sm,
+  #prompt-idea {
+    min-height: 44px;
+  }
+
+  .icon-btn {
+    min-width: 44px;
+  }
+
+  /* Inline links that act as controls need a target, not just a text baseline. */
+  .group-link,
+  .link-arrow {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .segmented {
+    padding: 3px;
+  }
+
+  /* The brand is a home link: give it a full-height tap band. */
+  .brand {
+    min-height: 44px;
+  }
+
+  .site-footer__links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 2px;
+  }
+
+  .segmented__option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .project-card__open,
+  .project-card__delete,
+  .project-card__actions .btn {
+    min-height: 44px;
+    height: auto;
+  }
+
+  .confirm__actions .btn,
+  .build-bar .btn,
+  .page-head__actions .btn {
+    min-height: 44px;
+  }
+
+  :root {
+    --header-h: 58px;
+    --gutter: 18px;
+    --s-10: 44px;
+    --s-11: 64px;
+  }
+
+  body {
+    font-size: 14.5px;
+  }
+
+  .brand__mark {
+    width: 24px;
+    height: 24px;
+  }
+
+  .brand__word {
+    font-size: 14.5px;
+  }
+
+  .site-header__actions {
+    gap: 6px;
+  }
+
+  .site-header__actions .btn--sm {
+    height: 34px;
+    padding-inline: 12px;
+    font-size: 12px;
+  }
+
+  .menu-toggle {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Hero */
+  .hero {
+    gap: 36px;
+    padding: 30px 0 32px;
+  }
+
+  .hero__title {
+    font-size: clamp(29px, 8.6vw, 38px);
+    letter-spacing: -0.032em;
+  }
+
+  .hero__lede {
+    margin-top: 14px;
+    font-size: 14.5px;
+    max-width: 34ch;
+  }
+
+  .hero__actions {
+    margin-top: 24px;
+    gap: 10px;
+  }
+
+  .hero__actions .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .hero__actions .btn--primary {
+    flex: 1 1 100%;
+    height: 48px;
+  }
+
+  /* Beat the .btn--lg rule that may outrank on specificity */
+  .hero__actions .btn--lg {
+    height: 48px;
+    padding-inline: 18px;
+    font-size: 14px;
+  }
+
+  .hero__meta {
+    margin-top: 24px;
+    padding-top: 20px;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .hero__visual {
+    min-height: 250px;
+  }
+
+  .worldviz {
+    max-width: 280px;
+  }
+
+  .worldviz__caption {
+    font-size: 10px;
+  }
+
+  /* Pipeline becomes a quiet 2x2 grid */
+  .pipeline {
+    padding: 20px 0 40px;
+    gap: 16px;
+  }
+
+  .pipeline__steps {
+    width: 100%;
+    gap: 8px 14px;
+  }
+
+  .pipeline__arrow {
+    display: none;
+  }
+
+  .pipeline__link {
+    font-size: 12px;
+  }
+
+  /* Page heads */
+  .page-head {
+    padding: 32px 0 20px;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .page-head__title {
+    font-size: 26px;
+  }
+
+  .page-head__sub {
+    font-size: 13.5px;
+    margin-top: 6px;
+  }
+
+  .page-head__actions {
+    width: 100%;
+  }
+
+  .page-head__actions .btn {
+    flex: 1 1 auto;
+  }
+
+  /* Composer */
+  .composer {
+    gap: 24px;
+  }
+
+  .prompt-block__textarea {
+    min-height: 124px;
+    padding: 16px 16px 6px;
+    font-size: 15px; /* avoid iOS zoom */
+  }
+
+  .prompt-block__bar {
+    padding: 10px 10px 10px 16px;
+    gap: 8px;
+  }
+
+  .prompt-block__bar .btn {
+    height: 34px;
+    padding-inline: 12px;
+  }
+
+  .chips {
+    gap: 6px;
+  }
+
+  /* No physical keyboard hint on touch devices */
+  .group-hint--keys {
+    display: none;
+  }
+
+  .group-hint {
+    font-size: 10.5px;
+  }
+
+  .group-link {
+    font-size: 11px;
+  }
+
+  .chip {
+    height: 30px;
+    font-size: 11.5px;
+  }
+
+  .config-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .input,
+  .select {
+    height: 46px;
+    font-size: 15px; /* avoid iOS zoom */
+  }
+
+  /* Inline field errors stay readable and never push the layout sideways */
+  .field__error {
+    font-size: 11.5px;
+    margin-top: 6px;
+    max-width: 46ch;
+  }
+
+  /* One column on phones: activity timeline, then progress */
+  .activity-col {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  /* The primary action owns the thumb zone on phones */
+  .build-bar {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 0;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .build-bar .btn {
+    width: 100%;
+    min-width: 0;
+    height: 52px;
+    font-size: 15px;
+  }
+
+  .build-bar__hint {
+    text-align: center;
+  }
+
+  /* Panels */
+  .panel__head {
+    padding: 15px 16px;
+  }
+
+  .panel__body {
+    padding: 16px;
+  }
+
+  /* Connections: label + status left, full-height action right */
+  .connection {
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+  }
+
+  .connection__actions {
+    width: auto;
+    padding-left: 0;
+  }
+
+  .connection__actions .btn {
+    height: 38px;
+    padding-inline: 14px;
+    border-color: var(--line-strong);
+    color: var(--text-soft);
+  }
+
+  .connection__title-row {
+    gap: 8px;
+  }
+
+  .progress__stages {
+    gap: 3px;
+  }
+
+  /* Timeline */
+  .timeline__step {
+    padding: 10px 0;
+    min-height: 44px;
+  }
+
+  .timeline__label {
+    font-size: 13.5px;
+  }
+
+  /* Current stage, activity log and result summary */
+  .stage-now {
+    padding: 10px 12px;
+  }
+
+  .stage-now__index {
+    font-size: 10px;
+  }
+
+  .log {
+    max-height: 150px;
+  }
+
+  .result__row {
+    grid-template-columns: minmax(74px, auto) minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .result__actions {
+    gap: 8px;
+  }
+
+  .result__actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  /* Projects */
+  .projects-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding-bottom: 56px;
+    align-items: start;
+  }
+
+  .project-card__thumb {
+    aspect-ratio: 2 / 1;
+  }
+
+  .project-new {
+    min-height: 120px;
+  }
+
+  .project-card__body {
+    padding: 13px 14px;
+  }
+
+  /* Filters scroll horizontally; search takes the full width beneath them. */
+  .project-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .project-toolbar .filter-row {
+    margin-bottom: 0;
+  }
+
+  .project-search {
+    width: 100%;
+  }
+
+  .project-search__input {
+    height: 38px;
+  }
+
+  .filter-row {
+    gap: 6px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .filter-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .segmented__option {
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+
+  .empty {
+    padding: 48px 20px;
+  }
+
+  /* Settings */
+  .settings {
+    gap: 20px;
+    padding-bottom: 56px;
+  }
+
+  .setting-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 0;
+  }
+
+  .setting-row__control {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .setting-row__control .select,
+  .setting-row__control .input-group {
+    width: 100%;
+  }
+
+  /* Status chips share a line with the heading on desktop; on a phone they
+     wrap onto their own line rather than squeezing the title. */
+  .settings-section__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .setting-row__title-row {
+    gap: 8px;
+  }
+
+  .setting-row__state {
+    white-space: normal;
+  }
+
+  .segmented {
+    width: 100%;
+  }
+
+  .segmented__option {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  /* Footer */
+  .site-footer {
+    padding: 24px 0;
+  }
+
+  .site-footer__inner {
+    gap: 14px;
+  }
+
+  .site-footer__links {
+    gap: 16px;
+    font-size: 12px;
+  }
+
+  .site-footer__tag {
+    display: none;
+  }
+
+  /* Toast clears the safe area */
+  .toast {
+    bottom: 18px;
+    left: 18px;
+    right: 18px;
+    transform: translateY(16px);
+    justify-content: center;
+  }
+
+  .toast.is-visible {
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Very small phones (320–380px) — 320px must stay usable, not merely survive
+   -------------------------------------------------------------------------- */
+@media (max-width: 380px) {
+  :root {
+    --gutter: 16px;
+    --header-h: 56px;
+  }
+
+  .hero__title {
+    font-size: 27px;
+  }
+
+  .hero__lede {
+    font-size: 14px;
+  }
+
+  .worldviz {
+    max-width: 240px;
+  }
+
+  .hero__visual {
+    min-height: 216px;
+  }
+
+  .pipeline__steps {
+    gap: 6px 10px;
+  }
+
+  .pipeline__step {
+    font-size: 11.5px;
+  }
+
+  .pipeline__step-num {
+    width: 18px;
+    height: 18px;
+  }
+
+  .start-card {
+    gap: 12px;
+    padding-bottom: var(--s-6);
+  }
+
+  .start-card__title {
+    font-size: 13px;
+  }
+
+  .start-card__note {
+    font-size: 12px;
+  }
+
+  .btn--lg {
+    padding-inline: 16px;
+    font-size: 13.5px;
+  }
+
+  /* Composer chrome drops the secondary action first */
+  .prompt-block__bar {
+    padding: 8px 8px 8px 14px;
+  }
+
+  #prompt-idea {
+    font-size: 11.5px;
+    padding-inline: 10px;
+  }
+
+  .prompt-block__count {
+    font-size: 11px;
+  }
+
+  .chip {
+    font-size: 11px;
+    padding-inline: 9px;
+  }
+
+  /* Timelines and progress stay compact but readable */
+  .timeline__label {
+    font-size: 13px;
+  }
+
+  .timeline__step {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  /* Phones: the stage description is the one line that may wrap */
+  .timeline__desc {
+    font-size: 10.5px;
+  }
+
+  .stage-now__desc {
+    font-size: 11px;
+  }
+
+  .log__item {
+    font-size: 11px;
+  }
+
+  .result__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .panel__head,
+  .panel__body {
+    padding-inline: 14px;
+  }
+
+  .connection__icon {
+    display: none;
+  }
+
+  .connection__actions .btn {
+    height: 36px;
+    padding-inline: 12px;
+    font-size: 12px;
+  }
+
+  /* Filters keep their intrinsic width and scroll, instead of squeezing
+     five lifecycle states into 320px. */
+  .segmented {
+    width: auto;
+  }
+
+  .segmented__option {
+    flex: 0 0 auto;
+    padding-inline: 11px;
+    font-size: 12px;
+  }
+
+  /* Card actions stay reachable at 320: the delete button grows to a 36px
+     touch target and the footer wraps rather than clipping. */
+  .project-card__foot {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .project-card__open {
+    height: 34px;
+  }
+
+  .project-card__desc {
+    min-height: 0;
+  }
+
+  .confirm__body {
+    padding: 20px 18px;
+  }
+
+  .confirm__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .confirm__actions .btn {
+    width: 100%;
+  }
+
+  .project-context {
+    padding: 12px;
+  }
+
+  .project-context__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Settings rows: control sits full width and never overflows */
+  .setting-row__control .segmented {
+    width: 100%;
+  }
+
+
+  .toast {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    font-size: 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Landscape phones — keep the hero breathable
+   -------------------------------------------------------------------------- */
+@media (max-height: 520px) and (orientation: landscape) {
+  .hero {
+    padding-block: 28px;
+  }
+
+  .hero__visual {
+    min-height: 220px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Print — nothing fancy is needed
+   -------------------------------------------------------------------------- */
+@media print {
+  .ambient,
+  .site-header,
+  .site-footer,
+  .mobile-nav {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
