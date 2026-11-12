@@ -636,7 +636,7 @@
     const label = target === "roblox" ? "Roblox connection" : "Studio bridge";
 
     if (!BM.isOk(result)) {
-      toast(result.error.message || "The connection was not available.");
+      toast(result.error.message || "The connection was not available.", "error");
       return;
     }
 
@@ -649,7 +649,7 @@
 
     const next = result.data && result.data.status;
     if (next === "connected") toast(`${BM.connectionController.label(target)} connected`);
-    else if (next === "unavailable") toast(result.error ? result.error.message : `${label} is not available`);
+    else if (next === "unavailable") toast(result.error ? result.error.message : `${label} is not available`, "error");
     else toast(`${label} disconnected`);
   }
 
@@ -774,10 +774,10 @@
         paintAction(getState().build);
         if (!BM.isOk(result)) {
           announce(result.error ? result.error.message : "The build could not be stopped.");
-          toast(result.error ? result.error.message : "The build could not be stopped.");
+          toast(result.error ? result.error.message : "The build could not be stopped.", "error");
           return;
         }
-        toast(result.data && result.data.stopped ? "Build stopped" : "The build already finished");
+        toast(result.data && result.data.stopped ? "Build stopped" : "The build already finished", "info");
       });
       return;
     }
@@ -1077,7 +1077,7 @@
         paintProviderOptions();
         paintModelOptions();
         paintConfigStatus();
-        if (!BM.isOk(result)) return toast(result.error.message);
+        if (!BM.isOk(result)) return toast(result.error.message, "error");
         setFieldError("provider", "");
         toast("Provider updated");
       });
@@ -1088,7 +1088,7 @@
       BM.settingsController.setModel(el.model.value).then((result) => {
         paintModelOptions();
         paintConfigStatus();
-        if (!BM.isOk(result)) return toast(result.error.message);
+        if (!BM.isOk(result)) return toast(result.error.message, "error");
         setFieldError("model", "");
       });
     });
@@ -1157,7 +1157,7 @@
         local.deepLinked = projectId;
         return BM.projectController.open(projectId).then((result) => {
           if (!BM.isOk(result)) {
-            toast("That project could not be opened.");
+            toast("That project could not be opened.", "error");
             return restoreDraft();
           }
           applyProjectContext(result.data.project, true);

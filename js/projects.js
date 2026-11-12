@@ -244,12 +244,16 @@
     const tile = document.createElement("a");
     tile.className = "project-new";
     tile.href = "build.html";
+    // The tile is a card-sized target in a grid of cards, so it says what it
+    // does in a sentence as well as in its label.
+    tile.setAttribute("aria-label", "Start a new project in the Build workspace");
     tile.innerHTML = `
       <span class="project-new__plus" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
              stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.2v9.6M3.2 8h9.6"/></svg>
       </span>
-      <span class="project-new__label">New project</span>`;
+      <span class="project-new__label">New project</span>
+      <span class="project-new__note">Describe an idea and build it</span>`;
     return tile;
   }
 
@@ -468,13 +472,19 @@
     return supportsDialog() ? el.dialog.open === true : el.dialog.hasAttribute("open");
   }
 
+  /**
+   * Close through the shell so the dialog plays its exit transition. The native
+   * `close` event still fires (BM.closeDialog calls dialog.close()), which is
+   * what clears the fallback roles below.
+   */
   function closeDialog() {
     if (!el.dialog) return;
-    if (supportsDialog()) {
-      el.dialog.close();
+    if (typeof BM.closeDialog === "function") {
+      BM.closeDialog(el.dialog);
       return;
     }
-    el.dialog.removeAttribute("open");
+    if (supportsDialog()) el.dialog.close();
+    else el.dialog.removeAttribute("open");
   }
 
   function askDelete(id, trigger) {
@@ -502,7 +512,7 @@
 
     controller().remove(id).then((result) => {
       if (!BM.isOk(result)) {
-        toast(result.error.message);
+        toast(result.error.message, "error");
         return;
       }
 

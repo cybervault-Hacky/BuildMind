@@ -1,7 +1,16 @@
 /* ==========================================================================
    BuildMind — animations.css
-   Keyframes, entrance choreography, page-transition layer and the
-   reduced-motion contract. Everything animates via opacity/transform.
+   The motion system: keyframes, reusable entrance utilities, the page
+   transition layer, scroll-reveal choreography, dialog and toast
+   choreography, and the reduced-motion contract.
+
+   Rules for this file:
+     * only transform / opacity / clip-path / filter animate — with two
+       documented exceptions (progress fill width, timeline description
+       max-height) that carry state rather than decoration;
+     * every perpetual animation is registered in the reduced-motion block at
+       the bottom, so "reduce" genuinely stops motion;
+     * entrance classes are opt-in, not applied by default.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -27,10 +36,8 @@
   }
 }
 
-/* A pulsing halo that only animates transform + opacity, so the compositor
-   owns it and the dot never triggers a repaint. Animating box-shadow (the
-   previous implementation) repaints the element on every frame — measured at
-   0.145s of task time over 3s of a running build with 7 such dots on screen. */
+/* A pulsing halo that animates transform + opacity only, so the compositor
+   owns it and the dot never triggers a repaint. */
 @keyframes pulse-dot {
   0%,
   100% {
@@ -38,7 +45,7 @@
     opacity: 1;
   }
   50% {
-    transform: scale(1.9);
+    transform: scale(1.85);
     opacity: 0.55;
   }
 }
@@ -50,8 +57,8 @@
     opacity: 1;
   }
   50% {
-    transform: scale(1.34);
-    opacity: 0.72;
+    transform: scale(1.32);
+    opacity: 0.74;
   }
 }
 
@@ -65,13 +72,23 @@
   }
 }
 
-@keyframes glow-drift {
+@keyframes skeleton-sweep {
   0% {
-    transform: translate3d(-2%, 0, 0) scale(1);
-    opacity: 0.9;
+    transform: translateX(-100%);
   }
   100% {
-    transform: translate3d(3%, 4%, 0) scale(1.08);
+    transform: translateX(100%);
+  }
+}
+
+/* Ambient light fields drift on a minutes-long loop at a few pixels of travel */
+@keyframes ambient-drift {
+  0% {
+    transform: translate3d(-1.5%, 0, 0) scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(2.5%, 3%, 0) scale(1.06);
     opacity: 1;
   }
 }
@@ -79,7 +96,7 @@
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -96,6 +113,15 @@
   }
 }
 
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes scale-in {
   from {
     opacity: 0;
@@ -107,7 +133,39 @@
   }
 }
 
-/* SVG world construction motion */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dialog-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes log-in {
   from {
     opacity: 0;
@@ -162,117 +220,111 @@
 }
 
 /* --------------------------------------------------------------------------
-   2. Page transition overlay
+   2. Entrance utilities
+
+   Opt-in classes for markup that should arrive rather than simply exist. The
+   delay is set by the `--enter-delay` custom property, so one class covers
+   every stagger without a rule per child.
+
+       .fade-in     opacity only
+       .fade-up     opacity + 12px rise
+       .fade-scale  opacity + 0.985 scale
+       .slide-in    opacity + 16px from the left
+       .reveal      the scroll-triggered variant (see section 5)
+   -------------------------------------------------------------------------- */
+.fade-in,
+.fade-up,
+.fade-scale,
+.slide-in,
+.reveal {
+  animation-fill-mode: both;
+  animation-timing-function: var(--ease-out);
+  animation-duration: 620ms;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.fade-up {
+  animation-name: rise-in;
+}
+
+.fade-scale {
+  animation-name: scale-in;
+  animation-duration: 520ms;
+}
+
+.slide-in {
+  animation-name: rise-in;
+  animation-duration: 560ms;
+}
+
+/* Stagger helper: set once on a group, honoured by the children */
+.stagger > * {
+  animation-delay: calc(var(--enter-stagger, 55ms) * var(--i, 0));
+}
+
+/* --------------------------------------------------------------------------
+   3. Page transitions
+
+   Navigation is a real page load, so links keep working without JavaScript.
+   The shell fades the outgoing document and the veil, and the incoming
+   document fades in from a short upward offset. Total perceived time is under
+   300ms; nothing is ever blocked for longer than the leave timer.
    -------------------------------------------------------------------------- */
 .page-veil {
   position: fixed;
   inset: 0;
-  z-index: 300;
-  background: var(--bg);
+  z-index: var(--layer-veil);
+  background: var(--bm-bg);
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--dur-3) var(--ease-out);
+  transition: opacity var(--motion-page) var(--ease-standard);
   will-change: opacity;
 }
 
 .page-veil.is-active {
-  opacity: 0.92;
+  opacity: 0.94;
 }
 
 body.is-leaving main,
-body.is-leaving .site-header {
-  transition: opacity var(--dur-2) var(--ease-soft), transform var(--dur-2) var(--ease-soft);
+body.is-leaving .site-header,
+body.is-leaving .site-footer {
+  transition: opacity var(--motion-normal) var(--ease-standard),
+    transform var(--motion-normal) var(--ease-standard);
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-6px);
 }
 
-/* Entrance for whole-document load */
-body.is-entering main,
-body.is-entering .site-header {
-  animation: fade-in var(--dur-4) var(--ease-out) both;
+/* Whole-document entrance */
+body.is-entering main {
+  animation: page-enter var(--motion-slow) var(--ease-out) both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* --------------------------------------------------------------------------
-   3. Choreographed entrances
-   Elements marked [data-reveal] start hidden and animate in when mounted
-   or when scrolled into view (app.js toggles .is-revealed).
-   -------------------------------------------------------------------------- */
-[data-reveal] {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out);
-  transition-delay: var(--reveal-delay, 0ms);
-  will-change: opacity, transform;
-}
-
-[data-reveal].is-revealed {
-  opacity: 1;
-  transform: none;
-}
-
-[data-reveal="fade"] {
-  transform: none;
-}
-
-[data-reveal="scale"] {
-  transform: scale(0.975);
-}
-
-[data-reveal="scale"].is-revealed {
-  transform: none;
-}
-
-/* Staggered children */
-[data-stagger] > * {
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out);
-}
-
-[data-stagger].is-revealed > * {
-  opacity: 1;
-  transform: none;
-}
-
-[data-stagger].is-revealed > *:nth-child(1) {
-  transition-delay: 0ms;
-}
-[data-stagger].is-revealed > *:nth-child(2) {
-  transition-delay: 55ms;
-}
-[data-stagger].is-revealed > *:nth-child(3) {
-  transition-delay: 110ms;
-}
-[data-stagger].is-revealed > *:nth-child(4) {
-  transition-delay: 165ms;
-}
-[data-stagger].is-revealed > *:nth-child(5) {
-  transition-delay: 220ms;
-}
-[data-stagger].is-revealed > *:nth-child(6) {
-  transition-delay: 275ms;
-}
-[data-stagger].is-revealed > *:nth-child(7) {
-  transition-delay: 330ms;
-}
-[data-stagger].is-revealed > *:nth-child(8) {
-  transition-delay: 385ms;
-}
-[data-stagger].is-revealed > *:nth-child(9) {
-  transition-delay: 440ms;
-}
-
-/* --------------------------------------------------------------------------
-   4. Component-level animation hooks
+   4. Component choreography
    -------------------------------------------------------------------------- */
 
-/* Mobile nav open */
+/* Mobile sheet */
 .mobile-nav.is-open {
-  animation: fade-in var(--dur-2) var(--ease-out) both;
+  animation: fade-in var(--motion-normal) var(--ease-out) both;
 }
 
 .mobile-nav.is-open .mobile-nav__link {
-  animation: rise-in var(--dur-3) var(--ease-out) both;
+  animation: rise-in var(--motion-slow) var(--ease-out) both;
 }
 
 .mobile-nav.is-open .mobile-nav__link:nth-child(1) {
@@ -288,37 +340,99 @@ body.is-entering .site-header {
   animation-delay: 120ms;
 }
 
-/* Timeline step states animate their internals */
-.timeline__step {
-  transition: opacity var(--dur-3) var(--ease-out);
+/* Project card entrance.
+   Only a node JS created carries `is-entering`, so a card updated in place
+   never replays the animation when its status or build time changes. */
+.project-card.is-entering {
+  animation: card-in 480ms var(--ease-out) both;
 }
 
-.timeline__step.is-pending {
-  opacity: 0.82;
+.projects-grid .project-card.is-entering:nth-child(1) {
+  animation-delay: 0ms;
+}
+.projects-grid .project-card.is-entering:nth-child(2) {
+  animation-delay: 45ms;
+}
+.projects-grid .project-card.is-entering:nth-child(3) {
+  animation-delay: 90ms;
+}
+.projects-grid .project-card.is-entering:nth-child(4) {
+  animation-delay: 135ms;
+}
+.projects-grid .project-card.is-entering:nth-child(5) {
+  animation-delay: 180ms;
+}
+.projects-grid .project-card.is-entering:nth-child(6) {
+  animation-delay: 225ms;
+}
+.projects-grid .project-card.is-entering:nth-child(7) {
+  animation-delay: 270ms;
+}
+.projects-grid .project-card.is-entering:nth-child(8) {
+  animation-delay: 315ms;
 }
 
-/* Progress fill glow while running */
+/* Reaching a project from Build: one calm ring, then gone */
+.project-card.is-highlight {
+  animation: card-highlight 1.6s var(--ease-out);
+}
+
+@keyframes card-highlight {
+  0% {
+    border-color: var(--bm-accent-line);
+  }
+  45% {
+    border-color: var(--bm-accent-line-strong);
+  }
+  100% {
+    border-color: var(--bm-accent-line);
+  }
+}
+
+/* Status change settles rather than flashing */
+.status.is-changing {
+  animation: scale-in var(--motion-slow) var(--ease-out);
+}
+
+/* Empty states and the toolbar fade in when they become the visible surface */
+.empty:not([hidden]),
+.project-toolbar:not([hidden]) {
+  animation: fade-in var(--motion-slow) var(--ease-out) both;
+}
+
+/* Dialog entrance (the exit is a class the owner adds — see components.css) */
+.confirm[open] {
+  animation: dialog-in var(--motion-slow) var(--ease-out) both;
+}
+
+.confirm[open]::backdrop {
+  animation: fade-in var(--motion-slow) var(--ease-out) both;
+}
+
+/* Progress fill: the only width transition in the system. It communicates
+   progress, runs on a 200ms state clock, and the value is also printed as text
+   and exposed via aria-valuenow, so reduced motion costs nothing. */
 .progress.is-running .progress__fill {
-  box-shadow: 0 0 18px -3px rgba(139, 147, 255, 0.45);
+  filter: drop-shadow(0 0 10px rgba(109, 139, 255, 0.28));
 }
 
-/* World visualizer motion */
+/* World visualizer breathing */
 .worldviz__orbit {
   transform-origin: center;
-  animation: wv-orbit 44s linear infinite;
+  animation: wv-orbit 46s linear infinite;
 }
 
 .worldviz__orbit--slow {
-  animation-duration: 76s;
+  animation-duration: 78s;
   animation-direction: reverse;
 }
 
 .wv-edge--flow {
-  animation: wv-dash 3.2s linear infinite;
+  animation: wv-dash 3.4s linear infinite;
 }
 
 .worldviz__float {
-  animation: wv-float 7s var(--ease-in-out) infinite;
+  animation: wv-float 7.5s var(--ease-in-out) infinite;
 }
 
 .worldviz__scan {
@@ -331,138 +445,82 @@ body.is-entering .site-header {
   opacity: 0;
 }
 
-/* Build page: states on the worldviz */
-.worldviz[data-state="idle"] .worldviz__orbit,
-.worldviz[data-state="idle"] .worldviz__float {
-  animation-play-state: running;
-}
-
 .worldviz[data-state="building"] .wv-cell {
-  animation: fade-in var(--dur-4) var(--ease-out) both;
-}
-
-/* Project card entrance.
-   Only a node JS created carries `is-entering`, so a card updated in place
-   never replays the animation when its status or build time changes. */
-.project-card.is-entering {
-  animation: card-in var(--dur-4) var(--ease-out) both;
-}
-
-/* Removal — the card fades and shrinks before the node is dropped */
-.project-card.is-leaving {
-  animation: none;
-  opacity: 0;
-  transform: scale(0.985);
-}
-
-@keyframes card-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Reaching a project from Build: a single calm ring, then gone */
-.project-card.is-highlight {
-  animation: card-highlight 1.6s var(--ease-out);
-}
-
-@keyframes card-highlight {
-  0% {
-    box-shadow: 0 0 0 0 rgba(139, 147, 255, 0.32);
-  }
-  40% {
-    box-shadow: 0 0 0 3px rgba(139, 147, 255, 0.18);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(139, 147, 255, 0);
-  }
-}
-
-/* The list itself settles when the filter or search result set changes */
-.projects-grid {
-  transition: opacity var(--dur-2) var(--ease-out);
-}
-
-/* Empty states and the toolbar fade in when they become the visible surface */
-.empty:not([hidden]),
-.project-toolbar:not([hidden]) {
-  animation: fade-in var(--dur-3) var(--ease-out) both;
-}
-
-/* Dialog entrance */
-.confirm[open] {
-  animation: dialog-in var(--dur-3) var(--ease-out) both;
-}
-
-.confirm[open]::backdrop {
-  animation: fade-in var(--dur-3) var(--ease-out) both;
-}
-
-@keyframes dialog-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.projects-grid .project-card.is-entering:nth-child(1) {
-  animation-delay: 40ms;
-}
-.projects-grid .project-card.is-entering:nth-child(2) {
-  animation-delay: 90ms;
-}
-.projects-grid .project-card.is-entering:nth-child(3) {
-  animation-delay: 140ms;
-}
-.projects-grid .project-card.is-entering:nth-child(4) {
-  animation-delay: 190ms;
-}
-.projects-grid .project-card.is-entering:nth-child(5) {
-  animation-delay: 240ms;
-}
-.projects-grid .project-card.is-entering:nth-child(6) {
-  animation-delay: 290ms;
-}
-.projects-grid .project-card.is-entering:nth-child(7) {
-  animation-delay: 340ms;
-}
-.projects-grid .project-card.is-entering:nth-child(8) {
-  animation-delay: 390ms;
-}
-
-/* Status change flash — a calm tint, never a flash */
-.status.is-changing {
-  animation: scale-in var(--dur-3) var(--ease-out);
+  animation: fade-in 480ms var(--ease-out) both;
 }
 
 /* --------------------------------------------------------------------------
-   5. Reduced motion contract
-  Reveals are only hidden once JS confirms it will animate them, so the page
-  is fully readable with JavaScript disabled.
+   5. Scroll reveals
+
+   Markup carries `data-reveal` (optionally `data-reveal="fade" | "scale"` and
+   `data-reveal-delay="120"`). app.js runs ONE IntersectionObserver for the
+   whole document and adds `.is-revealed`, then unobserves the element. The
+   hidden state only applies once JS has marked the document, so a reader with
+   JavaScript disabled always sees the content.
    -------------------------------------------------------------------------- */
 .js [data-reveal] {
   opacity: 0;
-  transform: translateY(14px);
+  transform: translateY(16px);
 }
 
-.js [data-stagger] > * {
-  opacity: 0;
-  transform: translateY(10px);
+[data-reveal] {
+  transition: opacity 620ms var(--ease-out), transform 620ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.js [data-reveal="fade"] {
+  transform: none;
+}
+
+.js [data-reveal="scale"] {
+  transform: translateY(8px) scale(0.985);
 }
 
 .js [data-reveal].is-revealed,
+.js [data-reveal="fade"].is-revealed,
+.js [data-reveal="scale"].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* Grouped children */
+.js [data-stagger] > * {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 560ms var(--ease-out), transform 560ms var(--ease-out);
+}
+
 .js [data-stagger].is-revealed > * {
   opacity: 1;
   transform: none;
+}
+
+[data-stagger].is-revealed > *:nth-child(1) {
+  transition-delay: 0ms;
+}
+[data-stagger].is-revealed > *:nth-child(2) {
+  transition-delay: 50ms;
+}
+[data-stagger].is-revealed > *:nth-child(3) {
+  transition-delay: 100ms;
+}
+[data-stagger].is-revealed > *:nth-child(4) {
+  transition-delay: 150ms;
+}
+[data-stagger].is-revealed > *:nth-child(5) {
+  transition-delay: 200ms;
+}
+[data-stagger].is-revealed > *:nth-child(6) {
+  transition-delay: 250ms;
+}
+[data-stagger].is-revealed > *:nth-child(7) {
+  transition-delay: 300ms;
+}
+[data-stagger].is-revealed > *:nth-child(8) {
+  transition-delay: 350ms;
+}
+[data-stagger].is-revealed > *:nth-child(9) {
+  transition-delay: 400ms;
 }
 
 /* Print and forced-colours must never drop content, whatever the JS did. */
@@ -474,6 +532,17 @@ body.is-entering .site-header {
   }
 }
 
+/* --------------------------------------------------------------------------
+   6. Reduced motion contract
+
+   Three inputs collapse to the same behaviour:
+     * the OS setting (`prefers-reduced-motion: reduce`)
+     * the in-app preference (html[data-motion-mode="reduced"])
+     * a coarse pointer (mobile) gets lighter ambient motion regardless
+
+   Reduced motion removes decoration, never information: state changes stay
+   instantaneous rather than disappearing.
+   -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -500,24 +569,34 @@ body.is-entering .site-header {
   .worldviz__float,
   .worldviz__scan,
   .wv-edge--flow,
-  .progress__fill::after {
+  .progress__fill::after,
+  .skeleton::after,
+  .ambient__grid {
     animation: none !important;
   }
 
-  .btn:hover {
+  .btn:hover,
+  .project-card:hover,
+  .start-card:hover {
     transform: none;
   }
 
-  .project-card:hover {
-    transform: none;
+  .page-veil {
+    display: none;
   }
 
-  .project-card {
+  body.is-leaving main,
+  body.is-leaving .site-header,
+  body.is-leaving .site-footer,
+  body.is-entering main {
     animation: none !important;
+    transition: none !important;
+    opacity: 1;
+    transform: none;
   }
 }
 
-/* Users who prefer reduced data / no motion on the settings page */
+/* The in-app preference mirrors the media query exactly */
 html[data-motion-mode="reduced"] *,
 html[data-motion-mode="reduced"] *::before,
 html[data-motion-mode="reduced"] *::after {
@@ -532,11 +611,31 @@ html[data-motion-mode="reduced"] [data-stagger] > * {
   transform: none !important;
 }
 
-/* Phase 5 components: the state is carried by text, so motion is optional */
-html[data-motion-mode="reduced"] .log__item {
+html[data-motion-mode="reduced"] .log__item,
+html[data-motion-mode="reduced"] .timeline__desc {
+  animation: none !important;
+  transition: none !important;
+}
+
+html[data-motion-mode="reduced"] .ambient__grid,
+html[data-motion-mode="reduced"] .ambient__noise {
   animation: none !important;
 }
 
-html[data-motion-mode="reduced"] .timeline__desc {
-  transition: none !important;
+/* Coarse pointers get a calmer ambient layer: the drift and the cursor light
+   are desktop affordances, and on a phone they cost battery for no gain. */
+@media (hover: none), (pointer: coarse) {
+  .ambient__glow {
+    animation: none;
+    filter: blur(72px);
+  }
+
+  .ambient__noise {
+    display: none;
+  }
+
+  .worldviz__orbit,
+  .worldviz__orbit--slow {
+    animation-duration: 120s;
+  }
 }

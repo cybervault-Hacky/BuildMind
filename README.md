@@ -74,8 +74,8 @@ an implementation *and* a test that exercises it end to end.
 - Four separate pages: Home, Build, Projects, Settings
 - Responsive from 320px to 1920px, dark-only by design
 - Motion honours `prefers-reduced-motion` and a stored motion preference
-- In simulated mode every connection and build state is a frontend
-  simulation, and the UI says so where it matters
+- Real accounts, real projects and a real build stream in `remote` mode; an
+  offline simulation that is labelled as one, and never entered by accident
 
 ## Project structure
 
@@ -93,44 +93,54 @@ buildmind/
 │   ├── images/logo.svg
 │   └── game-scenes/scene-lattice.svg
 ├── css/
-│   ├── main.css          design tokens, layout, components
-│   ├── animations.css    keyframes, entrance choreography, reduced motion
-│   └── responsive.css    tablet and mobile composition
+│   ├── tokens.css        every design value, declared once
+│   ├── main.css          typefaces, reset, layout, controls, panels, header
+│   ├── components.css    page compositions (hero, workspace, cards, settings)
+│   ├── animations.css    keyframes, entrances, transitions, reduced motion
+│   └── responsive.css    every breakpoint, landscape and print
 ├── js/
 │   ├── boot-class.js     adds the .js class before first paint (no inline script)
 │   ├── app.js            shell + boot: ambient, header, reveals, helpers
 │   ├── state.js          the single state store and the build state machine
-│   ├── navigation.js     active page + sliding nav indicator
+│   ├── navigation.js     aria-current, the mobile sheet, active-page state
 │   ├── home.js           hero visual and pipeline highlight
 │   ├── build.js          renderer for the Build workspace
 │   ├── projects.js       renderer for the project list and filters
 │   ├── settings.js       renderer for settings and connections
 │   ├── services/
-│   │   ├── contracts.js          result envelope, error model, service factory
-│   │   ├── storage.js            the only localStorage access + key audit
+│   │   ├── README.md            the layer's rules, for whoever edits it next
+│   │   ├── contracts.js         result envelope, error model, service factory
+│   │   ├── mode.js              picks one implementation, once, at boot
+│   │   ├── storage.js           the only localStorage access + key audit
+│   │   ├── api/
+│   │   │   ├── apiClient.js     the only fetch() in the frontend
+│   │   │   ├── sseClient.js     EventSource with runId filtering and backoff
+│   │   │   └── errors.js        HTTP/domain error → user-safe copy
+│   │   ├── auth/authService.js  register / login / logout / me
 │   │   ├── ai/
-│   │   │   ├── providers.js      single source of truth for providers/models
-│   │   │   ├── stages.js         the seven build stages, defined once
-│   │   │   └── mockAIService.js  simulated AI boundary
+│   │   │   ├── providers.js     single source of truth for providers/models
+│   │   │   ├── stages.js        the seven build stages, defined once
+│   │   │   ├── mockAIService.js    offline: timers
+│   │   │   └── remoteAIService.js  remote: POST + SSE + polling
 │   │   ├── connections/
-│   │   │   ├── mockRobloxService.js
-│   │   │   └── mockStudioService.js
+│   │   │   ├── mockRobloxService.js   · remoteRobloxService.js
+│   │   │   └── mockStudioService.js   · remoteStudioService.js
 │   │   ├── projects/
 │   │   │   ├── projectModel.js        pure project helpers: lifecycle copy,
 │   │   │   │                          relative times, descriptions, matching
-│   │   │   └── localProjectService.js the project boundary
+│   │   │   ├── localProjectService.js offline boundary
+│   │   │   └── remoteProjectService.js server boundary
 │   │   └── settings/localSettingsService.js
-│   ├── account.js        sign in/register/sign out + local-project migration
-│   ├── services/api/apiClient.js            the only fetch() in the frontend
-│   ├── services/mode.js                     chooses simulated or remote, once
-│   ├── services/ai/remoteAIService.js       SSE + polling against the API
-│   ├── services/projects/remoteProjectService.js
+│   ├── account.js        the Settings account panel (register/sign in/sign out)
 │   └── controllers/
+│       ├── authController.js        session state, the gate, migration
 │       ├── buildController.js       orchestration: validate → AI → state
 │       ├── connectionController.js  one connection path for both pages
 │       ├── projectController.js     the only writer of the project slice
 │       └── settingsController.js    the only settings path
-├── backend/                       the real API (see below)
+├── backend/                       the real API: Fastify + PostgreSQL (see below)
+├── scripts/e2e.sh                 starts the API, a stand-in provider and the
+│                                  proxy, then runs the browser suites
 ├── README.md
 └── .gitignore
 ```
@@ -180,8 +190,11 @@ python3 -m http.server 8080
 npx serve .
 ```
 
-Then open <http://localhost:8080>. It runs in `simulated` mode and makes no
-network requests. Serve over HTTP rather than opening a `file://` URL.
+Then open <http://localhost:8080>. With no `?mode=` parameter it starts in
+`remote` mode, finds no `/api` behind that origin, and says so on the gate
+rather than pretending. Append `?mode=simulated` for the offline demo, which
+makes no network requests at all. Serve over HTTP rather than opening a
+`file://` URL.
 
 ### The full product
 
@@ -232,9 +245,9 @@ types, caching, HTTPS and a post-deploy checklist.
 | Path | What it is |
 | --- | --- |
 | `index.html` | Home — the pitch, a live preview visualizer, the Idea → Build → Test → Play strip |
-| `build.html` | The workspace — composer, provider/model, connection rows, a stoppable simulated run |
-| `projects.html` | Local project records with search, status filters and six generated scenes |
-| `settings.html` | Provider/model, session-only key, two simulated connections, motion, scoped reset |
+| `build.html` | The workspace — composer, provider/model, connection rows, a real run with a stoppable SSE stream |
+| `projects.html` | Server-side project records with search, status filters and six generated scenes |
+| `settings.html` | Account, provider/model, session-only key, connection rows, motion, scoped reset |
 | `404.html` | Served for an unknown path at any depth; self-contained (inline styles, no external assets) so it can never render unstyled |
 
 All five are static HTML. Deep links use a query string
@@ -243,18 +256,40 @@ are needed.
 
 ## Design system
 
-Tokens live at the top of `css/main.css` and nothing outside them should be
-invented locally.
+Five stylesheets, loaded in the same order on every page. Each one has a single
+job, and a rule only lives in the layer that owns it:
 
-- **Surfaces** `--bg` → `--surface-3`, borders from `--line` to `--line-strong`
-- **Text** `--text`, `--text-soft`, `--text-muted`, `--text-faint`
-  (all ≥ 4.5:1 on every surface)
-- **Accent** one family (`--accent*`); mint (`--mint`, `--mint-deep`), amber and
-  rose are status only
-- **Space** `--s-1` … `--s-12` on a 4px base
-- **Radius** `--r-xs` … `--r-pill`
-- **Motion** `--ease-out`, `--ease-in-out`, `--ease-soft`, `--dur-1` … `--dur-5`
+| Layer | File | Owns | Lines |
+| --- | --- | --- | --- |
+| 1. Tokens | `css/tokens.css` | every value: colour, type scale, space, radius, borders, elevation, motion, layout metrics, z-layers | 290 |
+| 2. Core | `css/main.css` | `@font-face`, reset, base type, page furniture, header + nav + mobile sheet, buttons, fields, status language, panels | 1,767 |
+| 3. Components | `css/components.css` | page compositions: hero, pipeline, workspace, composer, timeline, project grid and scenes, settings, dialogs, toast, auth gates | 2,153 |
+| 4. Motion | `css/animations.css` | keyframes, entrance utilities, page transitions, reveal choreography, the reduced-motion contract | 641 |
+| 5. Adaptation | `css/responsive.css` | every breakpoint from 1440+ down to 380, landscape and print | 1,005 |
+
+Nothing outside `tokens.css` invents a value: there is not one six-digit hex
+literal in the other four stylesheets, and a `grep` for one is the review check.
+Components read `--bm-*` tokens;
+the legacy names from earlier phases (`--bg`, `--text-soft`, `--s-4`, `--r-lg`)
+still resolve, but every one of them is aliased to a token in one block at the
+bottom of `tokens.css`, so there is one palette rather than two.
+
+- **Surfaces** `--bm-bg` `#08090c`, then `--bm-surface-1/2/3`
+  (`#0f1116`, `#14161c`, `#191c24`); hairlines `--bm-border-faint` →
+  `--bm-border` → `--bm-border-strong`
+- **Text** `--bm-text` `#eceef4`, `--bm-text-secondary` `#b4b9c8`,
+  `--bm-text-muted` `#8b91a3`, `--bm-text-faint` `#858b9e` (≥ 5.0:1 on every
+  surface), plus `--bm-text-disabled` for inert controls only
+- **Accent** one family (`--bm-accent` `#6d8bff`, hover `#8ba3ff`, press
+  `#5674ec`); success, warning and danger are status only, never decoration
+- **Focus** one colour everywhere (`--bm-focus` `#a7b9ff`) and one 2px ring
+- **Space** `--space-*` on a 4px base, **radius** `--radius-xs` … `--radius-pill`
+- **Motion** `--ease-*`, `--motion-fast/normal/slow`
 - **Type** Inter with a system fallback stack, JetBrains Mono for numbers
+- **Layers** named in one place: `--layer-ambient` … `--layer-veil`, so the
+  sheet, header, toast and page veil cannot cross each other
+
+The Phase 13 rewrite is documented in [PHASE13_REPORT.md](PHASE13_REPORT.md).
 
 ### Typography
 
@@ -288,6 +323,15 @@ sans-serif with no layout break.
   share one palette and one light source so a grid of cards reads as a family.
   Each is gradients on `::before`/`::after` plus one empty child span: no
   images, no canvas, no WebGL, nothing to decode.
+- **One empty state, honestly.** The signed-out gate and the "no projects" state
+  are the same component: a 1px structural border, a surface wash, one hairline
+  of light across the top edge, a mark, a title, a sentence and at most one
+  action. A dropped database never renders a dashed placeholder box.
+- **The state is in the document.** Which region is visible is derived from two
+  attributes on `<html>` — `data-service-mode` and `data-auth-state` — so a
+  signed-out page shows the gate and the workspace is not merely hidden behind
+  a class race. Those rules are deliberately the last block in
+  `components.css`.
 
 ### Responsive strategy
 
@@ -297,19 +341,22 @@ grid floor is `minmax(min(320px, 100%), 1fr)` at tablet sizes so cards never get
 narrower than their content needs; at ≤700px the floor falls to
 `minmax(min(280px, 100%), 1fr)` so a 320px viewport cannot overflow.
 
-Breakpoints are declared in `css/responsive.css`, in one place, at 380, 620, 700,
-860 and 1024px. Mobile is composed deliberately rather than shrunk: the header
-nav collapses into a sheet, the workspace stacks composer → action → activity,
-rows become full-width, and touch targets grow to 44px.
+Breakpoints are declared in `css/responsive.css`, in one place, at 1440+, 1280,
+1120, 1024, 900, 860 (the nav collapses into the sheet), 768, 620, 480 and
+380px, plus a landscape phone rule and a print rule. Mobile is composed
+deliberately rather than shrunk: the sheet navigation, the stacked composer,
+the single-column settings rows, 44px touch targets and 46px inputs are layouts
+of their own.
 
 ### Animation system
 
-Motion is opacity, transform and clip-path only — never width, height, top or
-margin. The `@keyframes` in `css/animations.css` are checked for that in
-`p8_static`. Entrances are choreographed (a 14px rise over 520ms on
-`--ease-out`), interactions are 120–320ms, and only three ambient loops exist —
-two slow glows and the world visualiser, all decorative and all stopped under
-reduced motion.
+Motion is transform, opacity and colour only — never width, height, top or
+margin. Two exceptions are documented in the file because they carry state
+rather than decoration: the build progress fill width, and the timeline
+description opening. Entrances are choreographed (a 14px rise over 520ms on
+`--ease-out`, staggered through `--enter-delay`), interactions are 120–320ms,
+and the only perpetual motion is the world visualiser — decorative, paused
+when offscreen, and stopped entirely under reduced motion.
 
 Reduced motion is honoured two ways and both are tested:
 
@@ -325,15 +372,22 @@ ran.
 
 ### Verified in a real browser
 
-Phase 8 is the first phase with a rendering browser available (a vendored
-headless Chromium, no network access needed). `p8_visual.js` drives it and
-measures pixels: horizontal overflow at six widths on four pages, loaded font
-faces, heading hierarchy, painted project art, equal-height cards, one primary
-action per screen, control geometry, a focus ring on **every** control (84 of
-them), WCAG AA contrast on every text run, 44px touch targets by real
-hit-testing, the mobile sheet, both dialogs at three viewports, reduced motion,
-compositor-friendly keyframes, and whether the sticky build bar ever covers a
-control. It skips loudly if the browser is absent rather than claiming success.
+`scripts/e2e.sh` starts a stand-in provider, the real API and the production
+proxy, then drives headless Chromium through `backend/tests/e2e/`:
+
+| Suite | Assertions | What it proves |
+| --- | --- | --- |
+| `browserE2E.cjs` | 42 | the whole product loop in a real browser: register, configure, build, watch SSE, cancel, retry, fail honestly, delete a project |
+| `phase12FrontendE2E.cjs` | 70 | session gating, project round trip, provider catalogue, key handling, error copy, CSP |
+
+`node scripts/e2e.sh` is the gate; it exits non-zero on any failure, and it
+refuses to run against a port someone else is already holding.
+
+The visual pass for Phase 13 was a separate sweep over `{320, 375, 430, 768,
+1024, 1280, 1440} × {index, build, projects, settings}` plus the 404 page, in
+both signed-out and signed-in states: zero horizontal overflow, zero console or
+network errors, zero CSP violations, both font families reporting `loaded`, one
+`h1` per page, and the gate and the workspace never visible at the same time.
 
 ## Architecture
 
@@ -343,18 +397,23 @@ Four layers, one direction. Nothing calls upward and nothing skips a layer.
 UI             build.js · projects.js · settings.js · navigation.js
                 ↓ user intent                    ↑ subscribe()
 Controllers    buildController · connectionController
-                projectController · settingsController
+                projectController · settingsController · authController
                 ↓ service calls                  ↑ results
 Services       aiService · robloxService · studioService
-                projectService · settingsService
-                ↓ (future)                       ↑ results
-Future         OpenAI · Gemini · Anthropic · Roblox OAuth
-                Studio bridge · remote projects · backend
+                projectService · settingsService · authService
+                ↓                                   ↑
+Boundary       js/services/mode.js — chooses one implementation, once
+                ├─ simulated: timers, localStorage, local flags
+                └─ remote:    js/services/api/apiClient.js (the only fetch)
+                              ↓ HTTPS, same origin
+Backend        POST /api/v1/builds + SSE · /projects · /ai/providers · /auth
+                Fastify · PostgreSQL · queue · provider adapters · Roblox/Studio
 ```
 
 `js/state.js` sits beside this flow as the single state owner: controllers apply
 results to it, renderers subscribe to it. There is no second state system in the
-service layer — services return data and never keep UI state.
+service layer — services return data and never keep UI state. The mode boundary
+is picked once at boot and never per request, so no page can end up half remote.
 
 ### Result convention
 
@@ -378,11 +437,14 @@ internal message can reach the UI.
 | Application state, build machine | `js/state.js` |
 | Provider and model list | `js/services/ai/providers.js` |
 | Build stages and timings | `js/services/ai/stages.js` |
-| Real AI calls | replace `js/services/ai/mockAIService.js` |
-| Roblox account connection | replace `js/services/connections/mockRobloxService.js` |
-| Roblox Studio bridge | replace `js/services/connections/mockStudioService.js` |
-| Project persistence | replace `js/services/projects/localProjectService.js` |
-| Settings persistence | replace `js/services/settings/localSettingsService.js` |
+| Real AI calls | `js/services/ai/remoteAIService.js` (client) + `backend/src/services/ai/` |
+| Roblox account connection | `js/services/connections/remoteRobloxService.js` |
+| Roblox Studio bridge | `js/services/connections/remoteStudioService.js` |
+| Project persistence | `js/services/projects/remoteProjectService.js` |
+| Offline equivalents | `js/services/*/local*Service.js`, `mock*Service.js` |
+| Which implementation runs | `js/services/mode.js` |
+| HTTP, CSRF, SSE, error mapping | `js/services/api/{apiClient,sseClient,errors}.js` |
+| Settings persistence | `js/services/settings/localSettingsService.js` |
 | Storage access, key audit | `js/services/storage.js` |
 
 Adding an AI provider means editing `providers.js` and, later, its adapter.
@@ -394,13 +456,16 @@ Build UI, Settings UI, validation and the state machine need no changes.
 settings    provider, model, autoFix, hints      persisted
 motion      full | reduced                       persisted
 connections roblox, studio: disconnected | connecting | connected
-                                                 (flag persisted, state simulated)
+                                                 (local flag in simulated;
+                                                  server state in remote)
 build       status, stage, progress, prompt, provider, model,
             runId, startedAt, endedAt, error     in memory
 projects    list, active filter, local search,
-            active project id (Build's context)  persisted list;
+            active project id (Build's context)  server-owned in remote,
+                                                 localStorage in simulated;
                                                  filter/search/active are
                                                  in-memory view state
+account     status, user, error                  server session
 apiKeyPresent                                    in memory only
 ```
 
@@ -430,7 +495,8 @@ from the prompt, so both paths exist without a random flip on every run.
 
 The seven stages are defined once in `services/ai/stages.js` — label,
 description, activity lines, status, progress target and duration — and drive
-the service timing, the timeline, the progress markers and the runner.
+the timeline, the progress markers, the simulated runner, and the labels the
+remote stream is mapped onto.
 
 ### Build workflow
 
@@ -438,8 +504,9 @@ the service timing, the timeline, the progress markers and the runner.
 idea → configuration → build → preparing → stages → result → project
 ```
 
-- **Activity log** — simulated lines such as "Planned core systems" or
-  "Checked gameplay systems", released as the stage progresses. These describe
+- **Activity log** — one line per real server event in `remote` mode, such as
+  "Planned core systems" or "Checked gameplay systems"; in `simulated` mode the
+  same lines come from the stage definitions on a timer. These describe
   internal planning steps only; nothing claims a compilation, upload or
   deployment.
 - **Current stage** — title, description, index ("3 of 7") and status, so the
@@ -575,14 +642,18 @@ never written anywhere: not to `localStorage`, not to `sessionStorage`, not to
 the URL, not to state, not to a log, not to an error message. State holds one
 boolean, `apiKeyPresent`, and it resets on reload. The copy says so —
 "Used for this session. Not saved." — and the per-field line says the key is
-*held*, never *verified*: there is no provider call in this app, so there is
-nothing to verify it against. A blank or whitespace-only value is called out
-locally (`aria-invalid` plus a message) and does not count as present.
+*held*, never *verified*: the value is not sent anywhere until a build starts,
+so nothing has checked it yet. In `remote` mode "Test connection" does issue one
+real request through the server and reports what the provider said. A blank or
+whitespace-only value is called out locally (`aria-invalid` plus a message) and
+does not count as present.
 
-**Connections are two simulations.** The Roblox account and Roblox Studio are
-separate rows, separate flags, separate statuses. Both are `simulated` in the
-service layer and both say so in the UI. While a transition is in flight the
-button is disabled and `aria-busy`, so a second click cannot start a second
+**Connections are two boundaries, not one.** The Roblox account and Roblox
+Studio are separate rows, separate flags, separate statuses. In `remote` mode
+each one talks to its own adapter and reports what that adapter actually says —
+`Not configured`, `External integration required`, `Not connected` — and in
+`simulated` mode both are local flags and say so. While a transition is in
+flight the button is disabled and `aria-busy`, so a second click cannot start a second
 attempt (`connectionController` also refuses a duplicate with an `operation`
 error). A ticket per target invalidates in-flight callbacks: if the target is
 disconnected while connecting, the late callback returns `superseded` and does
@@ -598,7 +669,7 @@ returns the scope it applied:
 | --- | --- |
 | provider, model, auto-fix, hints | `buildmind.projects.v1` — every project and its history |
 | motion, including `html[data-motion-mode]` | `buildmind.draft.v1` — the prompt draft |
-| both simulated connections | the session's API key, because it was never stored |
+| both connection flags | the session's API key, because it was never stored |
 
 The dialog moves focus to "Keep settings", Escape and the backdrop both dismiss,
 focus returns to the button that opened it, and the result is announced through
@@ -639,31 +710,45 @@ accepts only the four known preference keys.
 
 ### Simulation boundaries
 
-- Builds, connections and the project created on completion are simulations.
-  A project is a local record of a simulated run — there is no playable game,
-  no upload and no deployment behind any card.
-- The API key is only ever checked for presence; the field is cleared when the
-  run starts, the value is never stored, logged, sent or put in a URL.
-- There is no `fetch`, `XMLHttpRequest`, WebSocket or SSE anywhere in the
-  source, and each page declares `connect-src 'none'` in its CSP.
-- No endpoints, no frameworks, no dependencies.
+The boundary is now a deployment choice, not a property of the code:
+
+- In `remote` mode builds are real: the API queues them, runs seven stages
+  against a provider, validates structured output and streams events over SSE.
+  In `simulated` mode the same UI is driven by timers and the page says so.
+- **A build produces validated structured artifacts, not a playable game.**
+  Nothing is uploaded and no Roblox runtime executes the output.
+- Roblox account and Studio are separate boundaries with real adapters, and
+  both report `EXTERNAL ENVIRONMENT REQUIRED` until they are configured.
+- The API key is held in memory for the life of the field; it is never written
+  to storage, a log line, a URL or an event, and a dedicated suite asserts that
+  across six sinks.
+- The only `fetch` in the frontend is `js/services/api/apiClient.js`. Each page
+  declares `connect-src 'self'` — not `'none'` — because the pages now talk to
+  their own origin. `404.html` is the one page that still declares `'none'`,
+  since it makes no requests at all.
+- No third-party JavaScript, no framework, no frontend build step.
 
 ### Content Security Policy
 
-All four pages ship the same policy as a `<meta http-equiv>` tag:
+The four app pages ship the same policy as a `<meta http-equiv>` tag:
 
 ```
 default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
-img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none';
+img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none';
 object-src 'none'; base-uri 'self'; form-action 'none'
 ```
+
+`404.html` is the exception and is stricter: `connect-src 'none'`, plus a
+`script-src` hash (`sha256-XiPfkVW7Fv8Pu7Gvjl3IbaK7RiUrgPZzw54hCnaV/9g=`) for
+the one small script that fixes up relative links when the page is served at an
+arbitrary depth.
 
 `script-src` carries no `unsafe-inline` and no `unsafe-eval`. The single inline
 script this app used to need (adding the `.js` class before first paint) now
 lives in `js/boot-class.js` so the exception could be dropped. `style-src` keeps
-`'unsafe-inline'` deliberately: the renderers set a handful of computed values
-via the `style` property (progress width, visualizer cell opacity, the nav
-indicator offset), which the CSP treats as inline style. There are no inline
+`'unsafe-inline'` deliberately: two places set computed values through the
+`style` property — the progress fill width and the visualizer cell opacity —
+and the ambient cursor also writes two custom properties. There are no inline
 `<style>` blocks outside a `<noscript>` fallback, and no inline event-handler
 attributes anywhere in the markup.
 
@@ -674,21 +759,25 @@ another origin are all refused before a request leaves the browser.
 
 ## Frontend behaviour
 
-- Shared header with active-page indicator and an animated, focus-trapped
-  mobile sheet
+- Shared header with `aria-current` on the active page and an animated,
+  focus-trapped mobile sheet
 - Cursor-following ambient light (desktop pointers only), generated
-  world-construction visualizer, scroll reveals, page fade transitions
+  world-construction visualizer, scroll reveals, page fade transitions — every
+  one of them opt-in and cancelled under reduced motion
 - Build workspace: prompt composer with examples and a counter, provider and
   model selectors, masked API-key field, connection rows, a current-stage card,
-  a described seven-step timeline, a simulated activity log, progress with
-  stage markers, and a stoppable simulated run with a result summary
-- Projects: sample projects, status filters, six CSS-generated abstract
-  preview scenes, equal-height cards, empty states
-- Settings: provider and model with a live configuration status, a session-only
-  API key with a reveal control, two separate simulated connections, motion and
-  preference switches, and a scoped, confirmed reset
-- Stored in `localStorage`: settings, motion preference, the simulated
-  connection flags and the local project list. The API key is never stored.
+  a described seven-step timeline, a live activity log, progress with stage
+  markers, and a run that can be stopped and retried, closing on a result
+  summary
+- Projects: server-side records, status filters, search, six CSS-generated
+  abstract preview scenes, equal-height cards, a real empty state, and a
+  confirmed delete dialog
+- Settings: account (register / sign in / sign out), provider and model with a
+  live configuration status, a session-only API key with a reveal control, two
+  separate connection rows, motion and preference switches, and a scoped,
+  confirmed reset
+- Stored in `localStorage`: the configuration keys, the motion preference, the
+  composer draft and the offline-mode project list. The API key is never stored.
 
 ## Intentionally not implemented
 
@@ -746,16 +835,7 @@ picks an implementation once at boot; every controller above it is untouched.
 `js/services/README.md` documents the layer's rules for whoever touches it next.
 
 ```js
-// The surface both implementations satisfy.
-aiService.initialize()      // → { ready, mode, providers }
-aiService.getProviders()    // → providers
-aiService.validateConfiguration({ … })  // → { valid, errors } — remote: a real request
-aiService.startBuild({ … }) // → { runId, … }
-aiService.subscribe(listener)
-```
-
-```js
-// AI — replace the implementation, keep the surface
+// AI — one surface, two implementations behind mode.js
 aiService.initialize()                       // → { ready, mode, providers }
 aiService.getProviders()                     // → providers
 aiService.getModels(providerId)              // → models
@@ -763,18 +843,21 @@ aiService.validateConfiguration({ … })       // → { valid, errors }
 aiService.startBuild({ prompt, provider, model, hasKey })  // → { runId, … }
 aiService.stopBuild(runId)                   // → { stopped }
 aiService.subscribe(listener)                // see the event contract below
-aiService.failBuild(runId)                   // simulated failure, for recovery
-aiService.planForPrompt(prompt)              // which path a run will take
+aiService.failBuild(runId)                   // simulated only: forced failure
+aiService.planForPrompt(prompt)              // simulated only: which path to take
 
 // Roblox and Studio — separate integrations, same shape
 robloxService.connect() / .disconnect() / .getConnectionState() / .subscribe()
 studioService.connect() / .disconnect() / .getConnectionState() / .subscribe()
 
-// Projects — swap local for remote
+// Projects — server-owned in remote, localStorage in simulated
 projectService.listProjects() / .getProject(id) / .createProject(data)
 projectService.updateProject(id, data) / .deleteProject(id)
 
-// Settings — swap local for per-account
+// Session
+authService.me() / .register(email, password) / .login(email, password) / .logout()
+
+// Settings — configuration only; the account is the server's
 settingsService.loadSettings() / .saveSettings(patch) / .resetSettings()
 ```
 
@@ -782,6 +865,7 @@ Controllers are the only callers, so nothing else changes when an
 implementation is swapped:
 
 ```js
+authController.init() / .bootstrap() / .register(…) / .login(…) / .logout()
 buildController.start({ prompt, hasKey })    // validate → aiService → state
 buildController.stop() / .retry() / .fail()
 connectionController.toggle("roblox" | "studio")
@@ -1051,8 +1135,8 @@ allows it.
 
 The CSP lives in a `<meta http-equiv>` tag on every page, and the markers are
 real: `script-src 'self'` with no `unsafe-inline` or `unsafe-eval`,
-`connect-src 'none'`, `object-src 'none'`, `base-uri 'self'`,
-`form-action 'none'`.
+`connect-src 'self'` (so the page can call its own origin and nothing else),
+`object-src 'none'`, `base-uri 'self'`, `form-action 'none'`.
 
 **Headers cannot be shipped from this repository.** `DEPLOYMENT.md` documents
 the recommended set — including `frame-ancestors 'none'`,
@@ -1131,21 +1215,30 @@ That is measurement noise on a localhost server, not a regression — idle
 mutations and the fully-flat repeat-use numbers above are the meaningful
 before/after evidence.
 
-### Verdict
+### Verdict (as of Phase 10)
 
-Release-ready as a **static, local-first, fully simulated frontend**. The five
-pages load, render and stay usable offline; every asset is committed and
-same-origin; the CSP is restrictive and real; API keys never leave the field;
-storage recovers from hostile input; and repeat use is flat.
+This section records what Phase 10 measured, and it is kept verbatim in
+substance because a claim that is quietly rewritten later is worth nothing.
+At that point the frontend was a **static, local-first, fully simulated
+frontend**: the pages loaded, rendered and stayed usable offline, every asset
+was committed and same-origin, the CSP was restrictive and real, API keys never
+left the field, storage recovered from hostile input, and repeat use was flat.
 
-It is not, and does not claim to be, ready as a product with real AI, real
-Roblox integration, accounts, a database or a backend — none of which exist.
+At that point it was not, and did not claim to be, a product with real AI, real
+Roblox integration, accounts, a database or a backend. Phases 11 and 12 built
+those: the accounts, the database and the API exist now and are covered by 137
+backend tests and 112 browser assertions. What is still *not* real is listed
+under "Known limitations" — real provider endpoints and real Roblox connectivity
+remain `EXTERNAL ENVIRONMENT REQUIRED`.
 
 ## Notes
 
 - Inter and JetBrains Mono are vendored in `assets/fonts/` under the SIL OFL and
-  served from this origin, with a system-font fallback stack. No request leaves
-  the page — the CSP forbids it.
+  served from this origin, with a system-font fallback stack. Nothing on the page
+  fetches a font from anywhere else; `font-src 'self'` would refuse it.
 - All visuals are original SVG or CSS generated in this repository. No stock
   photography, no game artwork, no Roblox assets.
-- No third-party JavaScript libraries are used, and there is no build step.
+- No third-party JavaScript is used in the frontend, and the frontend has no
+  build step: the files that are committed are the files the browser runs. The
+  backend is the opposite and does have one — TypeScript compiled with `tsc`,
+  no bundler.

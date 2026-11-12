@@ -1,0 +1,290 @@
+/* ==========================================================================
+   BuildMind — tokens.css
+   The single source of truth for the design system: colour, typography,
+   spacing, radius, borders, elevation, surfaces, motion and layout metrics.
+
+   Nothing in this file selects a component; it only declares values. Every
+   other stylesheet reads from these tokens, so a visual decision is made in
+   exactly one place.
+
+   Layers:  tokens.css → main.css → components.css → animations.css →
+            responsive.css
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* ------------------------------------------------------------------------
+     1. Colour — a deep graphite foundation and one restrained cool accent
+
+     The palette is deliberately narrow: near-black neutrals, one electric
+     blue-violet accent family, and three semantic hues that are only ever
+     used to report state (never decoration).
+     ------------------------------------------------------------------------ */
+
+  /* Foundation: deepest → elevated graphite */
+  --bm-void: #050608;
+  --bm-bg: #08090c;
+  --bm-bg-elevated: #0b0d11;
+
+  /* Surfaces: level 0 is the page, 1 a primary panel, 2 an elevated panel,
+     3 a modal / floating layer. */
+  --bm-surface-0: var(--bm-bg);
+  --bm-surface-1: #0f1116;
+  --bm-surface-2: #14161c;
+  --bm-surface-3: #191c24;
+  --bm-surface: var(--bm-surface-1);
+  --bm-surface-hover: #171a21;
+  --bm-surface-active: #1d2029;
+
+  /* Scrollbar: the only place a chrome colour is set directly */
+  --bm-scroll-track: #2b2f3a;
+  --bm-scroll-thumb: #262a34;
+  --bm-scroll-thumb-hover: #343948;
+
+  /* Hairlines */
+  --bm-border-faint: rgba(255, 255, 255, 0.045);
+  --bm-border: rgba(255, 255, 255, 0.075);
+  --bm-border-strong: rgba(255, 255, 255, 0.135);
+
+  /* Text — four levels, all of them readable */
+  --bm-text: #eceef4;
+  --bm-text-secondary: #b4b9c8;
+  --bm-text-muted: #8b91a3;
+  --bm-text-faint: #858b9e;
+  --bm-text-disabled: #6b7183;
+  --bm-text-inverse: #07080e;
+
+  /* Accent: electric blue-violet, used with discipline */
+  --bm-accent: #6d8bff;
+  --bm-accent-hover: #8ba3ff;
+  --bm-accent-press: #5674ec;
+  /* Solid-button ramp: the flat accent is right for text and borders, but a
+     filled primary needs a little vertical range to read as a surface. */
+  --bm-accent-rest-top: #7f9bff;
+  --bm-accent-rest-bottom: #5b78f0;
+  --bm-accent-ramp-top: #93acff;
+  --bm-accent-ramp-mid: #7c97ff;
+  --bm-accent-ramp-upper: #6885f8;
+  --bm-accent-fill-top: #6d89f5;
+  --bm-accent-fill-mid: #5b76ea;
+  --bm-accent-fill-bottom: #4f69dd;
+  --bm-accent-ink: #07080e;
+  --bm-accent-soft: rgba(109, 139, 255, 0.12);
+  --bm-accent-soft-strong: rgba(109, 139, 255, 0.2);
+  --bm-accent-line: rgba(109, 139, 255, 0.32);
+  --bm-accent-line-strong: rgba(109, 139, 255, 0.5);
+  --bm-accent-glow: rgba(109, 139, 255, 0.4);
+  --bm-accent-wash: rgba(109, 139, 255, 0.055);
+
+  /* Semantic state colours — deliberately desaturated, status only */
+  --bm-success: #57cfa6;
+  --bm-success-deep: #3fae8a;
+  --bm-success-soft: rgba(87, 207, 166, 0.12);
+  --bm-success-line: rgba(87, 207, 166, 0.26);
+  --bm-warning: #d8ab68;
+  --bm-warning-soft: rgba(216, 171, 104, 0.12);
+  --bm-warning-line: rgba(216, 171, 104, 0.26);
+  --bm-danger: #e5888d;
+  --bm-danger-strong: #f2a9ad;
+  --bm-danger-hover: #ffc4c7;
+  --bm-danger-soft: rgba(229, 136, 141, 0.12);
+  --bm-danger-line: rgba(229, 136, 141, 0.28);
+
+  /* Focus — one ring colour everywhere, never colour alone */
+  --bm-focus: #a7b9ff;
+  --bm-focus-ring: rgba(167, 185, 255, 0.3);
+  --bm-focus-offset: 2px;
+
+  /* Scrim / veils */
+  --bm-scrim: rgba(3, 4, 6, 0.66);
+  --bm-veil: rgba(5, 6, 8, 0.94);
+
+  /* Selection */
+  --bm-selection: rgba(109, 139, 255, 0.3);
+
+  /* ------------------------------------------------------------------------
+     2. Typography
+
+     Two self-hosted variable families. Inter carries the interface; JetBrains
+     Mono carries codes, counters and technical metadata.
+     ------------------------------------------------------------------------ */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --weight-regular: 400;
+  --weight-ui: 500;
+  --weight-medium: 520;
+  --weight-strong: 600;
+  --weight-display: 600;
+
+  --text-display: clamp(2.5rem, 5.2vw, 4rem);          /* 40 → 64 */
+  --text-hero: clamp(2.125rem, 4.2vw, 3.25rem);        /* 34 → 52 */
+  --text-page: clamp(1.6875rem, 2.6vw, 2.25rem);       /* 27 → 36 */
+  --text-section: 1rem;                                /* 16 */
+  --text-card: 0.9375rem;                              /* 15 */
+  --text-body: 0.9375rem;                              /* 15 */
+  --text-secondary: 0.875rem;                          /* 14 */
+  --text-meta: 0.8125rem;                              /* 13 */
+  --text-label: 0.6875rem;                             /* 11 */
+  --text-micro: 0.75rem;                               /* 12 */
+  --text-button: 0.84375rem;                           /* 13.5 */
+  --text-code: 0.8125rem;                              /* 13 */
+
+  --leading-none: 1;
+  --leading-tight: 1.12;
+  --leading-snug: 1.3;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.65;
+
+  --tracking-tight: -0.03em;
+  --tracking-snug: -0.018em;
+  --tracking-none: 0;
+  --tracking-wide: 0.02em;
+  --tracking-label: 0.1em;
+
+  /* ------------------------------------------------------------------------
+     3. Spacing — a 4px scale, plus three semantic steps
+     ------------------------------------------------------------------------ */
+  --space-2xs: 2px;
+  --space-xs: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+
+  --space-section: clamp(48px, 7vw, 80px);
+  --space-page-top: clamp(28px, 3.6vw, 44px);
+  --space-page-bottom: clamp(56px, 8vw, 88px);
+
+  /* ------------------------------------------------------------------------
+     4. Radius — engineered, not playful
+     ------------------------------------------------------------------------ */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* ------------------------------------------------------------------------
+     5. Borders
+     ------------------------------------------------------------------------ */
+  --border-width: 1px;
+  --border-width-strong: 1.5px;
+  --border-structural: var(--border-width) solid var(--bm-border);
+  --border-interactive: var(--border-width) solid var(--bm-border-strong);
+
+  /* ------------------------------------------------------------------------
+     6. Elevation — depth, never glow
+     ------------------------------------------------------------------------ */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 14px 32px -18px rgba(0, 0, 0, 0.85), 0 2px 6px -3px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 36px 72px -32px rgba(0, 0, 0, 0.92), 0 8px 20px -12px rgba(0, 0, 0, 0.6);
+  --shadow-accent: 0 14px 30px -16px rgba(86, 116, 236, 0.55);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+
+  /* ------------------------------------------------------------------------
+     7. Motion
+     ------------------------------------------------------------------------ */
+  --motion-fast: 110ms;
+  --motion-normal: 200ms;
+  --motion-slow: 320ms;
+  --motion-page: 260ms;
+  --motion-ambient: 34s;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --hover-lift: -1px;
+  --press-scale: 0.985;
+
+  /* ------------------------------------------------------------------------
+     8. Layout
+     ------------------------------------------------------------------------ */
+  --page-max: 1160px;
+  --page-max-wide: 1240px;
+  --narrow-max: 820px;
+  --header-h: 72px;
+  --gutter: clamp(20px, 4.4vw, 40px);
+  --control-h: 42px;
+  --control-h-sm: 34px;
+  --control-h-lg: 48px;
+
+  /* ------------------------------------------------------------------------
+     9. Layers
+     ------------------------------------------------------------------------ */
+  --layer-ambient: 0;
+  --layer-content: 1;
+  --layer-scrim: 90;
+  --layer-sheet: 95;
+  --layer-header: 100;
+  --layer-toast: 320;
+  --layer-veil: 340;
+}
+
+/* --------------------------------------------------------------------------
+   Compatibility aliases
+
+   Earlier phases (and a few scripts) reference the original variable names.
+   They now resolve to the same tokens, so there is one palette, not two.
+   -------------------------------------------------------------------------- */
+:root {
+  --bg: var(--bm-bg);
+  --surface-1: var(--bm-surface-1);
+  --surface-2: var(--bm-surface-2);
+  --surface-3: var(--bm-surface-3);
+  --line: var(--bm-border);
+  --line-strong: var(--bm-border-strong);
+  --text: var(--bm-text);
+  --text-soft: var(--bm-text-secondary);
+  --text-muted: var(--bm-text-muted);
+  --text-faint: var(--bm-text-faint);
+  --accent: var(--bm-accent);
+  --accent-hover: var(--bm-accent-hover);
+  --accent-press: var(--bm-accent-press);
+  --accent-ink: var(--bm-accent-ink);
+  --accent-soft: var(--bm-accent-soft);
+  --accent-line: var(--bm-accent-line);
+  --mint: var(--bm-success);
+  --mint-deep: #46b992;
+  --mint-soft: var(--bm-success-soft);
+  --amber: var(--bm-warning);
+  --amber-soft: var(--bm-warning-soft);
+  --rose: var(--bm-danger);
+  --rose-soft: var(--bm-danger-soft);
+  --s-1: var(--space-1);
+  --s-2: var(--space-2);
+  --s-3: var(--space-3);
+  --s-4: var(--space-4);
+  --s-5: var(--space-5);
+  --s-6: var(--space-6);
+  --s-7: var(--space-7);
+  --s-8: var(--space-8);
+  --s-9: var(--space-9);
+  --s-10: var(--space-10);
+  --s-11: 88px;
+  --r-xs: var(--radius-xs);
+  --r-sm: var(--radius-sm);
+  --r-md: var(--radius-md);
+  --r-lg: var(--radius-lg);
+  --r-xl: var(--radius-xl);
+  --r-pill: var(--radius-pill);
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+  --dur-1: var(--motion-fast);
+  --dur-2: var(--motion-normal);
+  --dur-3: var(--motion-slow);
+  --dur-4: 480ms;
+  --dur-5: 640ms;
+}

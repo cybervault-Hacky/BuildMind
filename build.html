@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Build a Game — BuildMind</title>
   <meta name="description" content="Describe the game you want to build and let BuildMind plan, build and test it.">
-  <meta name="theme-color" content="#060608">
+  <meta name="theme-color" content="#08090c">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="BuildMind">
   <meta property="og:title" content="Build a Game — BuildMind">
@@ -15,7 +15,9 @@
   <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
   <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
   <script src="js/boot-class.js"></script>
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/animations.css">
   <link rel="stylesheet" href="css/responsive.css">
   <noscript>
@@ -90,7 +92,7 @@
         <!-- The workspace needs a session. While the session is being checked
              nothing is shown, so the page never flashes a signed-in layout it
              then has to take away. -->
-        <div class="empty" id="build-auth-gate" data-auth-gate
+        <div class="empty" id="build-auth-gate" data-auth-gate role="status"
              data-gate-title="Sign in to build"
              data-gate-note="A build runs on the BuildMind server and needs an account."
              data-gate-error-title="The service is unavailable"
@@ -134,25 +136,25 @@
                 <span class="group-hint group-hint--keys">⌘ + Enter to build</span>
               </div>
 
-              <div class="field-errors field" data-field="prompt">
-              <div class="prompt-block">
-                <label class="sr-only" for="game-prompt">Describe the game you want to build</label>
-                <textarea class="prompt-block__textarea" id="game-prompt" name="prompt"
-                          maxlength="600" spellcheck="true"
-                          placeholder="Describe the game you want to build..."></textarea>
+              <div class="field" data-field="prompt">
+                <div class="prompt-block">
+                  <label class="sr-only" for="game-prompt">Describe the game you want to build</label>
+                  <textarea class="prompt-block__textarea" id="game-prompt" name="prompt"
+                            maxlength="600" spellcheck="true"
+                            placeholder="Describe the game you want to build..."></textarea>
 
-                <div class="prompt-block__bar">
-                  <div class="prompt-block__bar-left">
-                    <span class="prompt-block__count"><span id="prompt-count">0</span> / 600</span>
-                  </div>
-                  <div class="prompt-block__bar-right">
-                    <button class="btn btn--quiet btn--sm" type="button" id="prompt-clear" hidden>Clear</button>
-                    <button class="btn btn--ghost btn--sm" type="button" id="prompt-idea">
-                      Use an example
-                    </button>
+                  <div class="prompt-block__bar">
+                    <div class="prompt-block__bar-left">
+                      <span class="prompt-block__count"><span id="prompt-count">0</span> / 600</span>
+                    </div>
+                    <div class="prompt-block__bar-right">
+                      <button class="btn btn--quiet btn--sm" type="button" id="prompt-clear" hidden>Clear</button>
+                      <button class="btn btn--ghost btn--sm" type="button" id="prompt-idea">
+                        Use an example
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
                 <p class="field__error" id="prompt-error" hidden></p>
               </div>
 
@@ -339,7 +341,7 @@
               </div>
             </div>
 
-            <!-- Agent activity feed — simulated log lines, newest first -->
+            <!-- Agent activity feed — live log lines from the running build, newest first -->
             <div class="panel" id="activity-feed-panel" data-reveal="fade" data-reveal-delay="180" hidden>
               <div class="panel__head">
                 <span class="panel__title">Log</span>

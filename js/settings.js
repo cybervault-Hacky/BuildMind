@@ -312,16 +312,24 @@
 
   function closeResetDialog(restoreFocus) {
     if (!dialog) return;
+    const after = () => {
+      if (restoreFocus) {
+        const target = resetOpener && document.contains(resetOpener) ? resetOpener : els.resetButton;
+        if (target) target.focus();
+      }
+      resetOpener = null;
+    };
+    // Shared exit choreography; the callback lands focus once the panel is gone.
+    if (typeof BM.closeDialog === "function") {
+      BM.closeDialog(dialog, after);
+      return;
+    }
     if (typeof dialog.close === "function" && (dialog.open === true || dialog.hasAttribute("open"))) {
       dialog.close();
     } else {
       dialog.removeAttribute("open");
     }
-    if (restoreFocus) {
-      const target = resetOpener && document.contains(resetOpener) ? resetOpener : els.resetButton;
-      if (target) target.focus();
-    }
-    resetOpener = null;
+    after();
   }
 
   function confirmReset() {
@@ -440,11 +448,11 @@
           }
           if (state.status === "unavailable") {
             announce("The provider is not reachable.");
-            toast("The provider is not reachable right now.");
+            toast("The provider is not reachable right now.", "error");
             return;
           }
           announce("The provider did not accept the key.");
-          toast("The provider did not accept that key.");
+          toast("The provider did not accept that key.", "error");
         });
     });
 
@@ -472,7 +480,7 @@
           }
           if (state.unavailable) {
             announce(`${name} is not available on this server.`);
-            toast(outcome.error ? outcome.error.message : `${name} is not available.`);
+            toast(outcome.error ? outcome.error.message : `${name} is not available.`, "error");
             return;
           }
           announce(state.connected ? `${name} connected.` : `${name} disconnected.`);
