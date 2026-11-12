@@ -72,56 +72,255 @@
       <section class="shell" aria-labelledby="hero-title">
         <div class="hero">
           <div class="hero__copy">
+            <p class="hero__eyebrow" data-reveal="fade" data-reveal-delay="0">
+              <span class="hero__eyebrow-dot" aria-hidden="true"></span>
+              AI game development workspace
+            </p>
+
             <h1 class="hero__title" id="hero-title" data-reveal data-reveal-delay="40" tabindex="-1">
               Turn your ideas<br><em>into games.</em>
             </h1>
 
-            <p class="hero__lede" data-reveal data-reveal-delay="120">
-              Describe a game. BuildMind plans it, builds it and tests it.
+            <p class="hero__lede" data-reveal data-reveal-delay="110">
+              Describe a game. BuildMind plans it, builds it, tests it and fixes
+              what breaks — against the real tooling.
             </p>
 
-            <div class="hero__actions" data-reveal data-reveal-delay="200">
-              <a class="btn btn--primary btn--lg" href="build.html">
+            <div class="hero__actions" data-reveal data-reveal-delay="180">
+              <a class="btn btn--primary btn--lg hero__cta" href="build.html" data-hero-cta>
                 Build a Game
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3.2 8h9.6M9 4.2 12.8 8 9 11.8"/>
+                </svg>
               </a>
-              <a class="btn btn--ghost btn--lg" href="settings.html#roblox">
-                Connect Roblox
+              <!-- Real boundary only: the target host carries the connection
+                   state and the handler lives in js/home.js. Nothing here
+                   simulates a connection. -->
+              <a class="btn btn--ghost btn--lg hero__cta-secondary" href="settings.html#roblox"
+                 id="hero-roblox" data-hero-roblox>
+                <span class="status status--idle" id="hero-roblox-status">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Connect Roblox</span>
+                </span>
               </a>
             </div>
 
-            <p class="hero__meta" data-reveal="fade" data-reveal-delay="260">
+            <p class="hero__meta" data-reveal="fade" data-reveal-delay="240">
               Real builds · Roblox target · bring your own model
             </p>
           </div>
 
-          <div class="hero__visual" data-reveal="scale" data-reveal-delay="160">
-            <div class="worldviz" data-world id="hero-world"></div>
-            <span class="worldviz__caption" aria-hidden="true">world · assembling</span>
+          <!-- ============ The construction field ============
+               A hand-built orthographic scene: a plan tier above, a built
+               slab below, and the volume that links them. It is static SVG so
+               it renders without JavaScript and looks finished in reduced
+               motion; the assembly sequence is a CSS choreography that
+               js/home.js only has to start once. -->
+          <div class="hero__visual" data-reveal="scale" data-reveal-delay="120">
+            <figure class="planviz" data-planviz aria-labelledby="planviz-caption">
+              <figcaption class="sr-only" id="planviz-caption">
+                An abstract construction field: a plan floating above a grid of
+                built blocks, with idea nodes linked to the structure below.
+              </figcaption>
+
+              <div class="planviz__stage">
+                <svg class="planviz__svg" viewBox="0 0 560 552" role="img" focusable="false"
+                                     aria-label="An idea node linked to a plan lattice that projects onto a five by five world grid with eight built blocks">
+                                  <defs>
+                                    <radialGradient id="planviz-atmosphere" cx="50%" cy="52%" r="50%">
+                                      <stop offset="0%" stop-color="#6d8bff" stop-opacity="0.13"/>
+                                      <stop offset="58%" stop-color="#6d8bff" stop-opacity="0.04"/>
+                                      <stop offset="100%" stop-color="#6d8bff" stop-opacity="0"/>
+                                    </radialGradient>
+                                  </defs>
+
+                                  <circle class="planviz__atmosphere" cx="280" cy="286" r="264" fill="url(#planviz-atmosphere)"/>
+
+                                  <g class="planviz__backdrop">
+                                    <path class="planviz__backdrop-line" d="M0 172h560M0 392h560"/>
+                                    <path class="planviz__backdrop-line" d="M166 0v552M394 0v552"/>
+                                  </g>
+
+                                  <g class="planviz__plan">
+                                    <path class="planviz__plan-plane" d="M280 87L450 172L280 257L110 172Z"/>
+                                    <g class="planviz__plan-grid">
+                                      <path class="planviz__plan-line" d="M314 121L178 189"/>
+                                      <path class="planviz__plan-line" d="M246 121L382 189"/>
+                                      <path class="planviz__plan-line" d="M348 138L212 206"/>
+                                      <path class="planviz__plan-line" d="M212 138L348 206"/>
+                                      <path class="planviz__plan-line" d="M382 155L246 223"/>
+                                      <path class="planviz__plan-line" d="M178 155L314 223"/>
+                                      <path class="planviz__plan-line" d="M416 172L280 240"/>
+                                      <path class="planviz__plan-line" d="M144 172L280 240"/>
+                                    </g>
+                                    <g class="planviz__plan-cells">
+                                  <polygon class="planviz__plan-cell" style="--c:0" points="280,87 314,104 280,121 246,104"/>
+                                  <polygon class="planviz__plan-cell" style="--c:1" points="246,104 280,121 246,138 212,121"/>
+                                  <polygon class="planviz__plan-cell" style="--c:2" points="314,104 348,121 314,138 280,121"/>
+                                  <polygon class="planviz__plan-cell" style="--c:3" points="212,121 246,138 212,155 178,138"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:4" points="280,121 314,138 280,155 246,138"/>
+                                  <polygon class="planviz__plan-cell" style="--c:5" points="348,121 382,138 348,155 314,138"/>
+                                  <polygon class="planviz__plan-cell" style="--c:6" points="178,138 212,155 178,172 144,155"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:7" points="246,138 280,155 246,172 212,155"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:8" points="314,138 348,155 314,172 280,155"/>
+                                  <polygon class="planviz__plan-cell" style="--c:9" points="382,138 416,155 382,172 348,155"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:10" points="144,155 178,172 144,189 110,172"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:11" points="212,155 246,172 212,189 178,172"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:12" points="280,155 314,172 280,189 246,172"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:13" points="348,155 382,172 348,189 314,172"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:14" points="416,155 450,172 416,189 382,172"/>
+                                  <polygon class="planviz__plan-cell" style="--c:15" points="178,172 212,189 178,206 144,189"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:16" points="246,172 280,189 246,206 212,189"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:17" points="314,172 348,189 314,206 280,189"/>
+                                  <polygon class="planviz__plan-cell" style="--c:18" points="382,172 416,189 382,206 348,189"/>
+                                  <polygon class="planviz__plan-cell" style="--c:19" points="212,189 246,206 212,223 178,206"/>
+                                  <polygon class="planviz__plan-cell is-planned" style="--c:20" points="280,189 314,206 280,223 246,206"/>
+                                  <polygon class="planviz__plan-cell" style="--c:21" points="348,189 382,206 348,223 314,206"/>
+                                  <polygon class="planviz__plan-cell" style="--c:22" points="246,206 280,223 246,240 212,223"/>
+                                  <polygon class="planviz__plan-cell" style="--c:23" points="314,206 348,223 314,240 280,223"/>
+                                  <polygon class="planviz__plan-cell" style="--c:24" points="280,223 314,240 280,257 246,240"/>
+                                    </g>
+                                  </g>
+
+                                  <g class="planviz__guides">
+                                    <path class="planviz__guide" style="--g:0" d="M280 87L280 277"/>
+                                    <path class="planviz__guide" style="--g:1" d="M450 172L510 392"/>
+                                    <path class="planviz__guide" style="--g:2" d="M280 257L280 507"/>
+                                    <path class="planviz__guide" style="--g:3" d="M110 172L50 392"/>
+                                  </g>
+
+                                  <g class="planviz__graph">
+                                    <path class="planviz__link" style="--l:0" d="M280 40L222 68"/>
+                                    <path class="planviz__link" style="--l:1" d="M280 40L340 62"/>
+                                    <path class="planviz__link" style="--l:2" d="M222 68L192 34"/>
+                                    <path class="planviz__link" style="--l:3" d="M340 62L362 100"/>
+                                    <path class="planviz__link planviz__link--drop" style="--l:4" d="M280 40L280 155"/>
+                                    <circle class="planviz__node planviz__node--key" style="--n:0" cx="280" cy="40" r="4"/>
+                                    <circle class="planviz__node" style="--n:1" cx="222" cy="68" r="2.4"/>
+                                    <circle class="planviz__node" style="--n:2" cx="340" cy="62" r="2.1"/>
+                                    <circle class="planviz__node" style="--n:3" cx="192" cy="34" r="1.8"/>
+                                    <circle class="planviz__node" style="--n:4" cx="362" cy="100" r="1.8"/>
+                                  </g>
+
+                                  <g class="planviz__world">
+                                    <path class="planviz__slab" d="M280 277L510 392L280 507L50 392Z"/>
+                                    <g class="planviz__grid">
+                                      <path class="planviz__grid-line" d="M326 323L142 415"/>
+                                      <path class="planviz__grid-line" d="M234 323L418 415"/>
+                                      <path class="planviz__grid-line" d="M372 346L188 438"/>
+                                      <path class="planviz__grid-line" d="M188 346L372 438"/>
+                                      <path class="planviz__grid-line" d="M418 369L234 461"/>
+                                      <path class="planviz__grid-line" d="M142 369L326 461"/>
+                                      <path class="planviz__grid-line" d="M464 392L280 484"/>
+                                      <path class="planviz__grid-line" d="M96 392L280 484"/>
+                                    </g>
+                                    <g class="planviz__cells">
+                                      <polygon class="planviz__cell" style="--c:0" points="280,277 326,300 280,323 234,300"/>
+                                      <polygon class="planviz__cell" style="--c:1" points="234,300 280,323 234,346 188,323"/>
+                                      <polygon class="planviz__cell" style="--c:2" points="326,300 372,323 326,346 280,323"/>
+                                      <polygon class="planviz__cell" style="--c:3" points="188,323 234,346 188,369 142,346"/>
+                                      <polygon class="planviz__cell" style="--c:4" points="280,323 326,346 280,369 234,346"/>
+                                      <polygon class="planviz__cell" style="--c:5" points="372,323 418,346 372,369 326,346"/>
+                                      <polygon class="planviz__cell" style="--c:6" points="142,346 188,369 142,392 96,369"/>
+                                      <polygon class="planviz__cell" style="--c:7" points="234,346 280,369 234,392 188,369"/>
+                                      <polygon class="planviz__cell" style="--c:8" points="326,346 372,369 326,392 280,369"/>
+                                      <polygon class="planviz__cell" style="--c:9" points="418,346 464,369 418,392 372,369"/>
+                                      <polygon class="planviz__cell" style="--c:10" points="96,369 142,392 96,415 50,392"/>
+                                      <polygon class="planviz__cell" style="--c:11" points="188,369 234,392 188,415 142,392"/>
+                                      <polygon class="planviz__cell" style="--c:12" points="280,369 326,392 280,415 234,392"/>
+                                      <polygon class="planviz__cell" style="--c:13" points="372,369 418,392 372,415 326,392"/>
+                                      <polygon class="planviz__cell" style="--c:14" points="464,369 510,392 464,415 418,392"/>
+                                      <polygon class="planviz__cell" style="--c:15" points="142,392 188,415 142,438 96,415"/>
+                                      <polygon class="planviz__cell" style="--c:16" points="234,392 280,415 234,438 188,415"/>
+                                      <polygon class="planviz__cell" style="--c:17" points="326,392 372,415 326,438 280,415"/>
+                                      <polygon class="planviz__cell" style="--c:18" points="418,392 464,415 418,438 372,415"/>
+                                      <polygon class="planviz__cell" style="--c:19" points="188,415 234,438 188,461 142,438"/>
+                                      <polygon class="planviz__cell" style="--c:20" points="280,415 326,438 280,461 234,438"/>
+                                      <polygon class="planviz__cell" style="--c:21" points="372,415 418,438 372,461 326,438"/>
+                                      <polygon class="planviz__cell" style="--c:22" points="234,438 280,461 234,484 188,461"/>
+                                      <polygon class="planviz__cell" style="--c:23" points="326,438 372,461 326,484 280,461"/>
+                                      <polygon class="planviz__cell" style="--c:24" points="280,461 326,484 280,507 234,484"/>
+                                    </g>
+                                    <g class="planviz__blocks">
+                                  <g class="planviz__block" style="--b:0">
+                                    <polygon class="planviz__face planviz__face--left" points="234,282 280,305 280,323 234,300"/>
+                                    <polygon class="planviz__face planviz__face--right" points="280,305 326,282 326,300 280,323"/>
+                                    <polygon class="planviz__face planviz__face--top" points="280,259 326,282 280,305 234,282"/>
+                                  </g>
+                                  <g class="planviz__block" style="--b:1">
+                                    <polygon class="planviz__face planviz__face--left" points="234,306 280,329 280,369 234,346"/>
+                                    <polygon class="planviz__face planviz__face--right" points="280,329 326,306 326,346 280,369"/>
+                                    <polygon class="planviz__face planviz__face--top" points="280,283 326,306 280,329 234,306"/>
+                                  </g>
+                                  <g class="planviz__block" style="--b:2">
+                                    <polygon class="planviz__face planviz__face--left" points="372,345 418,368 418,392 372,369"/>
+                                    <polygon class="planviz__face planviz__face--right" points="418,368 464,345 464,369 418,392"/>
+                                    <polygon class="planviz__face planviz__face--top" points="418,322 464,345 418,368 372,345"/>
+                                  </g>
+                                  <g class="planviz__block planviz__block--accent" style="--b:3">
+                                    <polygon class="planviz__face planviz__face--left" points="326,330 372,353 372,415 326,392"/>
+                                    <polygon class="planviz__face planviz__face--right" points="372,353 418,330 418,392 372,415"/>
+                                    <polygon class="planviz__face planviz__face--top" points="372,307 418,330 372,353 326,330"/>
+                                  </g>
+                                  <g class="planviz__block planviz__block--accent" style="--b:4">
+                                    <polygon class="planviz__face planviz__face--left" points="234,296 280,319 280,415 234,392"/>
+                                    <polygon class="planviz__face planviz__face--right" points="280,319 326,296 326,392 280,415"/>
+                                    <polygon class="planviz__face planviz__face--top" points="280,273 326,296 280,319 234,296"/>
+                                  </g>
+                                  <g class="planviz__block" style="--b:5">
+                                    <polygon class="planviz__face planviz__face--left" points="142,370 188,393 188,415 142,392"/>
+                                    <polygon class="planviz__face planviz__face--right" points="188,393 234,370 234,392 188,415"/>
+                                    <polygon class="planviz__face planviz__face--top" points="188,347 234,370 188,393 142,370"/>
+                                  </g>
+                                  <g class="planviz__block" style="--b:6">
+                                    <polygon class="planviz__face planviz__face--left" points="234,392 280,415 280,461 234,438"/>
+                                    <polygon class="planviz__face planviz__face--right" points="280,415 326,392 326,438 280,461"/>
+                                    <polygon class="planviz__face planviz__face--top" points="280,369 326,392 280,415 234,392"/>
+                                  </g>
+                                  <g class="planviz__block" style="--b:7">
+                                    <polygon class="planviz__face planviz__face--left" points="326,422 372,445 372,461 326,438"/>
+                                    <polygon class="planviz__face planviz__face--right" points="372,445 418,422 418,438 372,461"/>
+                                    <polygon class="planviz__face planviz__face--top" points="372,399 418,422 372,445 326,422"/>
+                                  </g>
+                                    </g>
+                                  </g>
+
+                                  <g class="planviz__markers">
+                                    <circle class="planviz__marker" style="--m:0" cx="280" cy="296" r="5"/>
+                                    <circle class="planviz__marker-pulse" cx="280" cy="296" r="5"/>
+                                  </g>
+                                </svg>              </div>
+
+              <div class="planviz__hud" aria-hidden="true">
+                <span class="planviz__hud-item">
+                  <span class="planviz__hud-key">field</span>
+                  <span class="planviz__hud-val">idea → world</span>
+                </span>
+                <span class="planviz__hud-rule"></span>
+                <span class="planviz__hud-item">
+                  <span class="planviz__hud-key">stage</span>
+                  <span class="planviz__hud-val">plan → world</span>
+                </span>
+                <span class="planviz__hud-rule"></span>
+                <span class="planviz__hud-item">
+                  <span class="planviz__hud-key">grid</span>
+                  <span class="planviz__hud-val">05 × 05</span>
+                </span>
+              </div>
+            </figure>
           </div>
         </div>
 
-        <!-- Idea → Build → Test → Play -->
-        <section aria-labelledby="pipeline-title">
-          <h2 class="sr-only" id="pipeline-title">How a build runs</h2>
-          <div class="pipeline" data-reveal="fade">
-            <ol class="pipeline__steps">
-              <li class="pipeline__step">
-                <span class="pipeline__step-num" aria-hidden="true">1</span> Idea
-              </li>
-              <li class="pipeline__arrow" aria-hidden="true"></li>
-              <li class="pipeline__step">
-                <span class="pipeline__step-num" aria-hidden="true">2</span> Build
-              </li>
-              <li class="pipeline__arrow" aria-hidden="true"></li>
-              <li class="pipeline__step">
-                <span class="pipeline__step-num" aria-hidden="true">3</span> Test
-              </li>
-              <li class="pipeline__arrow" aria-hidden="true"></li>
-              <li class="pipeline__step">
-                <span class="pipeline__step-num" aria-hidden="true">4</span> Play
-              </li>
-            </ol>
-            <a class="link-arrow pipeline__link" href="projects.html">
+        <!-- ============ Concept strip ============
+             The product's own stage names, in order. This is a description of
+             how a build runs, not a live status readout. -->
+        <section class="concept" aria-labelledby="concept-title" data-reveal="fade">
+          <h2 class="sr-only" id="concept-title">How a build runs</h2>
+
+          <div class="concept__head">
+            <p class="concept__title">A build, end to end</p>
+            <a class="link-arrow concept__link" href="projects.html">
               View projects
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -129,6 +328,34 @@
               </svg>
             </a>
           </div>
+
+          <ol class="concept__track">
+            <li class="concept__step" data-step="0">
+              <span class="concept__dot" aria-hidden="true"></span>
+              <span class="concept__label">Idea</span>
+              <span class="concept__note">You describe it</span>
+            </li>
+            <li class="concept__step" data-step="1">
+              <span class="concept__dot" aria-hidden="true"></span>
+              <span class="concept__label">Plan</span>
+              <span class="concept__note">Structured stages</span>
+            </li>
+            <li class="concept__step" data-step="2">
+              <span class="concept__dot" aria-hidden="true"></span>
+              <span class="concept__label">Build</span>
+              <span class="concept__note">Validated output</span>
+            </li>
+            <li class="concept__step" data-step="3">
+              <span class="concept__dot" aria-hidden="true"></span>
+              <span class="concept__label">Test</span>
+              <span class="concept__note">Real gates run</span>
+            </li>
+            <li class="concept__step" data-step="4">
+              <span class="concept__dot" aria-hidden="true"></span>
+              <span class="concept__label">Validate</span>
+              <span class="concept__note">Checked, then recorded</span>
+            </li>
+          </ol>
         </section>
 
         <!-- One quiet shortcut back into the workspace -->

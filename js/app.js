@@ -692,94 +692,6 @@
     });
   }
 
-  /**
-   * Gentle preview loop for the home hero.
-   *
-   * The loop pauses while the tab is hidden or the visualizer is scrolled out of
-   * view, and resumes when it comes back — an off-screen element measures zero
-   * mutations per second. It tears itself down for good when its element leaves
-   * the document. Returns a stopper, which is idempotent.
-   */
-  function startWorldPreview(el, speed = 1) {
-    if (!el) return () => {};
-    mountWorld(el);
-
-    if (prefersReducedMotion()) {
-      updateWorld(el, { state: "complete", progress: 100 });
-      return () => {};
-    }
-
-    let progress = 0;
-    let direction = 1;
-    let timer = 0;
-    let halted = false;
-    let onscreen = true;
-
-    const stop = () => {
-      halted = true;
-      window.clearTimeout(timer);
-      timer = 0;
-      if (observer) observer.disconnect();
-    };
-
-    const schedule = (ms) => {
-      if (halted) return;
-      window.clearTimeout(timer);
-      timer = window.setTimeout(tick, ms);
-    };
-
-    const tick = () => {
-      if (halted) return;
-      if (!el.isConnected) {
-        stop();
-        return;
-      }
-      // Nothing to draw: try again in a moment rather than animating offscreen.
-      if (document.hidden || !onscreen) {
-        schedule(400);
-        return;
-      }
-      progress += direction * (0.9 * speed);
-      if (progress >= 100) {
-        progress = 100;
-        direction = -1;
-        updateWorld(el, { state: "complete", progress: 100 });
-        schedule(1400);
-        return;
-      }
-      if (progress <= 0) {
-        progress = 0;
-        direction = 1;
-      }
-      updateWorld(el, {
-        state: progress > 0 ? (progress > 88 ? "validating" : "building") : "idle",
-        progress,
-      });
-      schedule(90);
-    };
-
-    // Pause while offscreen. Kept as a lifecycle observer rather than a scroll
-    // handler so it costs nothing while scrolling.
-    // Visibility watching is an optimisation, not a requirement: where
-    // IntersectionObserver is unavailable the preview simply keeps its simple
-    // timer behaviour instead of throwing on load.
-    const observer =
-      typeof IntersectionObserver === "function"
-        ? new IntersectionObserver(
-            (entries) => {
-              onscreen = entries.some((entry) => entry.isIntersecting);
-            },
-            { rootMargin: "80px" }
-          )
-        : null;
-    if (observer) observer.observe(el);
-
-    updateWorld(el, { state: "idle", progress: 0 });
-    timer = window.setTimeout(tick, 700);
-
-    return stop;
-  }
-
   /* ------------------------------------------------------------------------
      Authentication gate
 
@@ -933,7 +845,6 @@
     toast,
     mountWorld,
     updateWorld,
-    startWorldPreview,
     initServices,
     paintAuthGate,
     scanReveals,

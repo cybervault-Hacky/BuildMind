@@ -11,191 +11,487 @@
 
 /* --------------------------------------------------------------------------
    1. Home — hero
+
+   The first viewport is a two-column composition: a copy column that does the
+   talking, and a construction field that shows what the product does. The
+   field is the only decorative element on the page and it is deliberately
+   quieter than the headline.
    -------------------------------------------------------------------------- */
 .hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.04fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.88fr);
   align-items: center;
-  gap: clamp(32px, 6vw, 76px);
-  padding: clamp(52px, 8vh, 92px) 0 clamp(44px, 6vh, 72px);
-  min-height: min(72vh, 640px);
+  gap: clamp(28px, 4.2vw, 64px);
+  padding: clamp(36px, 5vh, 60px) 0 clamp(30px, 4vh, 48px);
+  min-height: min(66vh, 600px);
 }
 
 .hero__copy {
-  max-width: 540px;
+  position: relative;
+  z-index: 2;
+  max-width: 560px;
 }
 
+/* ---- Eyebrow ------------------------------------------------------------
+   One line, small caps-ish, with a live dot. It names the product category
+   before the headline claims anything. */
+.hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-5);
+  padding: 5px 12px 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--bm-border);
+  background: rgba(255, 255, 255, 0.018);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--bm-text-muted);
+  white-space: nowrap;
+}
+
+.hero__eyebrow-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--bm-accent);
+  box-shadow: 0 0 0 3px rgba(109, 139, 255, 0.12);
+  flex: 0 0 auto;
+}
+
+/* ---- Headline -----------------------------------------------------------
+   The weight, the tight tracking and the two-tone line split do the work. No
+   gradient, no glow, no shadow: it has to look just as deliberate printed in
+   one colour. */
 .hero__title {
-  font-size: var(--text-hero);
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: clamp(2.4rem, 4.55vw, 3.9rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
   font-weight: var(--weight-display);
   color: var(--bm-text);
+  text-wrap: balance;
 }
 
 .hero__title em {
+  display: block;
   font-style: normal;
   color: var(--bm-text-muted);
-  display: block;
 }
 
 .hero__lede {
   margin-top: var(--space-5);
-  font-size: clamp(14.5px, 1.3vw, 16px);
-  line-height: var(--leading-relaxed);
+  font-size: clamp(14.5px, 1.15vw, 16px);
+  line-height: 1.62;
   color: var(--bm-text-muted);
-  max-width: 42ch;
+  max-width: 44ch;
+  text-wrap: pretty;
 }
 
 .hero__actions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-top: var(--space-7);
+  margin-top: var(--space-6);
   flex-wrap: wrap;
 }
 
+.hero__cta {
+  min-width: 176px;
+  gap: 9px;
+}
+
+.hero__cta svg {
+  width: 15px;
+  height: 15px;
+  transition: transform var(--motion-slow) var(--ease-out);
+}
+
+.hero__cta:hover svg {
+  transform: translateX(3px);
+}
+
+/* The secondary action is a boundary, not a button with a label: it shows the
+   real connection state in the same status language the rest of the app uses.
+   As a link it keeps its own copy of the chip so the two never fight. */
+.hero__cta-secondary {
+  min-width: 176px;
+  padding-inline: 18px;
+}
+
+.hero__cta-secondary .status {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: inherit;
+}
+
+.hero__cta-secondary .status__dot {
+  background: currentColor;
+  opacity: 0.5;
+}
+
+/* Connected: the dot takes the success colour and the label says so. The
+   button stays a button, because disconnecting belongs in Settings. */
+.hero__cta-secondary[data-connected="true"] .status {
+  color: var(--bm-text-secondary);
+}
+
+.hero__cta-secondary[data-connected="true"] .status__dot {
+  background: var(--bm-success);
+  opacity: 1;
+}
+
 .hero__meta {
-  margin-top: var(--space-7);
-  padding-top: var(--space-5);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--bm-border);
-  max-width: 470px;
+  max-width: 430px;
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--bm-text-faint);
   font-variant-numeric: tabular-nums;
 }
 
-/* The world preview sits inside a soft frame instead of floating on the page */
+/* --------------------------------------------------------------------------
+   2. Home — the construction field
+
+   Pure SVG: an isometric slab of built blocks under a floating plan tier,
+   linked by corner guides, with an idea graph above. Everything is drawn with
+   strokes and flat fills — no gradients inside the geometry, no filters, so
+   it stays crisp at every size and costs nothing to composite.
+
+   Load sequence (js/home.js adds `.is-assembling` once, then `.is-settled`):
+     backdrop → plan tier → guides → idea graph → slab → blocks → markers
+   -------------------------------------------------------------------------- */
 .hero__visual {
   position: relative;
-  min-height: 400px;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
 }
 
-/* A hairline frame around the preview. It is the same 1px structural border as
-   every panel, so the visual belongs to the system instead of floating on it. */
-.hero__visual::before {
-  content: "";
-  position: absolute;
-  inset: -18px -22px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--bm-border-faint);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.016), transparent 46%);
-  pointer-events: none;
-}
-
-.hero__visual::after {
-  content: "";
-  position: absolute;
-  inset: 12% 6%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 48%, rgba(96, 118, 245, 0.13), transparent 64%);
-  pointer-events: none;
-}
-
-.worldviz__caption {
+.planviz {
   position: relative;
-  z-index: 1;
-  display: inline-flex;
+  width: 100%;
+  max-width: min(560px, 100%);
+  margin: 0;
+  padding: 0;
+}
+
+/* The SVG is capped at its intrinsic width and centred, so a narrow column
+   shrinks the art instead of pushing it past the gutter. */
+.planviz__stage {
+  position: relative;
+  aspect-ratio: 560 / 552;
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+}
+
+/* A soft radial light behind the geometry, and nothing else. */
+.planviz__stage::before {
+  content: "";
+  position: absolute;
+  inset: 2% 2% 6%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse 60% 52% at 50% 50%, rgba(109, 139, 255, 0.085), transparent 70%);
+  pointer-events: none;
+}
+
+.planviz__svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+}
+
+/* ---- Structure ---------------------------------------------------------
+   Two tiers and the volume between them. The plan tier is the only place the
+   accent colour is used as a fill; the built world is neutral, so "planned"
+   and "built" are legible at a glance without a legend.
+   ------------------------------------------------------------------------ */
+.planviz__atmosphere {
+  opacity: 0.9;
+}
+
+.planviz__backdrop-line {
+  stroke: rgba(255, 255, 255, 0.045);
+  stroke-width: 1;
+  fill: none;
+}
+
+.planviz__plan-plane {
+  fill: rgba(109, 139, 255, 0.035);
+  stroke: rgba(109, 139, 255, 0.38);
+  stroke-width: 1;
+}
+
+.planviz__plan-line {
+  stroke: rgba(109, 139, 255, 0.15);
+  stroke-width: 1;
+  fill: none;
+}
+
+.planviz__plan-cell {
+  fill: rgba(255, 255, 255, 0.015);
+  stroke: rgba(255, 255, 255, 0.035);
+  stroke-width: 1;
+}
+
+/* A cell the plan claims. It is the same accent the build stage uses. */
+.planviz__plan-cell.is-planned {
+  fill: rgba(109, 139, 255, 0.12);
+  stroke: rgba(109, 139, 255, 0.24);
+}
+
+.planviz__guide {
+  fill: none;
+  stroke: rgba(109, 139, 255, 0.17);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+
+.planviz__slab {
+  fill: rgba(255, 255, 255, 0.012);
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 1;
+}
+
+.planviz__grid-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.055);
+  stroke-width: 1;
+}
+
+.planviz__cell {
+  fill: rgba(255, 255, 255, 0.018);
+  stroke: rgba(255, 255, 255, 0.028);
+  stroke-width: 1;
+}
+
+/* ---- Blocks ------------------------------------------------------------
+   Three faces, three values. Left and right are near-opaque so a block in
+   front genuinely occludes the one behind it — that is what makes the stack
+   read as mass rather than as glass.
+   ------------------------------------------------------------------------ */
+.planviz__face {
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.planviz__face--top {
+  fill: rgba(148, 166, 224, 0.18);
+  stroke: rgba(160, 178, 246, 0.36);
+}
+
+.planviz__face--left {
+  fill: rgba(28, 34, 49, 0.94);
+  stroke: rgba(109, 139, 255, 0.24);
+}
+
+.planviz__face--right {
+  fill: rgba(19, 23, 33, 0.94);
+  stroke: rgba(109, 139, 255, 0.18);
+}
+
+.planviz__block--accent .planviz__face--top {
+  fill: rgba(154, 174, 238, 0.3);
+  stroke: rgba(176, 193, 255, 0.58);
+}
+
+.planviz__block--accent .planviz__face--left {
+  fill: rgba(33, 41, 63, 0.95);
+  stroke: rgba(109, 139, 255, 0.36);
+}
+
+.planviz__block--accent .planviz__face--right {
+  fill: rgba(22, 27, 41, 0.95);
+  stroke: rgba(109, 139, 255, 0.27);
+}
+
+/* ---- Idea graph -------------------------------------------------------- */
+.planviz__link {
+  fill: none;
+  stroke: rgba(109, 139, 255, 0.4);
+  stroke-width: 1;
+  stroke-dasharray: 2.5 4;
+}
+
+.planviz__link--drop {
+  stroke: rgba(109, 139, 255, 0.55);
+  stroke-dasharray: 3 5;
+}
+
+.planviz__node {
+  fill: var(--bm-bg);
+  stroke: rgba(167, 185, 255, 0.36);
+  stroke-width: 1;
+}
+
+.planviz__node--key {
+  fill: rgba(109, 139, 255, 0.55);
+  stroke: rgba(195, 208, 255, 0.9);
+}
+
+/* ---- Marker ------------------------------------------------------------ */
+.planviz__marker {
+  fill: none;
+  stroke: rgba(190, 205, 255, 0.75);
+  stroke-width: 1;
+}
+
+.planviz__marker-pulse {
+  fill: none;
+  stroke: rgba(167, 185, 255, 0.45);
+  stroke-width: 1;
+}
+
+/* ---- HUD ---------------------------------------------------------------
+   A two-item readout under the field. It is decorative (aria-hidden) and it
+   is the only place the word "assembling" appears. */
+.planviz__hud {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  font-size: 10.5px;
+  justify-content: center;
+  gap: 6px var(--space-3);
+  margin-top: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--bm-text-faint);
-  font-family: var(--font-mono);
 }
 
-.worldviz__caption::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--bm-accent);
-  opacity: 0.7;
-}
-
-/* --------------------------------------------------------------------------
-   2. Home — pipeline strip
-   -------------------------------------------------------------------------- */
-.pipeline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  padding: var(--space-6) 0 var(--space-8);
-  border-top: 1px solid var(--bm-border);
-}
-
-.pipeline__steps {
-  display: flex;
-  align-items: center;
-  gap: clamp(10px, 2.4vw, 26px);
-  flex-wrap: wrap;
-}
-
-.pipeline__step {
+.planviz__hud-item {
   display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 12.5px;
-  font-weight: var(--weight-ui);
-  letter-spacing: -0.004em;
-  color: var(--bm-text-faint);
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .planviz__hud {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+}
+
+.planviz__hud-key {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.planviz__hud-val {
+  color: var(--bm-text-muted);
   transition: color var(--motion-slow) var(--ease-standard);
 }
 
-.pipeline__step.is-live {
-  color: var(--bm-text);
-}
-
-.pipeline__step-num {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--bm-border-strong);
-  font-size: 10px;
-  font-family: var(--font-mono);
-  color: var(--bm-text-faint);
-  transition: color var(--motion-slow) var(--ease-standard),
-    border-color var(--motion-slow) var(--ease-standard),
-    background var(--motion-slow) var(--ease-standard),
-    transform var(--motion-slow) var(--ease-out);
-}
-
-.pipeline__step.is-live .pipeline__step-num {
-  color: var(--bm-accent-hover);
-  border-color: var(--bm-accent-line);
-  background: var(--bm-accent-soft);
-  transform: scale(1.06);
-}
-
-.pipeline__step.is-past .pipeline__step-num {
-  color: var(--bm-text-secondary);
-  border-color: var(--bm-accent-line);
-}
-
-.pipeline__arrow {
-  width: 18px;
-  height: 1px;
-  background: linear-gradient(to right, var(--bm-border-strong), transparent);
-  flex: 0 0 auto;
-}
-
-.pipeline__link {
-  flex: 0 0 auto;
+.planviz__hud-rule {
+  width: 1px;
+  height: 9px;
+  background: var(--bm-border-strong);
 }
 
 /* --------------------------------------------------------------------------
-   3. Home — shortcut into the workspace
+   3. Home — concept strip
+
+   Five real stages, drawn as a track rather than a row of cards. Each node
+   sits on one continuous line, so the sequence reads as a process instead of
+   a feature list.
+   -------------------------------------------------------------------------- */
+.concept {
+  position: relative;
+  border-top: 1px solid var(--bm-border);
+  padding: var(--space-6) 0 var(--space-7);
+}
+
+.concept__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.concept__title {
+  font-size: var(--text-meta);
+  font-weight: 520;
+  letter-spacing: -0.006em;
+  color: var(--bm-text-secondary);
+}
+
+.concept__link {
+  flex: 0 0 auto;
+}
+
+.concept__track {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  counter-reset: concept;
+}
+
+.concept__step {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding-top: 18px;
+  min-width: 0;
+}
+
+/* The track: a hairline from this node to the next, drawn behind the dots. */
+.concept__step::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 11px;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(to right, var(--bm-border-strong), var(--bm-border-faint));
+}
+
+.concept__step:last-child::before {
+  right: auto;
+  width: 0;
+}
+
+.concept__dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid var(--bm-border-strong);
+  background: var(--bm-bg);
+}
+
+.concept__step[data-step="0"] .concept__dot {
+  border-color: var(--bm-accent-line-strong);
+  background: var(--bm-accent-soft-strong);
+  box-shadow: 0 0 0 4px rgba(109, 139, 255, 0.06);
+}
+
+.concept__label {
+  font-size: 13.5px;
+  font-weight: 540;
+  letter-spacing: -0.01em;
+  color: var(--bm-text);
+}
+
+.concept__note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--bm-text-faint);
+}
+
+/* --------------------------------------------------------------------------
+   4. Home — shortcut into the workspace
    -------------------------------------------------------------------------- */
 .start-row {
   border-top: 1px solid var(--bm-border);
@@ -280,7 +576,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   4. Build — workspace frame
+   5. Build — workspace frame
    -------------------------------------------------------------------------- */
 .workspace {
   display: grid;
@@ -349,7 +645,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   5. Build — prompt block
+   6. Build — prompt block
    -------------------------------------------------------------------------- */
 .prompt-block {
   position: relative;
@@ -524,7 +820,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   6. Build — activity column
+   7. Build — activity column
    -------------------------------------------------------------------------- */
 .activity-col {
   position: sticky;
@@ -1005,7 +1301,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   7. World visualizer
+   8. World visualizer
    -------------------------------------------------------------------------- */
 .worldviz {
   position: relative;
@@ -1079,7 +1375,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   8. Projects — toolbar, grid, card
+   9. Projects — toolbar, grid, card
    -------------------------------------------------------------------------- */
 .projects-grid {
   display: grid;
@@ -1690,7 +1986,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   9. Empty / loading / error surfaces
+   10. Empty / loading / error surfaces
 
    One shape for every dead end: a marked stage, a short title, one line of
    explanation, and exactly the actions that help. Calm geometry, no artwork.
@@ -1811,7 +2107,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   10. Dialog (native <dialog>, so focus trapping, Escape and the top layer are
+   11. Dialog (native <dialog>, so focus trapping, Escape and the top layer are
    the platform's job; this only styles and choreographs it)
    -------------------------------------------------------------------------- */
 .confirm {
@@ -1881,7 +2177,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   11. Settings
+   12. Settings
    -------------------------------------------------------------------------- */
 /* Settings is a reading column: it is centred in the page measure rather than
    pinned to the left edge of a wider shell, which is what made the section
@@ -2018,7 +2314,7 @@
 .setting-row__control--stack > .input,
 .setting-row__control--stack > .select,
 .setting-row__control--stack > .input-group,
-.setting-row__control--stack > .field__error,
+.setting-row__control--stack > .planviz__error,
 .setting-row__control--stack > .setting-row__state {
   flex: 1 1 100%;
   width: 100%;
@@ -2067,7 +2363,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   12. Toast
+   13. Toast
 
    One polite live region, mounted by app.js. Enter and exit are opacity +
    transform only; the element keeps its box so nothing reflows around it.
@@ -2126,7 +2422,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   13. Authentication gates
+   14. Authentication gates
 
    Which region is visible is derived from the document state written by the
    auth controller, so a signed-out page never flashes signed-in chrome.

@@ -219,6 +219,115 @@
   }
 }
 
+/* ---- Construction field ------------------------------------------------
+   The assembly is a six-beat sequence. Each beat is its own keyframe so a
+   rule can point at the beat it needs, and the whole thing runs once —
+   nothing loops except the two ambient beats at the end, which are registered
+   in the reduced-motion block below.
+
+   Every beat animates opacity and a transform. Nothing animates a path, a
+   `d` attribute or a layout property. */
+
+/* A corner-to-corner wipe that reads as a structure being drawn into place. */
+@keyframes field-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* A block rising out of the slab: it starts low and squashed, and grows to its
+   real height by scaling on Y from its base edge. */
+@keyframes field-rise {
+  from {
+    transform: translateY(9px) scaleY(0.6);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A node arriving: it lands slightly under-size and settles, which reads as
+   "placed" rather than "faded in". */
+@keyframes field-node-in {
+  from {
+    transform: scale(0.45);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* A guide line travelling from the plan down to the built corner. */
+@keyframes field-guide-in {
+  from {
+    stroke-dashoffset: 190;
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* The plan tier settles down onto the axis; the world settles up to meet it. */
+@keyframes field-plan-in {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes field-world-in {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Ambient: link dashes crawl along their path. */
+@keyframes field-dash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+/* Ambient: the marker on the tallest block breathes outward. */
+@keyframes field-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  60% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
 /* --------------------------------------------------------------------------
    2. Entrance utilities
 
@@ -445,6 +554,140 @@ body.is-entering main {
   opacity: 0;
 }
 
+/* --------------------------------------------------------------------------
+   4b. Construction field — the home hero reveal
+
+   One calm reveal, not a theatre piece: the plan tier settles down, the world
+   settles up, and the blocks arrive underneath. It is over in ~1.3s and the
+   field never looks half-built on the way — the whole composition is present
+   from the first beat, it just hasn't finished settling.
+
+   The scene is complete in the markup, so if this class is never added the
+   field is simply finished. That is what keeps the hero correct with JS off.
+   -------------------------------------------------------------------------- */
+.planviz__backdrop-line,
+.planviz__plan,
+.planviz__graph,
+.planviz__world,
+.planviz__markers {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.planviz__block {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* ---- the reveal ---- */
+.planviz.is-assembling .planviz__backdrop {
+  animation: field-fade 700ms var(--ease-out) both;
+}
+
+.planviz.is-assembling .planviz__plan {
+  animation: field-plan-in 800ms var(--ease-out) both;
+  animation-delay: 70ms;
+}
+
+.planviz.is-assembling .planviz__guide {
+  stroke-dasharray: 190;
+  animation: field-guide-in 560ms cubic-bezier(0.3, 0, 0.2, 1) both;
+  animation-delay: calc(280ms + var(--g) * 55ms);
+}
+
+.planviz.is-assembling .planviz__graph {
+  animation: field-fade 460ms var(--ease-out) both;
+  animation-delay: 200ms;
+}
+
+.planviz.is-assembling .planviz__link {
+  animation: field-fade 500ms var(--ease-out) both;
+  animation-delay: calc(260ms + var(--l) * 55ms);
+}
+
+.planviz.is-assembling .planviz__node {
+  animation: field-node-in 480ms var(--ease-out) both;
+  animation-delay: calc(300ms + var(--n) * 55ms);
+}
+
+.planviz.is-assembling .planviz__world {
+  animation: field-world-in 820ms var(--ease-out) both;
+  animation-delay: 150ms;
+}
+
+.planviz.is-assembling .planviz__block {
+  animation: field-rise 620ms var(--ease-out) both;
+  animation-delay: calc(360ms + var(--b) * 55ms);
+}
+
+.planviz.is-assembling .planviz__markers {
+  animation: field-fade 520ms var(--ease-out) both;
+  animation-delay: 900ms;
+}
+
+/* ---- ambient beats, starting only once the reveal has finished ---- */
+.planviz.is-settled .planviz__link {
+  animation: field-dash 6s linear infinite;
+}
+
+.planviz.is-settled .planviz__marker-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: field-pulse 3.8s var(--ease-in-out) infinite;
+}
+
+/* ---- CTA-linked emphasis, and a local response on hover ---- */
+.hero:has([data-hero-cta]:hover) .planviz__plan-plane,
+.hero:has([data-hero-cta]:focus-visible) .planviz__plan-plane {
+  stroke: rgba(139, 168, 255, 0.55);
+}
+
+.hero:has([data-hero-cta]:hover) .planviz__guide,
+.hero:has([data-hero-cta]:focus-visible) .planviz__guide {
+  stroke: rgba(139, 168, 255, 0.34);
+}
+
+.planviz__guide,
+.planviz__plan-plane,
+.planviz__link,
+.planviz__face {
+  transition: stroke var(--motion-slow) var(--ease-standard),
+    fill var(--motion-slow) var(--ease-standard);
+}
+
+/* Hovering the field lifts the intention tier a hair and brightens the one
+   accent block. Two properties, no movement of the composition. */
+@media (hover: hover) and (pointer: fine) {
+  .planviz:hover .planviz__plan-plane {
+    fill: rgba(109, 139, 255, 0.06);
+    stroke: rgba(139, 168, 255, 0.5);
+  }
+
+  .planviz:hover .planviz__plan-cell.is-planned {
+    fill: rgba(109, 139, 255, 0.17);
+  }
+
+  .planviz:hover .planviz__block--accent .planviz__face--top {
+    fill: rgba(162, 181, 242, 0.36);
+  }
+
+  .planviz:hover .planviz__hud-val {
+    color: var(--bm-text-secondary);
+  }
+}
+
+/* The pointer-linked state: js/home.js writes --field-x/--field-y from the
+   eased pointer position, and only the two upper tiers read them. The travel
+   is capped at 4px in the script, so no clamp is needed here. */
+.planviz[data-pointer="true"] .planviz__plan,
+.planviz[data-pointer="true"] .planviz__graph {
+  transform: translate3d(var(--field-x, 0), var(--field-y, 0), 0);
+  transition: transform 700ms var(--ease-out);
+}
+
+/* Reduced motion: the assembly still completes (the beats collapse to a
+   single frame), the ambient loops stop, and the pointer offset is ignored. */
+
 .worldviz[data-state="building"] .wv-cell {
   animation: fade-in 480ms var(--ease-out) both;
 }
@@ -571,8 +814,16 @@ body.is-entering main {
   .wv-edge--flow,
   .progress__fill::after,
   .skeleton::after,
-  .ambient__grid {
+  .ambient__grid,
+  .planviz.is-settled .planviz__link,
+  .planviz.is-settled .planviz__marker-pulse {
     animation: none !important;
+  }
+
+  /* The field's pointer offset is decoration; drop it entirely. */
+  .planviz[data-pointer="true"] .planviz__plan,
+  .planviz[data-pointer="true"] .planviz__graph {
+    transform: none !important;
   }
 
   .btn:hover,
@@ -617,6 +868,18 @@ html[data-motion-mode="reduced"] .timeline__desc {
   transition: none !important;
 }
 
+/* The field's ambient loops are infinite, so zeroing their duration would
+   leave them flickering on a 1ms cycle — they are removed by name instead. */
+html[data-motion-mode="reduced"] .planviz.is-settled .planviz__link,
+html[data-motion-mode="reduced"] .planviz.is-settled .planviz__marker-pulse {
+  animation: none !important;
+}
+
+html[data-motion-mode="reduced"] .planviz[data-pointer="true"] .planviz__plan,
+html[data-motion-mode="reduced"] .planviz[data-pointer="true"] .planviz__graph {
+  transform: none !important;
+}
+
 html[data-motion-mode="reduced"] .ambient__grid,
 html[data-motion-mode="reduced"] .ambient__noise {
   animation: none !important;
@@ -637,5 +900,12 @@ html[data-motion-mode="reduced"] .ambient__noise {
   .worldviz__orbit,
   .worldviz__orbit--slow {
     animation-duration: 120s;
+  }
+
+  /* On a phone the field keeps one slow ambient beat and nothing else: two
+     more marquees are battery spent on decoration. */
+  .planviz.is-settled .planviz__link,
+  .planviz.is-settled .planviz__marker-pulse {
+    animation: none;
   }
 }

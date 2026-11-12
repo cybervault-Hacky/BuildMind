@@ -186,6 +186,11 @@
     min-height: 0;
   }
 
+  .planviz {
+    max-width: 440px;
+    margin-inline: auto;
+  }
+
   .worldviz {
     max-width: 340px;
   }
@@ -421,6 +426,37 @@
     border-radius: var(--radius-lg);
   }
 
+  .planviz {
+    max-width: 360px;
+  }
+
+  /* Five columns cannot hold a label and a note on a phone, so the notes drop
+     away and the track stays intact: the sequence is still the whole story. */
+  .concept__step {
+    padding-top: 15px;
+  }
+
+  .concept__label {
+    font-size: 12px;
+    letter-spacing: -0.015em;
+  }
+
+  .concept__note {
+    display: none;
+  }
+
+  .hero__meta {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    font-size: 12px;
+  }
+
+  /* Two readouts fit on one line at 320. The third is the first to go. */
+  .planviz__hud-item:nth-of-type(3),
+  .planviz__hud-rule:nth-of-type(2) {
+    display: none;
+  }
+
   .worldviz {
     max-width: 290px;
   }
@@ -522,7 +558,7 @@
     font-size: 15px;
   }
 
-  .field__error {
+  .planviz__error {
     font-size: 11.5px;
     margin-top: 6px;
     max-width: 46ch;
@@ -877,6 +913,20 @@
   .pipeline__step-num {
     width: 20px;
     height: 20px;
+  }
+
+  .planviz {
+    max-width: 320px;
+  }
+
+  .hero__eyebrow {
+    font-size: 9.5px;
+    letter-spacing: 0.07em;
+    padding-inline: 9px 10px;
+  }
+
+  .concept__step {
+    padding-top: 16px;
   }
 
   .start-card {
