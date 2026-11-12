@@ -21,6 +21,7 @@
     disconnected: "Not connected",
     connecting: "Connecting…",
     connected: "Connected",
+    unavailable: "External integration required",
   };
 
   /* ------------------------------------------------------------------------
@@ -37,6 +38,9 @@
       keyToggle: byId("settings-api-key-toggle"),
       keyState: byId("settings-key-state"),
       keyError: byId("settings-key-error"),
+      providerStatus: byId("settings-provider-status"),
+      validateButton: byId("settings-validate-provider"),
+      validateDetail: byId("settings-validate-detail"),
       robloxButton: byId("settings-connect-roblox"),
       studioButton: byId("settings-connect-studio"),
       robloxStatus: byId("settings-roblox-status"),
@@ -175,6 +179,39 @@
   }
 
   /* ------------------------------------------------------------------------
+     Provider validation
+
+     Five states, and only the backend can produce the fourth one:
+       not_configured | checking | valid | invalid | unavailable
+     ------------------------------------------------------------------------ */
+  const VALIDATION_TEXT = {
+    not_configured: { label: "Not configured", tone: "idle" },
+    checking: { label: "Checking…", tone: "warn" },
+    valid: { label: "Valid", tone: "ready" },
+    invalid: { label: "Invalid", tone: "error" },
+    unavailable: { label: "Unavailable", tone: "error" },
+  };
+
+  function paintProviderValidation(view) {
+    const state = (view && view.providerValidation) || BM.getState().providerValidation;
+    const text = VALIDATION_TEXT[state.status] || VALIDATION_TEXT.not_configured;
+
+    setStatus(els.providerStatus, text.label, text.tone);
+
+    if (els.validateDetail) {
+      const detail = state.detail || "";
+      if (els.validateDetail.textContent !== detail) els.validateDetail.textContent = detail;
+    }
+
+    if (els.validateButton) {
+      const checking = state.status === "checking";
+      els.validateButton.disabled = checking;
+      els.validateButton.setAttribute("aria-busy", String(checking));
+      els.validateButton.textContent = checking ? "Checking…" : "Test connection";
+    }
+  }
+
+  /* ------------------------------------------------------------------------
      Connections
      ------------------------------------------------------------------------ */
   function connectionState(view, target) {
@@ -184,24 +221,40 @@
       status,
       connected: status === "connected",
       busy: status === "connecting",
+      unavailable: status === "unavailable",
       label: STATUS_TEXT[status] || "Not connected",
-      tone: status === "connected" ? "ready" : status === "connecting" ? "warn" : "idle",
+      tone:
+        status === "connected"
+          ? "ready"
+          : status === "connecting"
+          ? "warn"
+          : status === "unavailable"
+          ? "warn"
+          : "idle",
     };
   }
 
   function paintConnection(view, target, button, statusEl) {
     const state = connectionState(view, target);
+    const name = target === "roblox" ? "Roblox account" : "Roblox Studio";
+
     if (button) {
-      const verb = state.connected ? "Disconnect" : state.busy ? "Connecting…" : "Connect";
+      // An integration the server does not have cannot be connected from
+      // here, so the button says so instead of offering a dead action.
+      const verb = state.unavailable
+        ? "Not available"
+        : state.connected
+        ? "Disconnect"
+        : state.busy
+        ? "Connecting…"
+        : "Connect";
       if (button.textContent !== verb) button.textContent = verb;
-      button.disabled = state.busy;
+      button.disabled = state.busy || state.unavailable;
       button.setAttribute("aria-busy", String(state.busy));
       // Disconnecting mid-transition is allowed: it is the escape hatch.
       button.setAttribute(
         "aria-label",
-        state.connected
-          ? `Disconnect ${target === "roblox" ? "Roblox account" : "Roblox Studio"}`
-          : `Connect ${target === "roblox" ? "Roblox account" : "Roblox Studio"}`
+        state.connected ? `Disconnect ${name}` : `Connect ${name}`
       );
     }
     setStatus(statusEl, state.label, state.tone);
@@ -234,13 +287,16 @@
      Render
      ------------------------------------------------------------------------ */
   function render(view, changed) {
-    const keys = changed || ["settings", "connections", "motion"];
+    const keys = changed || ["settings", "connections", "motion", "providerValidation"];
     if (keys.indexOf("settings") !== -1) {
       paintAi(view);
       paintGeneral(view);
     }
     if (keys.indexOf("connections") !== -1) paintConnections(view);
     if (keys.indexOf("motion") !== -1) paintAppearance(view);
+    if (keys.indexOf("providerValidation") !== -1 || keys.length === 0) {
+      paintProviderValidation(view);
+    }
   }
 
   /* ------------------------------------------------------------------------
@@ -353,6 +409,45 @@
       BM.bindKeyReveal(els.keyInput, els.keyToggle);
     }
 
+    // Real validation: the backend checks the key against the provider.
+    els.validateButton?.addEventListener("click", () => {
+      const key = els.keyInput ? String(els.keyInput.value || "").trim() : "";
+      BM.settingsController
+        .verifyProvider({ apiKey: key })
+        .then((result) => {
+          const state = BM.getState().providerValidation;
+          if (state.status === "valid" && key && els.keyInput) {
+            // The backend now holds the sealed credential for this session; drop
+            // the plaintext value from the input element.
+            els.keyInput.value = "";
+            els.keyInput.type = "password";
+            els.keyToggle?.setAttribute("aria-pressed", "false");
+            els.keyToggle?.setAttribute("aria-label", "Show API key");
+            els.keyToggle?.querySelectorAll(".icon-eye").forEach((node) => node.removeAttribute("hidden"));
+            els.keyToggle?.querySelector(".icon-eye-off")?.classList.add("is-off");
+            BM.setApiKeyPresent(true);
+          }
+          render(BM.getState(), ["settings", "providerValidation"]);
+          if (!BM.isOk(result)) {
+            toast(result.error.message, "error");
+            announce("The provider could not be checked.");
+            return;
+          }
+          if (state.status === "valid") {
+            announce("The provider accepted the key.");
+            toast("Provider key accepted.");
+            return;
+          }
+          if (state.status === "unavailable") {
+            announce("The provider is not reachable.");
+            toast("The provider is not reachable right now.");
+            return;
+          }
+          announce("The provider did not accept the key.");
+          toast("The provider did not accept that key.");
+        });
+    });
+
     const toggle = (target, button) => {
       if (!button) return;
       button.addEventListener("click", () => {
@@ -370,8 +465,18 @@
           const state = connectionState(BM.getState(), target);
           const name = target === "roblox" ? "Roblox account" : "Roblox Studio";
           if (outcome.data && outcome.data.superseded) return;
+          if (outcome.data && outcome.data.authorizeUrl) {
+            // A real OAuth hand-off: leave for the provider.
+            window.location.assign(outcome.data.authorizeUrl);
+            return;
+          }
+          if (state.unavailable) {
+            announce(`${name} is not available on this server.`);
+            toast(outcome.error ? outcome.error.message : `${name} is not available.`);
+            return;
+          }
           announce(state.connected ? `${name} connected.` : `${name} disconnected.`);
-          toast(state.connected ? `${name} connected (simulated).` : `${name} disconnected.`);
+          toast(state.connected ? `${name} connected.` : `${name} disconnected.`);
         });
       });
     };
@@ -462,18 +567,21 @@
 
     BM.subscribe((view, changed) => render(view, changed));
 
-    BM.settingsController.load().then((result) => {
-      if (!BM.isOk(result)) {
-        toast(result.error.message, "error");
-        return;
-      }
-      render(BM.getState(), ["settings", "connections", "motion"]);
+    const remote = BM.serviceMode === BM.SERVICE_MODES.REMOTE;
+    if (!remote || BM.getState().auth.status !== "loading") {
+      BM.settingsController.load().then((result) => {
+        if (!BM.isOk(result)) {
+          toast(result.error.message, "error");
+          return;
+        }
+        render(BM.getState(), ["settings", "connections", "motion", "providerValidation"]);
+        applyHash();
+      });
+      BM.connectionController.restore();
+    } else {
       applyHash();
-    });
-
-    // Restore simulated connections from their stored flags on load.
-    BM.connectionController.restore();
-    render(BM.getState(), ["connections"]);
+    }
+    render(BM.getState(), ["settings", "connections", "motion", "providerValidation"]);
   }
 
   if (document.readyState === "loading") {

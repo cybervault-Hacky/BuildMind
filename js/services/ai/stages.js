@@ -23,6 +23,7 @@
   const BUILD_STAGES = [
     {
       id: "understand",
+      remoteId: "understanding",
       label: "Understanding",
       description: "Analyzing the game idea",
       status: "building",
@@ -36,6 +37,7 @@
     },
     {
       id: "plan",
+      remoteId: "planning",
       label: "Planning",
       description: "Structuring gameplay and systems",
       status: "building",
@@ -45,6 +47,7 @@
     },
     {
       id: "build",
+      remoteId: "building",
       label: "Building",
       description: "Creating the required game systems",
       status: "building",
@@ -54,6 +57,7 @@
     },
     {
       id: "test",
+      remoteId: "testing",
       label: "Testing",
       description: "Checking the generated result",
       status: "testing",
@@ -63,6 +67,7 @@
     },
     {
       id: "fix",
+      remoteId: "fixing",
       label: "Fixing",
       description: "Resolving detected issues",
       status: "fixing",
@@ -72,6 +77,7 @@
     },
     {
       id: "validate",
+      remoteId: "validating",
       label: "Validating",
       description: "Performing final checks",
       status: "validating",
@@ -81,6 +87,7 @@
     },
     {
       id: "complete",
+      remoteId: "complete",
       label: "Complete",
       description: "Build finished successfully",
       status: "complete",
@@ -96,6 +103,18 @@
     return map;
   }, {});
 
+  /**
+   * The backend's stage ids mapped onto this list.
+   *
+   * The two vocabularies describe the same seven stages but name them
+   * differently ("understand" here, "understanding" there). The mapping lives
+   * beside the stages so there is one list to keep in step — not two.
+   */
+  const STAGE_BY_REMOTE_ID = BUILD_STAGES.reduce((map, stage, index) => {
+    if (stage.remoteId) map[stage.remoteId] = index;
+    return map;
+  }, {});
+
   const LAST_STAGE = BUILD_STAGES.length - 1;
 
   function stageAt(index) {
@@ -107,5 +126,12 @@
     return index === undefined ? null : BUILD_STAGES[index];
   }
 
-  Object.assign(BM, { BUILD_STAGES, LAST_STAGE, STAGE_INDEX, stageAt, stageById });
+  Object.assign(BM, {
+    BUILD_STAGES,
+    LAST_STAGE,
+    STAGE_INDEX,
+    STAGE_BY_REMOTE_ID,
+    stageAt,
+    stageById,
+  });
 })();

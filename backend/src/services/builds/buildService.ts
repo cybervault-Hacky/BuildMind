@@ -73,6 +73,8 @@ export interface PublicBuildEvent {
 export class BuildService {
   private readonly builds: BuildRepository;
   private readonly projects: ProjectRepository;
+  /** Per-user create queue so concurrent submissions never race the active cap. */
+  private readonly createLocks = new Map<string, Promise<void>>();
 
   constructor(
     private readonly db: Queryable,
@@ -83,8 +85,36 @@ export class BuildService {
     this.projects = new ProjectRepository(db);
   }
 
+  private async withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.createLocks.get(userId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => current);
+    this.createLocks.set(userId, tail);
+
+    await previous;
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (this.createLocks.get(userId) === tail) {
+        this.createLocks.delete(userId);
+      }
+    }
+  }
+
   /** Create a build and start it in the background. Returns immediately. */
   async create(
+    userId: string,
+    input: { projectId: string; prompt?: string; provider: string; model: string; apiKey?: string },
+    options: { retryOf?: string } = {},
+  ): Promise<PublicBuild> {
+    return this.withUserLock(userId, () => this.createUnlocked(userId, input, options));
+  }
+
+  private async createUnlocked(
     userId: string,
     input: { projectId: string; prompt?: string; provider: string; model: string; apiKey?: string },
     options: { retryOf?: string } = {},
@@ -129,13 +159,21 @@ export class BuildService {
     // still works without the client resending it.
     if (input.apiKey) await this.credentials.store(userId, input.provider, input.apiKey);
 
-    const build = await this.builds.create({
-      projectId: input.projectId,
-      userId,
-      provider: input.provider,
-      model: input.model,
-      ...(options.retryOf ? { retryOf: options.retryOf } : {}),
-    });
+    let build: Build;
+    try {
+      build = await this.builds.create({
+        projectId: input.projectId,
+        userId,
+        provider: input.provider,
+        model: input.model,
+        ...(options.retryOf ? { retryOf: options.retryOf } : {}),
+      });
+    } catch (err) {
+      if ((err as { code?: string } | null)?.code === '23505') {
+        throw new AppError('BUILD_CONFLICT', { fields: { build: 'This project already has a build running.' } });
+      }
+      throw err;
+    }
 
     await this.projects.update(input.projectId, userId, {
       prompt,

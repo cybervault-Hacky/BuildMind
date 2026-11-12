@@ -3385,3 +3385,38 @@ body.is-sheet-open {
 .page > main {
   flex: 1 0 auto;
 }
+
+/* ==========================================================================
+   Authentication gating
+
+   The page shows exactly one authentication state. The document element
+   carries `data-auth-state` (loading | authenticated | unauthenticated |
+   error) and `data-service-mode` (remote | simulated); the CSS decides what
+   is visible from those two attributes alone.
+
+   The rules, in one place:
+     * while the session is being checked, nothing signed-in is painted — the
+       page never flashes a layout it then has to take away
+     * when there is no session, the gate is shown and the signed-in regions
+       are hidden
+     * in the simulated demo mode there is no account and no server, so the
+       gate stays out of the way entirely
+   ========================================================================== */
+
+[data-auth-gate] {
+  display: none;
+}
+
+html[data-service-mode="remote"][data-auth-state="unauthenticated"] [data-auth-gate],
+html[data-service-mode="remote"][data-auth-state="error"] [data-auth-gate] {
+  display: grid;
+}
+
+html[data-service-mode="remote"][data-auth-state="loading"] [data-auth-only] {
+  visibility: hidden;
+}
+
+html[data-service-mode="remote"][data-auth-state="unauthenticated"] [data-auth-only],
+html[data-service-mode="remote"][data-auth-state="error"] [data-auth-only] {
+  display: none;
+}

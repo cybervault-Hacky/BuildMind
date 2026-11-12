@@ -81,6 +81,10 @@
   function cache() {
     el.grid = $("#projects-grid");
     el.empty = $("#projects-empty");
+    el.loading = $("#projects-loading");
+    el.error = $("#projects-error");
+    el.errorNote = $("#projects-error-note");
+    el.retry = $("#projects-retry");
     el.noMatch = $("#projects-no-match");
     el.noResults = $("#projects-no-results");
     el.noResultsTitle = $("#projects-no-results-title");
@@ -293,6 +297,30 @@
     const view = getState();
     if (!el.grid) return;
 
+    // The list's lifecycle comes first: a loading list is not an empty list,
+    // and a failed list is not an empty list either.
+    const status = view.projectsStatus || "idle";
+    const loading = status === "loading";
+    const failed = status === "error";
+
+    setHidden(el.loading, !loading);
+    setHidden(el.error, !failed);
+    if (el.errorNote && failed && view.projectsError) {
+      if (el.errorNote.textContent !== view.projectsError) {
+        el.errorNote.textContent = view.projectsError;
+      }
+    }
+
+    if (loading || failed) {
+      el.grid.hidden = true;
+      if (el.toolbar) el.toolbar.hidden = true;
+      if (el.empty) el.empty.hidden = true;
+      if (el.noMatch) el.noMatch.hidden = true;
+      if (el.noResults) el.noResults.hidden = true;
+      if (el.count) el.count.textContent = "";
+      return;
+    }
+
     const filters = controller().filters();
     const activeFilter = filters.some((f) => f.id === view.projectsFilter) ? view.projectsFilter : "all";
     const query = view.projectsQuery || "";
@@ -407,6 +435,11 @@
     window.setTimeout(() => {
       el.live.textContent = message;
     }, 30);
+  }
+
+  /** Same idea as `hidden`: a redundant write still invalidates style. */
+  function setHidden(node, hidden) {
+    if (node && node.hidden !== hidden) node.hidden = hidden;
   }
 
   /* ------------------------------------------------------------------------
@@ -562,6 +595,20 @@
       announce("Search cleared");
     });
 
+    // The list failed to load: offer the one action that can fix it.
+    el.retry?.addEventListener("click", () => {
+      el.retry.disabled = true;
+      controller().load().then(() => {
+        el.retry.disabled = false;
+        const state = getState();
+        if (state.projectsStatus === "error") {
+          announce("Projects could not be loaded.");
+          return;
+        }
+        announce("Projects loaded.");
+      });
+    });
+
     // Escape closes the dialog without deleting. Both the native and the
     // fallback path fire `cancel`/`keydown`, so one handler covers each.
     el.dialog?.addEventListener("cancel", (event) => {
@@ -640,6 +687,14 @@
   // listeners and interval below — measured before this guard: a repeated
   // init on build.html took the live listener count from 36 to 69.
   let booted = false;
+  let deepLinkHighlighted = false;
+
+  function maybeHighlightDeepLink() {
+    if (deepLinkHighlighted) return;
+    if (!getState().projects.length) return;
+    deepLinkHighlighted = true;
+    highlightDeepLink();
+  }
 
   function init() {
     if (booted) return;
@@ -648,24 +703,33 @@
     cache();
     bindEvents();
 
-    // The list is normally loaded by boot(); reload when this page arrives
-    // before that (or after a full navigation) so the view is never empty by
-    // accident.
-    if (!getState().projects.length) {
-      controller().load().then(() => highlightDeepLink());
-    } else {
-      highlightDeepLink();
+    // In remote mode, app.js loads the project list once the session check
+    // confirms an authenticated user. Reload here only in simulated mode or
+    // when already authenticated with an idle list.
+    const remote = BM.serviceMode === BM.SERVICE_MODES.REMOTE;
+    if (!remote) {
+      if (!getState().projects.length) {
+        controller().load().then(() => maybeHighlightDeepLink());
+      } else {
+        maybeHighlightDeepLink();
+      }
+    } else if (BM.isAuthenticated() && getState().projectsStatus === "idle") {
+      controller().load().then(() => maybeHighlightDeepLink());
+    } else if (getState().projectsStatus === "ready") {
+      maybeHighlightDeepLink();
     }
 
     subscribe((view, changed) => {
       if (
         !changed.length ||
         changed.includes("projects") ||
+        changed.includes("projectsStatus") ||
         changed.includes("projectsFilter") ||
         changed.includes("projectsQuery") ||
         changed.includes("activeProjectId")
       ) {
         render();
+        if (view.projectsStatus === "ready") maybeHighlightDeepLink();
       }
     });
 

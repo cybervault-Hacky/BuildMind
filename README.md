@@ -22,12 +22,13 @@ on its own:
 
 | Mode | Selected by | What happens |
 | --- | --- | --- |
-| `simulated` | nothing (the default) | Every service is the original frontend simulation. No network calls are made. |
-| `remote` | `?mode=remote`, `window.BM_CONFIG.mode`, or `__BUILDMIND_MODE__` | Every service talks to the API. A failure is a failure — it never falls back to the simulation. |
+| `remote` | default (or `?mode=remote`, `window.BM_CONFIG.mode = "remote"`) | Every service talks to the BuildMind API (`/api/v1`). A failure is reported as a failure — it never falls back to simulation. |
+| `simulated` | explicit opt-in (`?mode=simulated`, `window.BM_CONFIG.mode = "simulated"`, or `window.__BUILDMIND_MODE__ = "simulated"`) | Labelled offline demo mode. No network calls are made. |
 
-Opening the static pages without configuration therefore gives you the same
-self-contained demo as before, with no hidden requests. Pointing them at the
-backend gives you the real product. Nothing in between.
+Opening the static pages in production talks to the real BuildMind backend by
+default, gating workspace views on the server session and reporting outages
+honestly. Explicit `?mode=simulated` preserves the offline demo boundary
+without ever being entered as a fallback.
 
 ## Status: what is real, what is not
 

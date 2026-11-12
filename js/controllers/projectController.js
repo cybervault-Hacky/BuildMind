@@ -17,6 +17,8 @@
      • Terminal outcomes — a stopped or failed run is recorded as an event on
        the project it belonged to, and never as a build.
      • Filter and search state, both derived on read.
+     • The list's request lifecycle, so the page can show a loading state and
+       an honest error instead of an empty list that means nothing.
    ========================================================================== */
 
 (function () {
@@ -39,20 +41,28 @@
      Reads
      ------------------------------------------------------------------------ */
   /** Load the list into state. Safe to call on every page. */
-  function load() {
-    return service().listProjects().then((result) => {
-      if (!BM.isOk(result)) return result;
-      BM.setProjects(result.data.projects);
-      return result;
-    });
+  function load(options) {
+    BM.setProjectsStatus("loading", null);
+
+    return service()
+      .listProjects({}, options)
+      .then((result) => {
+        if (!BM.isOk(result)) {
+          BM.setProjectsStatus("error", result.error ? result.error.message : "Projects could not be loaded.");
+          return result;
+        }
+        BM.setProjects(result.data.projects);
+        BM.setProjectsStatus("ready", null);
+        return result;
+      });
   }
 
-  function refresh() {
-    return load();
+  function refresh(options) {
+    return load(options);
   }
 
-  function get(id) {
-    return service().getProject(id);
+  function get(id, options) {
+    return service().getProject(id, options);
   }
 
   /** All projects, newest build first (the store keeps them sorted). */
@@ -86,28 +96,34 @@
   /* ------------------------------------------------------------------------
      Writes
      ------------------------------------------------------------------------ */
-  function create(data) {
-    return service().createProject(data).then((result) => {
-      if (!BM.isOk(result)) return result;
-      BM.insertProject(result.data.project);
-      return result;
-    });
+  function create(data, options) {
+    return service()
+      .createProject(data, options)
+      .then((result) => {
+        if (!BM.isOk(result)) return result;
+        BM.insertProject(result.data.project);
+        return result;
+      });
   }
 
-  function update(id, patch) {
-    return service().updateProject(id, patch).then((result) => {
-      if (!BM.isOk(result)) return result;
-      BM.replaceProject(result.data.project);
-      return result;
-    });
+  function update(id, patch, options) {
+    return service()
+      .updateProject(id, patch, options)
+      .then((result) => {
+        if (!BM.isOk(result)) return result;
+        BM.replaceProject(result.data.project);
+        return result;
+      });
   }
 
-  function remove(id) {
-    return service().deleteProject(id).then((result) => {
-      if (!BM.isOk(result)) return result;
-      BM.removeProject(id);
-      return result;
-    });
+  function remove(id, options) {
+    return service()
+      .deleteProject(id, options)
+      .then((result) => {
+        if (!BM.isOk(result)) return result;
+        BM.removeProject(id);
+        return result;
+      });
   }
 
   /**
@@ -116,18 +132,20 @@
    * restores a key — the composer only ever sees the prompt and the settings
    * the user already chose.
    */
-  function open(id) {
+  function open(id, options) {
     if (!id) {
       return Promise.resolve(BM.serviceFail(ERROR_TYPES.VALIDATION, "That project could not be found."));
     }
 
-    return service().getProject(id).then((result) => {
-      if (!BM.isOk(result)) return result;
-      const project = result.data.project;
-      BM.insertProject(project);
-      BM.setActiveProject(project.id);
-      return BM.serviceOk({ project: { ...project } });
-    });
+    return service()
+      .getProject(id, options)
+      .then((result) => {
+        if (!BM.isOk(result)) return result;
+        const project = result.data.project;
+        BM.insertProject(project);
+        BM.setActiveProject(project.id);
+        return BM.serviceOk({ project: { ...project } });
+      });
   }
 
   /** Clear the active project (Build is no longer working on a project). */
@@ -137,7 +155,7 @@
   }
 
   /**
-   * Record a finished simulated build.
+   * Record a finished build.
    *
    * `input` is either the prompt string (older callers) or
    * `{ prompt, runId, projectId, name }`. Identity, in order:
@@ -146,36 +164,40 @@
    *   3. the derived name, for a first build with nothing open
    * and duplicate protection on `runId` lives in the service.
    */
-  function recordBuild(input) {
+  function recordBuild(input, options) {
     const request = typeof input === "string" ? { prompt: input } : (input || {});
     const payload = {
       ...request,
       projectId: request.projectId || BM.getState().activeProjectId || "",
     };
 
-    return service().recordBuild(payload).then((result) => {
-      if (!BM.isOk(result)) return result;
-      BM.replaceProject(result.data.project);
-      // The build that produced this project is now the active one, so the
-      // next "Build again" keeps updating the same record.
-      BM.setActiveProject(result.data.project.id);
-      return result;
-    });
+    return service()
+      .recordBuild(payload, options)
+      .then((result) => {
+        if (!BM.isOk(result)) return result;
+        BM.replaceProject(result.data.project);
+        // The build that produced this project is now the active one, so the
+        // next "Build again" keeps updating the same record.
+        BM.setActiveProject(result.data.project.id);
+        return result;
+      });
   }
 
   /**
    * A run ended without a build. Only the project it belonged to is touched,
    * and only its event history and status — never its last-build time.
    */
-  function markRun(outcome, runId) {
+  function markRun(outcome, runId, options) {
     const id = BM.getState().activeProjectId;
     if (!id) return Promise.resolve(BM.serviceOk(null));
 
-    return service().markRun(id, outcome, runId).then((result) => {
-      if (!BM.isOk(result)) return result;
-      BM.replaceProject(result.data.project);
-      return result;
-    });
+    return service()
+      .markRun(id, outcome, runId, options)
+      .then((result) => {
+        if (!BM.isOk(result)) return result;
+        BM.replaceProject(result.data.project);
+        return result;
+      });
   }
 
   /* ------------------------------------------------------------------------
@@ -197,7 +219,7 @@
   }
 
   BM.projectController = {
-    mode: "local",
+    mode: "remote",
     load,
     refresh,
     get,

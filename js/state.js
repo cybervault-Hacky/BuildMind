@@ -121,6 +121,56 @@
      ------------------------------------------------------------------------ */
   const state = {
     page: document.body ? document.body.dataset.page || "" : "",
+    /**
+     * The authoritative authentication state.
+     *
+     * `status` is one of:
+     *   loading        the session check is in flight — the page must not
+     *                  claim to be signed in or signed out yet
+     *   authenticated  the backend confirmed a session
+     *   unauthenticated the backend answered "no session"
+     *   error          the session check itself failed (the service is down)
+     *
+     * `user` is the public record the server returned, or null. There is no
+     * second copy of this anywhere: every page reads it from here.
+     */
+    auth: {
+      status: "loading",
+      user: null,
+      error: null,
+      expiresAt: null,
+      checkedAt: 0,
+    },
+    /**
+     * The state of the backend itself, derived from request lifecycles.
+     * `pending` counts requests in flight; `status` is the summary the UI
+     * shows ("Loading projects…", "The service is unavailable").
+     */
+    server: {
+      status: "idle",
+      pending: 0,
+      lastError: null,
+    },
+    /**
+     * The result of the last real provider validation.
+     *
+     * `status` is one of:
+     *   not_configured  no key has been supplied or stored
+     *   checking        a validation request is in flight
+     *   valid           the backend confirmed the credential works
+     *   invalid         the backend rejected the credential
+     *   unavailable     the provider could not be reached
+     *
+     * Only the backend can move this to `valid`: a non-empty field never
+     * counts as a working key.
+     */
+    providerValidation: {
+      status: "not_configured",
+      detail: "",
+      provider: "",
+      model: "",
+      checkedAt: 0,
+    },
     settings: {
       provider: "",
       model: "",
@@ -155,6 +205,12 @@
       needsFix: false,
     },
     projects: [],
+    /** 'idle' | 'loading' | 'ready' | 'error' — the request lifecycle of the
+        project list, so the page can say "Loading projects…" instead of
+        showing an empty list that means nothing. */
+    projectsStatus: "idle",
+    /** The safe message of the last project-list failure, if any. */
+    projectsError: null,
     projectsFilter: "all",
     projectsQuery: "",
     /** The project the Build composer is working on, if any. */
@@ -167,6 +223,9 @@
   function snapshot() {
     return {
       ...state,
+      auth: { ...state.auth },
+      server: { ...state.server },
+      providerValidation: { ...state.providerValidation },
       settings: { ...state.settings },
       connections: {
         roblox: { ...state.connections.roblox },
@@ -249,6 +308,115 @@
   }
 
   /* ------------------------------------------------------------------------
+     Authentication — one authoritative slice.
+
+     `status` is the only thing a page branches on. A page never asks "is the
+     user signed in?" by looking at a cookie, at storage, or at a local
+     variable: it asks the store, and the store is written by the auth
+     controller from the backend's answer.
+     ------------------------------------------------------------------------ */
+  const AUTH_STATUS = {
+    LOADING: "loading",
+    AUTHENTICATED: "authenticated",
+    UNAUTHENTICATED: "unauthenticated",
+    ERROR: "error",
+  };
+
+  function setAuth(patch) {
+    const input = patch || {};
+    const next = {
+      status: input.status || state.auth.status,
+      user: input.user === undefined ? state.auth.user : input.user,
+      error: input.error === undefined ? state.auth.error : input.error,
+      expiresAt: input.expiresAt === undefined ? state.auth.expiresAt : input.expiresAt,
+      checkedAt: input.checkedAt === undefined ? state.auth.checkedAt : input.checkedAt,
+    };
+
+    const unchanged =
+      next.status === state.auth.status &&
+      next.user === state.auth.user &&
+      next.error === state.auth.error &&
+      next.expiresAt === state.auth.expiresAt &&
+      next.checkedAt === state.auth.checkedAt;
+    if (unchanged) return false;
+
+    state.auth = next;
+    notify(["auth"]);
+    return true;
+  }
+
+  /** Convenience for the common "the session is gone" path. */
+  function clearAuth() {
+    return setAuth({
+      status: AUTH_STATUS.UNAUTHENTICATED,
+      user: null,
+      error: null,
+      expiresAt: null,
+      checkedAt: Date.now(),
+    });
+  }
+
+  function isAuthenticated() {
+    return state.auth.status === AUTH_STATUS.AUTHENTICATED;
+  }
+
+  /* ------------------------------------------------------------------------
+     Server state — derived from the API client's request lifecycle.
+     ------------------------------------------------------------------------ */
+  function setServerState(patch) {
+    const input = patch || {};
+    const next = {
+      status: input.status || state.server.status,
+      pending: typeof input.pending === "number" ? input.pending : state.server.pending,
+      lastError: input.lastError === undefined ? state.server.lastError : input.lastError,
+    };
+
+    const unchanged =
+      next.status === state.server.status &&
+      next.pending === state.server.pending &&
+      next.lastError === state.server.lastError;
+    if (unchanged) return false;
+
+    state.server = next;
+    notify(["server"]);
+    return true;
+  }
+
+  /* ------------------------------------------------------------------------
+     Provider validation — the backend's answer, never a guess.
+     ------------------------------------------------------------------------ */
+  const PROVIDER_VALIDATION = {
+    NOT_CONFIGURED: "not_configured",
+    CHECKING: "checking",
+    VALID: "valid",
+    INVALID: "invalid",
+    UNAVAILABLE: "unavailable",
+  };
+
+  function setProviderValidation(patch) {
+    const input = patch || {};
+    const next = {
+      status: input.status || state.providerValidation.status,
+      detail: input.detail === undefined ? state.providerValidation.detail : input.detail,
+      provider: input.provider === undefined ? state.providerValidation.provider : input.provider,
+      model: input.model === undefined ? state.providerValidation.model : input.model,
+      checkedAt: input.checkedAt === undefined ? state.providerValidation.checkedAt : input.checkedAt,
+    };
+
+    const unchanged =
+      next.status === state.providerValidation.status &&
+      next.detail === state.providerValidation.detail &&
+      next.provider === state.providerValidation.provider &&
+      next.model === state.providerValidation.model &&
+      next.checkedAt === state.providerValidation.checkedAt;
+    if (unchanged) return false;
+
+    state.providerValidation = next;
+    notify(["providerValidation"]);
+    return true;
+  }
+
+  /* ------------------------------------------------------------------------
      Connections — status only. The simulation lives in the services; this is
      the store side of it.
      ------------------------------------------------------------------------ */
@@ -295,6 +463,21 @@
       state.activeProjectId = "";
     }
     notify(["projects"]);
+  }
+
+  /**
+   * The lifecycle of the project list.
+   *
+   * `error` carries only a safe message: the API client already normalised
+   * it, so a stack trace or a server message can never reach the DOM.
+   */
+  function setProjectsStatus(status, error) {
+    const next = status || "idle";
+    const nextError = error === undefined ? state.projectsError : error;
+    if (next === state.projectsStatus && nextError === state.projectsError) return false;
+    state.projectsStatus = next;
+    state.projectsError = nextError;
+    notify(["projectsStatus"]);
   }
 
   function insertProject(project) {
@@ -711,16 +894,26 @@
     window.addEventListener("storage", (event) => {
       if (!event.key) return;
 
+      const remote = BM.serviceMode === BM.SERVICE_MODES.REMOTE;
+
       if (event.key === BM.STORAGE_KEYS.settings || event.key === BM.STORAGE_KEYS.preferences) {
         BM.settingsController.load();
       } else if (event.key === BM.STORAGE_KEYS.connections) {
+        // In remote mode the connection state belongs to the backend, so the
+        // local flag is not the truth: the backend is asked instead.
+        if (remote) {
+          BM.connectionController?.restore?.();
+          return;
+        }
         BM.settingsService.loadSettings().then((result) => {
           if (!BM.isOk(result)) return;
           const { connections } = result.data;
           setConnectionStatus("roblox", connections.roblox ? "connected" : "disconnected");
           setConnectionStatus("studio", connections.studio ? "connected" : "disconnected");
         });
-      } else if (event.key === BM.STORAGE_KEYS.projects) {
+      } else if (event.key === BM.STORAGE_KEYS.projects && !remote) {
+        // Projects live on the server in remote mode; a local storage event
+        // says nothing about them.
         BM.projectController.load();
       }
     });
@@ -737,6 +930,8 @@
     STATUS_LABEL,
     STATUS_TONE,
     TRANSITIONS,
+    AUTH_STATUS,
+    PROVIDER_VALIDATION,
 
     // state
     getState: snapshot,
@@ -744,6 +939,11 @@
     loadState,
     initSync,
     setServiceMode,
+    setAuth,
+    clearAuth,
+    isAuthenticated,
+    setServerState,
+    setProviderValidation,
 
     // apply (controllers only)
     applySettings,
@@ -753,6 +953,7 @@
     setConnectionStatus,
     isConnected,
     setProjects,
+    setProjectsStatus,
     insertProject,
     replaceProject,
     removeProject,

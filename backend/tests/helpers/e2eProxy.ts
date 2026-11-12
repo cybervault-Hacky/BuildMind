@@ -108,3 +108,11 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`E2E proxy on http://127.0.0.1:${PORT} → ${API}`);
 });
+
+const shutdown = (): void => {
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 500).unref();
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

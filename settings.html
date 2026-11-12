@@ -80,7 +80,7 @@
               <div class="settings-section__titles">
                 <h2 class="settings-section__title" id="ai-title" tabindex="-1">AI configuration</h2>
                 <p class="settings-section__note" id="ai-note">
-                  Simulated — no provider is contacted.
+                  Your key is checked against the provider when you test it.
                 </p>
               </div>
               <!-- Configuration status: derived from state, never colour-only. -->
@@ -140,6 +140,25 @@
                 <p class="field__error" id="settings-key-error" hidden></p>
               </span>
             </div>
+
+            <!-- Real validation. Only the backend can move this to "Valid". -->
+            <div class="setting-row setting-row--stacked">
+              <span class="setting-row__copy">
+                <span class="setting-row__title" id="settings-validate-title">Test the connection</span>
+                <span class="setting-row__note" id="settings-validate-note">
+                  Sends one request to the provider to check the key really works.
+                </span>
+              </span>
+              <span class="setting-row__control setting-row__control--stack">
+                <span class="status status--idle" id="settings-provider-status">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Not configured</span>
+                </span>
+                <button class="btn btn--ghost btn--sm" type="button" id="settings-validate-provider"
+                        aria-describedby="settings-validate-note">Test connection</button>
+                <p class="setting-row__state" id="settings-validate-detail"></p>
+              </span>
+            </div>
           </section>
 
           <!-- ================= Connections ================= -->
@@ -148,7 +167,8 @@
               <div class="settings-section__titles">
                 <h2 class="settings-section__title" id="roblox-title" tabindex="-1">Connections</h2>
                 <p class="settings-section__note">
-                  Simulated for this session — no account is signed in and no bridge is opened.
+                  The BuildMind server holds these connections. Roblox needs an account; Studio
+                  is connected from the plugin inside Roblox Studio.
                 </p>
               </div>
             </div>
@@ -265,6 +285,18 @@
                 </p>
               </div>
               <span class="status-pill" id="account-mode" data-mode="local">Local only</span>
+            </div>
+
+            <!-- Session check in flight. Nothing is claimed until it answers. -->
+            <div id="account-pending" hidden>
+              <div class="setting-row">
+                <span class="setting-row__copy">
+                  <span class="setting-row__title">Checking your session…</span>
+                  <span class="setting-row__note">
+                    Asking the BuildMind server whether you are signed in.
+                  </span>
+                </span>
+              </div>
             </div>
 
             <!-- Signed out -->
@@ -418,10 +450,16 @@
   <script src="js/services/projects/projectModel.js"></script>
   <script src="js/services/projects/localProjectService.js"></script>
   <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/services/api/errors.js"></script>
   <script src="js/services/api/apiClient.js"></script>
+  <script src="js/services/api/sseClient.js"></script>
+  <script src="js/services/auth/authService.js"></script>
   <script src="js/services/projects/remoteProjectService.js"></script>
   <script src="js/services/ai/remoteAIService.js"></script>
+  <script src="js/services/connections/remoteRobloxService.js"></script>
+  <script src="js/services/connections/remoteStudioService.js"></script>
   <script src="js/services/mode.js"></script>
+  <script src="js/controllers/authController.js"></script>
   <script src="js/controllers/buildController.js"></script>
   <script src="js/controllers/connectionController.js"></script>
   <script src="js/controllers/projectController.js"></script>

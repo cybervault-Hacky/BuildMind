@@ -656,33 +656,88 @@
   }
 
   /* ------------------------------------------------------------------------
+     Authentication gate
+
+     A page that needs a session shows one of two messages: "sign in" when
+     the session check answered "not signed in", and "the service is
+     unavailable" when the check itself failed. The copy lives in the markup
+     (data-gate-*), so each page says what is true for it.
+     ------------------------------------------------------------------------ */
+  function paintAuthGate() {
+    const gate = $("[data-auth-gate]");
+    if (!gate) return;
+
+    const status = BM.getState().auth.status;
+    const error = status === "error";
+
+    const title = $(".empty__title", gate);
+    const note = $(".empty__note", gate);
+
+    const titleText = error ? gate.dataset.gateErrorTitle : gate.dataset.gateTitle;
+    const noteText = error ? gate.dataset.gateErrorNote : gate.dataset.gateNote;
+
+    if (title && titleText && title.textContent !== titleText) title.textContent = titleText;
+    if (note && noteText && note.textContent !== noteText) note.textContent = noteText;
+
+    // The sign-in call to action only makes sense when there is a session to
+    // have; an unreachable service is not fixed by signing in.
+    const action = $(".empty__action", gate);
+    if (action) action.hidden = error;
+  }
+
+  /* ------------------------------------------------------------------------
      Boot
      ------------------------------------------------------------------------ */
   /**
    * Initialise every service boundary once, then load state through the
    * controllers. Order matters: state must exist before controllers load,
-   * and services must be initialised before a controller talks to them.
+   * services must be initialised before a controller talks to them, and the
+   * session must be known before anything that depends on a session is
+   * requested.
    */
   function initServices() {
     BM.getState(); // touches state before any service does
 
     // Pick the implementation explicitly before anything asks for one. The
-    // simulation is the default because the static frontend must work with no
-    // backend; `BM_CONFIG.mode = "remote"` (or an API base) opts into the real
-    // one, and the choice is never made silently at request time.
+    // remote backend is the default; the simulated mode is an explicit,
+    // labelled deployment choice and is never entered as a fallback.
     if (typeof BM.installServices === "function") {
       BM.installServices(BM.requestedServiceMode());
     }
 
-    const ai = BM.aiService;
-    ai?.initialize().then((result) => {
-      const mode = BM.isOk(result) && result.data ? result.data.mode : "unknown";
-      BM.setServiceMode(mode, BM.isOk(result));
-    });
+    // The session check comes first: the projects, the provider catalogue and
+    // the account all depend on who is signed in.
+    BM.authController?.init();
 
-    // Project and settings controllers own the persisted slices.
-    BM.settingsController?.load();
-    BM.projectController?.load();
+    const boot = BM.authController
+      ? BM.authController.bootstrap()
+      : Promise.resolve(BM.serviceOk(null));
+
+    return boot.then((session) => {
+      paintAuthGate();
+
+      if (!BM.isOk(session)) {
+        // The service could not be reached. That is an error state, and the
+        // page says so. It is never downgraded to a simulation.
+        BM.setServiceMode(BM.serviceMode || "remote", false);
+        return session;
+      }
+
+      const ai = BM.aiService;
+      const ready = (ai ? ai.initialize() : Promise.resolve(BM.serviceOk(null))).then((result) => {
+        const mode = BM.isOk(result) && result.data ? result.data.mode : "unknown";
+        BM.setServiceMode(mode, BM.isOk(result));
+        BM.settingsController?.load({ skipProviders: BM.isOk(result) && result.data && result.data.ready });
+        return result;
+      });
+
+      if (BM.isAuthenticated()) {
+        BM.connectionController?.restore?.();
+        BM.projectController?.load();
+      }
+
+      return ready;
+    });
   }
 
   // The shell boots once per document. Guards against a re-dispatched
@@ -706,8 +761,20 @@
 
     // Load the shared state once for every page; page scripts only render it.
     BM.loadState?.();
+    BM.subscribe?.((view, changed) => {
+      if (!changed.length || changed.includes("auth")) paintAuthGate();
+    });
     BM.initServices();
     BM.initSync?.();
+
+    // A page that is torn down mid-build must not leave a live stream behind.
+    window.addEventListener(
+      "pagehide",
+      () => {
+        BM.sse?.closeAll?.("pagehide");
+      },
+      { once: true }
+    );
 
     // Fill in shared brand marks and mark the active nav item defensively.
     $$("[data-brand-mark]").forEach((el) => {
@@ -742,5 +809,6 @@
     updateWorld,
     startWorldPreview,
     initServices,
+    paintAuthGate,
   });
 })();
