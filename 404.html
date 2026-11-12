@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Page not found — BuildMind</title>
-  <meta name="theme-color" content="#060608">
+  <meta name="theme-color" content="#08090c">
   <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
   <!--
     This page is served for ANY unknown path, at ANY depth, from any deployment
@@ -25,7 +25,24 @@
     are copied from the design tokens in css/main.css.
   -->
   <style>
-    :root { color-scheme: dark; }
+    /* Self-contained by necessity: this page is served for any unknown path at
+       any depth, so it cannot reference css/. The values are copied from
+       css/tokens.css — keep them in step when the palette changes. */
+    :root {
+      color-scheme: dark;
+      --bm-bg: #08090c;
+      --bm-void: #050608;
+      --bm-surface-1: #0f1116;
+      --bm-surface-2: #14161c;
+      --bm-border: rgba(255, 255, 255, 0.075);
+      --bm-border-strong: rgba(255, 255, 255, 0.135);
+      --bm-text: #eceef4;
+      --bm-text-secondary: #b4b9c8;
+      --bm-text-muted: #8b91a3;
+      --bm-text-faint: #858b9e;
+      --bm-accent: #6d8bff;
+      --bm-focus: #a7b9ff;
+    }
     * { margin: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
@@ -33,49 +50,51 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 0;
-      padding: 32px 20px;
-      background: #060608;
-      color: #f2f3f6;
+      padding: 40px 22px 96px;
+      background:
+        radial-gradient(ellipse 120% 70% at 50% -10%, rgba(78, 96, 190, 0.1), transparent 62%),
+        var(--bm-bg);
+      color: var(--bm-text);
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       -webkit-font-smoothing: antialiased;
       text-align: center;
     }
     .mark {
-      width: 34px;
-      height: 34px;
-      margin-bottom: 26px;
-      border-radius: 9px;
-      border: 1px solid rgba(139, 147, 255, 0.34);
-      background: rgba(139, 147, 255, 0.12);
+      width: 38px;
+      height: 38px;
+      margin-bottom: 30px;
+      border-radius: 10px;
+      border: 1px solid rgba(109, 139, 255, 0.28);
+      background: linear-gradient(160deg, rgba(109, 139, 255, 0.16), rgba(109, 139, 255, 0.03));
       display: grid;
       place-items: center;
-      color: #8b93ff;
+      color: #9db2ff;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 650;
+      letter-spacing: -0.02em;
     }
     .code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 13px;
-      letter-spacing: 0.18em;
-      color: #7c8094;
-      margin-bottom: 18px;
+      font-size: 12px;
+      letter-spacing: 0.22em;
+      color: var(--bm-text-faint);
+      margin-bottom: 20px;
     }
     h1 {
-      font-size: clamp(26px, 5vw, 38px);
-      line-height: 1.15;
-      letter-spacing: -0.02em;
-      font-weight: 650;
+      font-size: clamp(27px, 5vw, 40px);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      font-weight: 600;
       margin-bottom: 14px;
     }
     p.note {
-      max-width: 42ch;
-      color: #b9bcc7;
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 28px;
+      max-width: 44ch;
+      color: var(--bm-text-secondary);
+      font-size: 14.5px;
+      line-height: 1.62;
+      margin-bottom: 30px;
     }
-    .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
     a.btn {
       display: inline-flex;
       align-items: center;
@@ -86,28 +105,34 @@
       font-size: 13.5px;
       font-weight: 560;
       text-decoration: none;
-      transition: background 180ms ease, border-color 180ms ease;
+      transition: background 140ms ease, border-color 140ms ease, transform 110ms ease;
     }
-    a.primary { background: #8b93ff; color: #0a0a14; }
-    a.primary:hover { background: #a2a9ff; }
+    a.primary {
+      background: linear-gradient(180deg, #7f9bff, var(--bm-accent) 46%, #5b78f0);
+      color: #07080e;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    a.primary:hover { background: linear-gradient(180deg, #93acff, #7c97ff 46%, #6885f8); }
     a.ghost {
-      color: #f2f3f6;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.03);
+      color: var(--bm-text);
+      border: 1px solid var(--bm-border-strong);
+      background: var(--bm-surface-1);
     }
-    a.ghost:hover { border-color: rgba(139, 147, 255, 0.4); }
-    a.btn:focus-visible { outline: 2px solid #8b93ff; outline-offset: 2px; }
+    a.ghost:hover { border-color: rgba(109, 139, 255, 0.4); background: var(--bm-surface-2); }
+    a.btn:active { transform: translateY(1px); }
+    a.btn:focus-visible { outline: 2px solid var(--bm-focus); outline-offset: 2px; }
     footer {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
       padding: 18px 20px;
-      border-top: 1px solid rgba(255, 255, 255, 0.07);
-      font-size: 11px;
-      letter-spacing: 0.1em;
+      border-top: 1px solid var(--bm-border);
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: #7c8094;
+      color: var(--bm-text-faint);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
     @media (prefers-reduced-motion: reduce) {
       a.btn { transition: none; }
@@ -120,13 +145,13 @@
   <h1>That page is not here</h1>
   <p class="note">
     BuildMind has four pages: Home, Build, Projects and Settings. Nothing was
-    lost — your projects live in this browser, not on a server.
+    lost — your projects are stored on the BuildMind server with your account.
   </p>
   <div class="actions">
     <a class="btn primary" href="index.html">Back to Home</a>
     <a class="btn ghost" href="projects.html">Open Projects</a>
   </div>
-  <footer>Simulated in your browser</footer>
+  <footer>BuildMind</footer>
   <script>
 (function(){var p=location.pathname;if(/\/$/.test(p))p=p.slice(0,-1);var d=p.split('/').length-2;if(d<0)d=0;var up=d?new Array(d+1).join('../'):'';var links=document.getElementsByTagName('a');for(var i=0;i<links.length;i++){var h=links[i].getAttribute('href');if(h&&h.indexOf('://')===-1&&h.charAt(0)!=='/'&&h.charAt(0)!=='#'&&h.indexOf('mailto:')!==0){links[i].setAttribute('href',up+h);}}})();
   </script>

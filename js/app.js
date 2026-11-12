@@ -11,8 +11,10 @@
      3. load state through the controllers
      4. start cross-tab sync
 
-   Every "connected" or "building" state is simulated in the browser. There are
-   no network requests, no backend, no AI calls and no Roblox calls.
+   Nothing here decides product state: authentication, projects and builds are
+   owned by the controllers and services in js/services → js/controllers. This
+   file only paints the shell around them (brand, ambient light, reveals, page
+   transitions, toasts, dialogs) and boots the service layer once.
    ========================================================================== */
 
 (function () {
@@ -52,8 +54,8 @@
     <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id="bm-mark-g" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color="#a8aeff"/>
-          <stop offset="1" stop-color="#737cf2"/>
+          <stop offset="0" stop-color="#9db2ff"/>
+          <stop offset="1" stop-color="#5d78ee"/>
         </linearGradient>
       </defs>
       <path d="M16 3.2 27.4 9.6v12.8L16 28.8 4.6 22.4V9.6L16 3.2Z" stroke="url(#bm-mark-g)" stroke-width="1.6" stroke-linejoin="round"/>
@@ -73,6 +75,8 @@
   const ICONS = {
     check: '<path d="M3.2 8.4 6.4 11.6 12.8 4.8"/>',
     stop: '<rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1.2"/>',
+    error: '<path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6"/>',
+    info: '<path d="M8 4.2v.2M8 7.2v4.6"/>',
   };
 
   /** Return an inline SVG string for a named runtime icon. */
@@ -97,36 +101,56 @@
     const cursor = $(".ambient__cursor");
     const fine = media("(hover: hover) and (pointer: fine)").matches;
 
-    if (!fine) return;
+    // The cursor light is a desktop affordance. Coarse pointers, reduced motion
+    // and a missing mount point all opt out before any listener is attached.
+    if (!fine || !cursor || prefersReducedMotion()) return;
 
     document.documentElement.classList.add("has-pointer");
 
     let raf = 0;
-    let tx = window.innerWidth / 2;
-    let ty = window.innerHeight * 0.25;
-    let cx = tx;
-    let cy = ty;
+    let lastX = window.innerWidth / 2;
+    let lastY = window.innerHeight * 0.25;
+    let cx = lastX;
+    let cy = lastY;
 
     const render = () => {
-      cx += (tx - cx) * 0.08;
-      cy += (ty - cy) * 0.08;
-      if (cursor) {
-        cursor.style.setProperty("--mx", `${cx.toFixed(1)}px`);
-        cursor.style.setProperty("--my", `${cy.toFixed(1)}px`);
-      }
-      const settled = Math.abs(tx - cx) < 0.4 && Math.abs(ty - cy) < 0.4;
+      cx += (lastX - cx) * 0.09;
+      cy += (lastY - cy) * 0.09;
+      cursor.style.setProperty("--mx", `${cx.toFixed(1)}px`);
+      cursor.style.setProperty("--my", `${cy.toFixed(1)}px`);
+      const settled = Math.abs(lastX - cx) < 0.4 && Math.abs(lastY - cy) < 0.4;
+      // One loop per settle: it stops when the light catches up, so an idle
+      // pointer costs nothing at all.
       raf = settled ? 0 : requestAnimationFrame(render);
     };
 
+    const onMove = (event) => {
+      if (document.documentElement.getAttribute("data-motion-mode") === "reduced") return;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      if (!raf && !document.hidden) raf = requestAnimationFrame(render);
+    };
+
+    // A hidden tab must not keep a frame loop alive; resuming re-arms on the
+    // next pointer move rather than spinning.
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener(
-      "pointermove",
-      (event) => {
-        if (prefersReducedMotion()) return;
-        tx = event.clientX;
-        ty = event.clientY;
-        if (!raf) raf = requestAnimationFrame(render);
+      "pagehide",
+      () => {
+        cancelAnimationFrame(raf);
+        raf = 0;
+        window.removeEventListener("pointermove", onMove);
+        document.removeEventListener("visibilitychange", onVisibility);
       },
-      { passive: true }
+      { once: true }
     );
   }
 
@@ -134,6 +158,27 @@
      Scroll reveals
      ------------------------------------------------------------------------ */
   let revealObserver = null;
+  let revealScanTimer = 0;
+
+  /**
+   * Register every not-yet-revealed element with the one observer.
+   * Idempotent: an element already observed or revealed is skipped, so the
+   * post-boot rescan is cheap and can never stack observers.
+   */
+  function scanReveals() {
+    if (!revealObserver) return;
+    $$("[data-reveal]:not(.is-revealed), [data-stagger]:not(.is-revealed)").forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight + 120 && rect.bottom > -120) {
+        // Already in (or just above) the viewport: reveal on the next frame so
+        // the transition runs, rather than waiting for a scroll that may never
+        // come.
+        requestAnimationFrame(() => el.classList.add("is-revealed"));
+      } else {
+        revealObserver.observe(el);
+      }
+    });
+  }
 
   function initReveals() {
     const targets = $$("[data-reveal], [data-stagger]");
@@ -180,13 +225,16 @@
       }
     });
 
-    // Safety net: a reveal that can never fire (layout settled off-screen after
-    // the observer was created, or a scroll container the observer cannot see)
-    // must not hide content forever. One late pass, not a loop.
-    window.setTimeout(() => {
+    // Page scripts mount their content after boot (project cards, timeline
+    // rows, the result panel). One rescan after they have run registers them,
+    // and the same pass is the safety net for a reveal the observer can never
+    // fire for. One timer, not a loop.
+    window.clearTimeout(revealScanTimer);
+    revealScanTimer = window.setTimeout(() => {
       $$("[data-reveal]:not(.is-revealed), [data-stagger]:not(.is-revealed)").forEach((el) => {
         const rect = el.getBoundingClientRect();
         if (rect.top < window.innerHeight * 1.5) el.classList.add("is-revealed");
+        else revealObserver?.observe(el);
       });
     }, 1200);
   }
@@ -290,6 +338,14 @@
      Visual only: navigation still uses real page loads, so links keep working
      with JavaScript disabled.
      ------------------------------------------------------------------------ */
+  /** True when either the OS or the in-app preference asks for less motion. */
+  function motionReduced() {
+    return (
+      prefersReducedMotion() ||
+      document.documentElement.getAttribute("data-motion-mode") === "reduced"
+    );
+  }
+
   function initPageTransitions() {
     const veil = document.createElement("div");
     veil.className = "page-veil";
@@ -297,9 +353,13 @@
     document.body.appendChild(veil);
 
     document.body.classList.add("is-entering");
-    window.addEventListener("load", () => document.body.classList.remove("is-entering"));
+    const settle = () => document.body.classList.remove("is-entering");
+    window.addEventListener("load", settle);
+    // A page restored from bfcache, or one that finished loading before this
+    // listener attached, would otherwise keep the entrance class forever.
+    window.setTimeout(settle, 900);
 
-    if (prefersReducedMotion()) return;
+    if (motionReduced()) return;
 
     document.addEventListener("click", (event) => {
       const link = event.target.closest("a[href]");
@@ -307,6 +367,8 @@
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       if (link.target && link.target !== "_self") return;
       if (link.hasAttribute("download")) return;
+
+      if (motionReduced()) return;
 
       const href = link.getAttribute("href");
       if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
@@ -322,7 +384,7 @@
       // Leave enough time for the fade, but never trap the user.
       window.setTimeout(() => {
         window.location.href = url.href;
-      }, 190);
+      }, 180);
     });
 
     // Restore visuals when the page comes back from the bfcache.
@@ -354,27 +416,90 @@
   }
 
   /* ------------------------------------------------------------------------
+     Dialog choreography
+
+     Native <dialog> shows and hides instantly. The shell adds one class for
+     the closing transition and calls the dialog's own close() when it ends, so
+     Escape, backdrop clicks and the two owner scripts all share one exit.
+
+     Reduced motion skips the wait entirely: the state change is what matters.
+     ------------------------------------------------------------------------ */
+  function closeDialog(dialog, onClosed) {
+    if (!dialog) {
+      if (typeof onClosed === "function") onClosed();
+      return;
+    }
+
+    const finish = () => {
+      dialog.classList.remove("is-closing");
+      dialog.removeEventListener("animationend", onEnd);
+      if (dialog.open && typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+      if (typeof onClosed === "function") onClosed();
+    };
+
+    if (prefersReducedMotion() || !dialog.open) {
+      finish();
+      return;
+    }
+
+    const onEnd = (event) => {
+      if (event.target !== dialog) return;
+      finish();
+    };
+
+    dialog.classList.add("is-closing");
+    dialog.addEventListener("animationend", onEnd);
+    // A closing dialog must never be stuck open if the animation is skipped by
+    // the environment (throttled tab, display change). One timer, cleared by the
+    // animation path because `finish` is idempotent through the listener guard.
+    window.setTimeout(() => {
+      if (dialog.classList.contains("is-closing")) finish();
+    }, 260);
+  }
+
+  /* ------------------------------------------------------------------------
      Toasts
      ------------------------------------------------------------------------ */
   let toastEl = null;
+  let toastText = null;
   let toastTimer = 0;
 
   /** Last painted visual state per mount point, so repeat ticks are free. */
   const localWorld = { state: "", progress: -1, scanHidden: null };
 
-  function toast(message) {
+  /**
+   * One polite live region for the whole product.
+   *
+   * @param {string} message human sentence, already normalised by the caller
+   * @param {"success" | "error" | "info"} tone severity; carried by the icon
+   *        and by data-tone (never by colour alone)
+   */
+  function toast(message, tone) {
     if (!toastEl) {
       toastEl = document.createElement("div");
       toastEl.className = "toast";
       toastEl.setAttribute("role", "status");
       toastEl.setAttribute("aria-live", "polite");
+      toastEl.setAttribute("aria-atomic", "true");
+      toastEl.innerHTML = `<span class="toast__icon" aria-hidden="true"></span><span class="toast__text"></span>`;
+      toastText = toastEl.querySelector(".toast__text");
       document.body.appendChild(toastEl);
     }
-    toastEl.innerHTML = `${icon("check")}<span></span>`;
-    toastEl.querySelector("span").textContent = message;
+
+    const severity = tone === "error" ? "error" : tone === "info" ? "info" : "success";
+    const glyph = toastEl.querySelector(".toast__icon");
+    if (glyph) glyph.innerHTML = icon(severity === "error" ? "error" : severity === "info" ? "info" : "check");
+    toastEl.dataset.tone = severity;
+    if (toastText && toastText.textContent !== message) toastText.textContent = message;
+
+    // Re-trigger the entrance when a second message arrives during the first.
+    toastEl.classList.remove("is-visible");
+    void toastEl.offsetWidth;
     toastEl.classList.add("is-visible");
+
     window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => toastEl.classList.remove("is-visible"), 2200);
+    toastTimer = window.setTimeout(() => toastEl.classList.remove("is-visible"), 2600);
   }
 
   /* ------------------------------------------------------------------------
@@ -464,13 +589,13 @@
            aria-label="Abstract visualisation of a game world being assembled">
         <defs>
           <radialGradient id="wv-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#8b93ff" stop-opacity="0.20"/>
-            <stop offset="100%" stop-color="#8b93ff" stop-opacity="0"/>
+            <stop offset="0%" stop-color="#6d8bff" stop-opacity="0.20"/>
+            <stop offset="100%" stop-color="#6d8bff" stop-opacity="0"/>
           </radialGradient>
           <linearGradient id="wv-scan-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#8b93ff" stop-opacity="0"/>
-            <stop offset="60%" stop-color="#8b93ff" stop-opacity="0.10"/>
-            <stop offset="100%" stop-color="#8b93ff" stop-opacity="0"/>
+            <stop offset="0%" stop-color="#6d8bff" stop-opacity="0"/>
+            <stop offset="60%" stop-color="#6d8bff" stop-opacity="0.10"/>
+            <stop offset="100%" stop-color="#6d8bff" stop-opacity="0"/>
           </linearGradient>
         </defs>
 
@@ -567,92 +692,34 @@
     });
   }
 
-  /**
-   * Gentle preview loop for the home hero.
-   *
-   * The loop pauses while the tab is hidden or the visualizer is scrolled out of
-   * view, and resumes when it comes back — an off-screen element measures zero
-   * mutations per second. It tears itself down for good when its element leaves
-   * the document. Returns a stopper, which is idempotent.
-   */
-  function startWorldPreview(el, speed = 1) {
-    if (!el) return () => {};
-    mountWorld(el);
+  /* ------------------------------------------------------------------------
+     Authentication gate
 
-    if (prefersReducedMotion()) {
-      updateWorld(el, { state: "complete", progress: 100 });
-      return () => {};
-    }
+     A page that needs a session shows one of two messages: "sign in" when
+     the session check answered "not signed in", and "the service is
+     unavailable" when the check itself failed. The copy lives in the markup
+     (data-gate-*), so each page says what is true for it.
+     ------------------------------------------------------------------------ */
+  function paintAuthGate() {
+    const gate = $("[data-auth-gate]");
+    if (!gate) return;
 
-    let progress = 0;
-    let direction = 1;
-    let timer = 0;
-    let halted = false;
-    let onscreen = true;
+    const status = BM.getState().auth.status;
+    const error = status === "error";
 
-    const stop = () => {
-      halted = true;
-      window.clearTimeout(timer);
-      timer = 0;
-      if (observer) observer.disconnect();
-    };
+    const title = $(".empty__title", gate);
+    const note = $(".empty__note", gate);
 
-    const schedule = (ms) => {
-      if (halted) return;
-      window.clearTimeout(timer);
-      timer = window.setTimeout(tick, ms);
-    };
+    const titleText = error ? gate.dataset.gateErrorTitle : gate.dataset.gateTitle;
+    const noteText = error ? gate.dataset.gateErrorNote : gate.dataset.gateNote;
 
-    const tick = () => {
-      if (halted) return;
-      if (!el.isConnected) {
-        stop();
-        return;
-      }
-      // Nothing to draw: try again in a moment rather than animating offscreen.
-      if (document.hidden || !onscreen) {
-        schedule(400);
-        return;
-      }
-      progress += direction * (0.9 * speed);
-      if (progress >= 100) {
-        progress = 100;
-        direction = -1;
-        updateWorld(el, { state: "complete", progress: 100 });
-        schedule(1400);
-        return;
-      }
-      if (progress <= 0) {
-        progress = 0;
-        direction = 1;
-      }
-      updateWorld(el, {
-        state: progress > 0 ? (progress > 88 ? "validating" : "building") : "idle",
-        progress,
-      });
-      schedule(90);
-    };
+    if (title && titleText && title.textContent !== titleText) title.textContent = titleText;
+    if (note && noteText && note.textContent !== noteText) note.textContent = noteText;
 
-    // Pause while offscreen. Kept as a lifecycle observer rather than a scroll
-    // handler so it costs nothing while scrolling.
-    // Visibility watching is an optimisation, not a requirement: where
-    // IntersectionObserver is unavailable the preview simply keeps its simple
-    // timer behaviour instead of throwing on load.
-    const observer =
-      typeof IntersectionObserver === "function"
-        ? new IntersectionObserver(
-            (entries) => {
-              onscreen = entries.some((entry) => entry.isIntersecting);
-            },
-            { rootMargin: "80px" }
-          )
-        : null;
-    if (observer) observer.observe(el);
-
-    updateWorld(el, { state: "idle", progress: 0 });
-    timer = window.setTimeout(tick, 700);
-
-    return stop;
+    // The sign-in call to action only makes sense when there is a session to
+    // have; an unreachable service is not fixed by signing in.
+    const action = $(".empty__action", gate);
+    if (action) action.hidden = error;
   }
 
   /* ------------------------------------------------------------------------
@@ -661,28 +728,53 @@
   /**
    * Initialise every service boundary once, then load state through the
    * controllers. Order matters: state must exist before controllers load,
-   * and services must be initialised before a controller talks to them.
+   * services must be initialised before a controller talks to them, and the
+   * session must be known before anything that depends on a session is
+   * requested.
    */
   function initServices() {
     BM.getState(); // touches state before any service does
 
     // Pick the implementation explicitly before anything asks for one. The
-    // simulation is the default because the static frontend must work with no
-    // backend; `BM_CONFIG.mode = "remote"` (or an API base) opts into the real
-    // one, and the choice is never made silently at request time.
+    // remote backend is the default; the simulated mode is an explicit,
+    // labelled deployment choice and is never entered as a fallback.
     if (typeof BM.installServices === "function") {
       BM.installServices(BM.requestedServiceMode());
     }
 
-    const ai = BM.aiService;
-    ai?.initialize().then((result) => {
-      const mode = BM.isOk(result) && result.data ? result.data.mode : "unknown";
-      BM.setServiceMode(mode, BM.isOk(result));
-    });
+    // The session check comes first: the projects, the provider catalogue and
+    // the account all depend on who is signed in.
+    BM.authController?.init();
 
-    // Project and settings controllers own the persisted slices.
-    BM.settingsController?.load();
-    BM.projectController?.load();
+    const boot = BM.authController
+      ? BM.authController.bootstrap()
+      : Promise.resolve(BM.serviceOk(null));
+
+    return boot.then((session) => {
+      paintAuthGate();
+
+      if (!BM.isOk(session)) {
+        // The service could not be reached. That is an error state, and the
+        // page says so. It is never downgraded to a simulation.
+        BM.setServiceMode(BM.serviceMode || "remote", false);
+        return session;
+      }
+
+      const ai = BM.aiService;
+      const ready = (ai ? ai.initialize() : Promise.resolve(BM.serviceOk(null))).then((result) => {
+        const mode = BM.isOk(result) && result.data ? result.data.mode : "unknown";
+        BM.setServiceMode(mode, BM.isOk(result));
+        BM.settingsController?.load({ skipProviders: BM.isOk(result) && result.data && result.data.ready });
+        return result;
+      });
+
+      if (BM.isAuthenticated()) {
+        BM.connectionController?.restore?.();
+        BM.projectController?.load();
+      }
+
+      return ready;
+    });
   }
 
   // The shell boots once per document. Guards against a re-dispatched
@@ -706,8 +798,20 @@
 
     // Load the shared state once for every page; page scripts only render it.
     BM.loadState?.();
+    BM.subscribe?.((view, changed) => {
+      if (!changed.length || changed.includes("auth")) paintAuthGate();
+    });
     BM.initServices();
     BM.initSync?.();
+
+    // A page that is torn down mid-build must not leave a live stream behind.
+    window.addEventListener(
+      "pagehide",
+      () => {
+        BM.sse?.closeAll?.("pagehide");
+      },
+      { once: true }
+    );
 
     // Fill in shared brand marks and mark the active nav item defensively.
     $$("[data-brand-mark]").forEach((el) => {
@@ -734,13 +838,15 @@
     sleep,
     icon,
     bindKeyReveal,
+    closeDialog,
     prefersReducedMotion,
     applyMotionPreference,
     media,
     toast,
     mountWorld,
     updateWorld,
-    startWorldPreview,
     initServices,
+    paintAuthGate,
+    scanReveals,
   });
 })();

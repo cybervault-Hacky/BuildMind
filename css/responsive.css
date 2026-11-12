@@ -1,13 +1,41 @@
 /* ==========================================================================
    BuildMind — responsive.css
-   Tablet and mobile recomposition. Mobile is laid out on purpose,
-   never just a shrunken desktop.
+   Breakpoints, ordered from the widest down. Every layout decision that
+   changes with viewport width lives here, so main.css/components.css stay
+   one-size and this file is the single place to read the adaptation.
+
+   Ladder: 1440+ · 1280 · 1120 · 1024 · 900 · 860 (nav collapses) ·
+           768 · 620 · 480 · 380
+
+   Notes:
+     * mobile is designed, not scaled: the sheet navigation, the stacked
+       composer, the single-column settings rows and 44px touch targets are
+       deliberate layouts, not fallbacks;
+     * no rule here redefines a colour token — the palette is global.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   Large desktop refinements
+   Ultra-wide: hold the measure, grow the canvas
    -------------------------------------------------------------------------- */
-@media (min-width: 1280px) {
+@media (min-width: 1440px) {
+  :root {
+    --page-max: var(--page-max-wide);
+    --gutter: 48px;
+  }
+
+  .hero {
+    min-height: min(72vh, 700px);
+  }
+
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Large desktop
+   -------------------------------------------------------------------------- */
+@media (min-width: 1280px) and (max-width: 1439px) {
   :root {
     --page-max: 1180px;
   }
@@ -18,15 +46,37 @@
 }
 
 /* --------------------------------------------------------------------------
-   Small desktop / large tablet
+   Laptop
    -------------------------------------------------------------------------- */
+@media (max-width: 1120px) {
+  .hero {
+    gap: 48px;
+  }
+
+  .hero__visual {
+    min-height: 360px;
+  }
+
+  .worldviz {
+    max-width: 420px;
+  }
+
+  .workspace {
+    gap: 32px;
+  }
+
+  .nav__link {
+    padding-inline: 13px;
+  }
+}
+
 @media (max-width: 1024px) {
   .hero {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.88fr);
     gap: 40px;
     min-height: 0;
     padding-top: 56px;
-    padding-bottom: 56px;
+    padding-bottom: 52px;
   }
 
   .hero__visual {
@@ -38,39 +88,52 @@
   }
 
   .workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.88fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.86fr);
     gap: 28px;
   }
 
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  }
+
+  .settings {
+    max-width: 100%;
+    margin-inline: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Small laptop / large tablet — the primary nav is still present
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  :root {
+    --page-max: 900px;
+  }
+
+  .site-header__inner {
+    gap: var(--space-3);
+  }
+
   .nav__link {
+    padding-inline: 11px;
+    font-size: 12.5px;
+  }
+
+  .btn--header-cta {
     padding-inline: 12px;
   }
 
-  /* Tablet and small desktop: two comfortable card columns rather than a
-     squeezed three. The floor is set high enough that a card keeps its name,
-     status, date and actions on one line — at 260px the name and the
-     "Last build" line both truncated at 900-1024px. */
-  .projects-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  .activity-col {
+    position: static;
   }
 }
 
 /* --------------------------------------------------------------------------
-   Grid min-tracks — every width the product supports, including 320px
-   -------------------------------------------------------------------------- */
-@media (max-width: 700px) {
-  /* A 280px track plus gutters would overflow a 320px viewport */
-  .projects-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
-  }
-}
-
-/* --------------------------------------------------------------------------
-   Tablet — collapse header nav into the sheet
+   Tablet — the navigation collapses into the sheet
    -------------------------------------------------------------------------- */
 @media (max-width: 860px) {
   :root {
-    --header-h: 62px;
+    --header-h: 64px;
   }
 
   .nav {
@@ -89,9 +152,9 @@
     display: block;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-8px);
-    transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out),
-      visibility var(--dur-3);
+    transform: translateY(-10px);
+    transition: opacity var(--motion-slow) var(--ease-out),
+      transform var(--motion-slow) var(--ease-out), visibility var(--motion-slow);
   }
 
   .mobile-nav.is-open {
@@ -106,16 +169,16 @@
 
   .hero {
     grid-template-columns: minmax(0, 1fr);
-    gap: 48px;
+    gap: 44px;
     padding: 44px 0 40px;
   }
 
   .hero__copy {
-    max-width: 100%;
+    max-width: 620px;
   }
 
   .hero__title {
-    font-size: clamp(32px, 7vw, 44px);
+    font-size: clamp(32px, 6.6vw, 46px);
   }
 
   .hero__visual {
@@ -123,8 +186,13 @@
     min-height: 0;
   }
 
+  .planviz {
+    max-width: 440px;
+    margin-inline: auto;
+  }
+
   .worldviz {
-    max-width: 320px;
+    max-width: 340px;
   }
 
   .pipeline {
@@ -135,7 +203,7 @@
   }
 
   .start-card {
-    padding: var(--s-5) 0 var(--s-7);
+    padding: var(--space-3) 0 var(--space-6);
   }
 
   .workspace {
@@ -146,18 +214,12 @@
 
   .activity-col {
     position: static;
-  }
-
-  /* Activity sits under the composer once the two columns collapse:
-     timeline + progress side by side while there is tablet width, stacked on phones */
-  .activity-col {
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     align-items: start;
     gap: 16px;
   }
 
-  /* The log and result belong under the pair, spanning both columns */
   .activity-col > #activity-feed-panel,
   .activity-col > #build-result {
     grid-column: 1 / -1;
@@ -166,9 +228,7 @@
   .build-bar {
     position: static;
     background: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-top: 0;
+    border-top: 1px solid var(--bm-border);
     padding-bottom: 0;
   }
 
@@ -178,15 +238,46 @@
 
   .settings {
     max-width: 100%;
+    margin-inline: 0;
   }
 }
 
 /* --------------------------------------------------------------------------
-   Mobile
+   Portrait tablet
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  :root {
+    --gutter: 24px;
+  }
+
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+    gap: var(--space-4);
+  }
+
+  .project-toolbar {
+    gap: var(--space-3);
+  }
+
+  .project-search {
+    width: 100%;
+  }
+
+  .hero__meta {
+    max-width: 100%;
+  }
+
+  .confirm {
+    width: min(430px, calc(100vw - 28px));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Phones — 44px targets, single column, designed spacing
    -------------------------------------------------------------------------- */
 @media (max-width: 620px) {
-  /* Touch widths: every tappable control gets a comfortable height. The
-     visuals stay compact because the extra size is padding, not type. */
+  /* Touch targets: any control that is visually smaller than 44px gets a
+     larger hit area without changing its drawn size. */
   .chip,
   .segmented__option,
   .menu-toggle,
@@ -200,7 +291,6 @@
     min-width: 44px;
   }
 
-  /* Inline links that act as controls need a target, not just a text baseline. */
   .group-link,
   .link-arrow {
     display: inline-flex;
@@ -208,11 +298,6 @@
     min-height: 44px;
   }
 
-  .segmented {
-    padding: 3px;
-  }
-
-  /* The brand is a home link: give it a full-height tap band. */
   .brand {
     min-height: 44px;
   }
@@ -244,10 +329,12 @@
   }
 
   :root {
-    --header-h: 58px;
+    --header-h: 60px;
     --gutter: 18px;
-    --s-10: 44px;
-    --s-11: 64px;
+    --text-page: 26px;
+    --space-page-top: 30px;
+    --space-page-bottom: 56px;
+    --space-10: 44px;
   }
 
   body {
@@ -255,8 +342,14 @@
   }
 
   .brand__mark {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+  }
+
+  .brand__mark svg {
+    width: 17px;
+    height: 17px;
   }
 
   .brand__word {
@@ -274,30 +367,33 @@
   }
 
   .menu-toggle {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
   }
 
-  /* Hero */
+  .mobile-nav {
+    padding: var(--space-2) var(--gutter) var(--space-5);
+  }
+
   .hero {
-    gap: 36px;
-    padding: 30px 0 32px;
+    gap: 34px;
+    padding: 28px 0 30px;
   }
 
   .hero__title {
-    font-size: clamp(29px, 8.6vw, 38px);
-    letter-spacing: -0.032em;
+    font-size: clamp(29px, 8.4vw, 38px);
+    letter-spacing: -0.034em;
   }
 
   .hero__lede {
-    margin-top: 14px;
+    margin-top: var(--space-3);
     font-size: 14.5px;
-    max-width: 34ch;
+    max-width: 36ch;
   }
 
   .hero__actions {
-    margin-top: 24px;
-    gap: 10px;
+    margin-top: var(--space-6);
+    gap: var(--space-2);
   }
 
   .hero__actions .btn {
@@ -310,33 +406,72 @@
     height: 48px;
   }
 
-  /* Beat the .btn--lg rule that may outrank on specificity */
   .hero__actions .btn--lg {
-    height: 48px;
+    height: 46px;
     padding-inline: 18px;
     font-size: 14px;
   }
 
   .hero__meta {
-    margin-top: 24px;
-    padding-top: 20px;
-    gap: 18px;
-    flex-wrap: wrap;
+    margin-top: var(--space-6);
+    padding-top: var(--space-5);
   }
 
   .hero__visual {
     min-height: 250px;
   }
 
+  .hero__visual::before {
+    inset: -10px -6px;
+    border-radius: var(--radius-lg);
+  }
+
+  .planviz {
+    max-width: 360px;
+  }
+
+  /* Five columns cannot hold a label and a note on a phone, so the notes drop
+     away and the track stays intact: the sequence is still the whole story. */
+  .concept__step {
+    padding-top: 15px;
+  }
+
+  .concept__label {
+    font-size: 12px;
+    letter-spacing: -0.015em;
+  }
+
+  .concept__note {
+    display: none;
+  }
+
+  /* Two lingering marquees on a phone are battery spent on decoration. The
+     field still reads as alive thanks to the plan tier's hover response. */
+  .planviz.is-settled .planviz__link,
+  .planviz.is-settled .planviz__marker-pulse {
+    animation: none;
+  }
+
+  .hero__meta {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    font-size: 12px;
+  }
+
+  /* Two readouts fit on one line at 320. The third is the first to go. */
+  .planviz__hud-item:nth-of-type(3),
+  .planviz__hud-rule:nth-of-type(2) {
+    display: none;
+  }
+
   .worldviz {
-    max-width: 280px;
+    max-width: 290px;
   }
 
   .worldviz__caption {
     font-size: 10px;
   }
 
-  /* Pipeline becomes a quiet 2x2 grid */
   .pipeline {
     padding: 20px 0 40px;
     gap: 16px;
@@ -355,9 +490,8 @@
     font-size: 12px;
   }
 
-  /* Page heads */
   .page-head {
-    padding: 32px 0 20px;
+    padding: 30px 0 20px;
     gap: 16px;
     align-items: flex-start;
   }
@@ -379,15 +513,14 @@
     flex: 1 1 auto;
   }
 
-  /* Composer */
   .composer {
     gap: 24px;
   }
 
   .prompt-block__textarea {
-    min-height: 124px;
+    min-height: 128px;
     padding: 16px 16px 6px;
-    font-size: 15px; /* avoid iOS zoom */
+    font-size: 15px;
   }
 
   .prompt-block__bar {
@@ -404,7 +537,6 @@
     gap: 6px;
   }
 
-  /* No physical keyboard hint on touch devices */
   .group-hint--keys {
     display: none;
   }
@@ -430,29 +562,27 @@
   .input,
   .select {
     height: 46px;
-    font-size: 15px; /* avoid iOS zoom */
+    font-size: 15px;
   }
 
-  /* Inline field errors stay readable and never push the layout sideways */
-  .field__error {
+  .planviz__error {
     font-size: 11.5px;
     margin-top: 6px;
     max-width: 46ch;
   }
 
-  /* One column on phones: activity timeline, then progress */
   .activity-col {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
 
-  /* The primary action owns the thumb zone on phones */
   .build-bar {
     flex-direction: column-reverse;
     align-items: stretch;
     gap: 10px;
     margin-top: 0;
     padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--bm-border);
   }
 
   .build-bar .btn {
@@ -466,16 +596,15 @@
     text-align: center;
   }
 
-  /* Panels */
   .panel__head {
-    padding: 15px 16px;
+    padding: 14px 16px;
+    min-height: 48px;
   }
 
   .panel__body {
     padding: 16px;
   }
 
-  /* Connections: label + status left, full-height action right */
   .connection {
     align-items: center;
     gap: 12px;
@@ -490,8 +619,8 @@
   .connection__actions .btn {
     height: 38px;
     padding-inline: 14px;
-    border-color: var(--line-strong);
-    color: var(--text-soft);
+    border-color: var(--bm-border-strong);
+    color: var(--bm-text-secondary);
   }
 
   .connection__title-row {
@@ -502,7 +631,6 @@
     gap: 3px;
   }
 
-  /* Timeline */
   .timeline__step {
     padding: 10px 0;
     min-height: 44px;
@@ -512,7 +640,6 @@
     font-size: 13.5px;
   }
 
-  /* Current stage, activity log and result summary */
   .stage-now {
     padding: 10px 12px;
   }
@@ -526,7 +653,7 @@
   }
 
   .result__row {
-    grid-template-columns: minmax(74px, auto) minmax(0, 1fr);
+    grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
     gap: 10px;
   }
 
@@ -539,7 +666,6 @@
     justify-content: center;
   }
 
-  /* Projects */
   .projects-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
@@ -559,7 +685,6 @@
     padding: 13px 14px;
   }
 
-  /* Filters scroll horizontally; search takes the full width beneath them. */
   .project-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -600,7 +725,6 @@
     padding: 48px 20px;
   }
 
-  /* Settings */
   .settings {
     gap: 20px;
     padding-bottom: 56px;
@@ -618,13 +742,17 @@
     width: 100%;
   }
 
+  /* A stacked settings row puts its button on a full-width line at touch
+     widths, so the target is the row rather than the label. */
+  .setting-row__control--stack > .btn {
+    flex: 1 1 100%;
+  }
+
   .setting-row__control .select,
   .setting-row__control .input-group {
     width: 100%;
   }
 
-  /* Status chips share a line with the heading on desktop; on a phone they
-     wrap onto their own line rather than squeezing the title. */
   .settings-section__head {
     flex-direction: column;
     align-items: flex-start;
@@ -648,9 +776,8 @@
     text-align: center;
   }
 
-  /* Footer */
   .site-footer {
-    padding: 24px 0;
+    padding: 22px 0;
   }
 
   .site-footer__inner {
@@ -666,152 +793,45 @@
     display: none;
   }
 
-  /* Toast clears the safe area */
   .toast {
     bottom: 18px;
     left: 18px;
     right: 18px;
-    transform: translateY(16px);
+    transform: translateY(16px) scale(0.99);
+    max-width: none;
     justify-content: center;
+    border-radius: var(--radius-md);
   }
 
   .toast.is-visible {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+  }
+
+  .confirm {
+    width: calc(100vw - 24px);
   }
 }
 
 /* --------------------------------------------------------------------------
-   Very small phones (320–380px) — 320px must stay usable, not merely survive
+   Small phones
    -------------------------------------------------------------------------- */
-@media (max-width: 380px) {
-  :root {
-    --gutter: 16px;
-    --header-h: 56px;
-  }
-
-  .hero__title {
-    font-size: 27px;
-  }
-
-  .hero__lede {
-    font-size: 14px;
-  }
-
+@media (max-width: 480px) {
   .worldviz {
-    max-width: 240px;
+    max-width: 260px;
   }
 
   .hero__visual {
-    min-height: 216px;
+    min-height: 230px;
   }
 
-  .pipeline__steps {
-    gap: 6px 10px;
+  .hero__title {
+    font-size: clamp(27px, 8.8vw, 33px);
   }
 
-  .pipeline__step {
-    font-size: 11.5px;
-  }
-
-  .pipeline__step-num {
-    width: 18px;
-    height: 18px;
-  }
-
-  .start-card {
-    gap: 12px;
-    padding-bottom: var(--s-6);
-  }
-
-  .start-card__title {
-    font-size: 13px;
-  }
-
-  .start-card__note {
-    font-size: 12px;
-  }
-
-  .btn--lg {
-    padding-inline: 16px;
-    font-size: 13.5px;
-  }
-
-  /* Composer chrome drops the secondary action first */
   .prompt-block__bar {
-    padding: 8px 8px 8px 14px;
+    flex-wrap: wrap;
   }
 
-  #prompt-idea {
-    font-size: 11.5px;
-    padding-inline: 10px;
-  }
-
-  .prompt-block__count {
-    font-size: 11px;
-  }
-
-  .chip {
-    font-size: 11px;
-    padding-inline: 9px;
-  }
-
-  /* Timelines and progress stay compact but readable */
-  .timeline__label {
-    font-size: 13px;
-  }
-
-  .timeline__step {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    gap: 10px;
-  }
-
-  /* Phones: the stage description is the one line that may wrap */
-  .timeline__desc {
-    font-size: 10.5px;
-  }
-
-  .stage-now__desc {
-    font-size: 11px;
-  }
-
-  .log__item {
-    font-size: 11px;
-  }
-
-  .result__actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .panel__head,
-  .panel__body {
-    padding-inline: 14px;
-  }
-
-  .connection__icon {
-    display: none;
-  }
-
-  .connection__actions .btn {
-    height: 36px;
-    padding-inline: 12px;
-    font-size: 12px;
-  }
-
-  /* Filters keep their intrinsic width and scroll, instead of squeezing
-     five lifecycle states into 320px. */
-  .segmented {
-    width: auto;
-  }
-
-  .segmented__option {
-    flex: 0 0 auto;
-    padding-inline: 11px;
-    font-size: 12px;
-  }
-
-  /* Card actions stay reachable at 320: the delete button grows to a 36px
-     touch target and the footer wraps rather than clipping. */
   .project-card__foot {
     flex-wrap: wrap;
     gap: 8px;
@@ -852,11 +872,9 @@
     justify-content: flex-end;
   }
 
-  /* Settings rows: control sits full width and never overflows */
   .setting-row__control .segmented {
     width: 100%;
   }
-
 
   .toast {
     left: 14px;
@@ -867,7 +885,147 @@
 }
 
 /* --------------------------------------------------------------------------
-   Landscape phones — keep the hero breathable
+   Narrowest supported width — 320px
+   -------------------------------------------------------------------------- */
+@media (max-width: 380px) {
+  :root {
+    --gutter: 16px;
+    --header-h: 58px;
+  }
+
+  .hero__title {
+    font-size: 26px;
+  }
+
+  .hero__lede {
+    font-size: 13.5px;
+  }
+
+  .worldviz {
+    max-width: 236px;
+  }
+
+  .hero__visual {
+    min-height: 216px;
+  }
+
+  .pipeline__steps {
+    gap: 6px 10px;
+  }
+
+  .pipeline__step {
+    font-size: 11.5px;
+  }
+
+  .pipeline__step-num {
+    width: 20px;
+    height: 20px;
+  }
+
+  .planviz {
+    max-width: 320px;
+  }
+
+  .hero__eyebrow {
+    font-size: 9.5px;
+    letter-spacing: 0.07em;
+    padding-inline: 9px 10px;
+  }
+
+  .concept__step {
+    padding-top: 16px;
+  }
+
+  .start-card {
+    gap: 12px;
+    padding-bottom: var(--space-6);
+  }
+
+  .start-card__title {
+    font-size: 13px;
+  }
+
+  .start-card__note {
+    font-size: 12px;
+  }
+
+  .btn--lg {
+    padding-inline: 16px;
+    font-size: 13.5px;
+  }
+
+  .prompt-block__bar {
+    padding: 8px 8px 8px 14px;
+  }
+
+  #prompt-idea {
+    font-size: 11.5px;
+    padding-inline: 10px;
+  }
+
+  .prompt-block__count {
+    font-size: 11px;
+  }
+
+  .chip {
+    font-size: 11px;
+    padding-inline: 9px;
+  }
+
+  .timeline__label {
+    font-size: 13px;
+  }
+
+  .timeline__step {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .timeline__desc {
+    font-size: 10.5px;
+  }
+
+  .stage-now__desc {
+    font-size: 11px;
+  }
+
+  .log__item {
+    font-size: 11px;
+  }
+
+  .result__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .panel__head,
+  .panel__body {
+    padding-inline: 14px;
+  }
+
+  .connection__icon {
+    display: none;
+  }
+
+  .connection__actions .btn {
+    height: 36px;
+    padding-inline: 12px;
+    font-size: 12px;
+  }
+
+  .segmented {
+    width: auto;
+  }
+
+  .segmented__option {
+    flex: 0 0 auto;
+    padding-inline: 11px;
+    font-size: 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Short landscape phones
    -------------------------------------------------------------------------- */
 @media (max-height: 520px) and (orientation: landscape) {
   .hero {
@@ -877,16 +1035,23 @@
   .hero__visual {
     min-height: 220px;
   }
+
+  .mobile-nav {
+    max-height: calc(100dvh - var(--header-h));
+    overflow-y: auto;
+  }
 }
 
 /* --------------------------------------------------------------------------
-   Print — nothing fancy is needed
+   Print
    -------------------------------------------------------------------------- */
 @media print {
   .ambient,
   .site-header,
   .site-footer,
-  .mobile-nav {
+  .mobile-nav,
+  .toast,
+  .page-veil {
     display: none !important;
   }
 

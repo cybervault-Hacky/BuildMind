@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Projects — BuildMind</title>
   <meta name="description" content="Your BuildMind games. Reopen a project or start a new build.">
-  <meta name="theme-color" content="#060608">
+  <meta name="theme-color" content="#08090c">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="BuildMind">
   <meta property="og:title" content="Projects — BuildMind">
@@ -15,7 +15,9 @@
   <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
   <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
   <script src="js/boot-class.js"></script>
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/animations.css">
   <link rel="stylesheet" href="css/responsive.css">
 </head>
@@ -72,13 +74,58 @@
               <span class="page-head__count" id="projects-count"></span>
             </p>
           </div>
-          <div class="page-head__actions" data-reveal="fade" data-reveal-delay="100">
-            <a class="btn btn--primary" href="build.html">Build a Game</a>
+          <!-- No "Build a Game" here: the sticky header already carries that
+               action on every page, and the empty state offers its own. Two
+               copies of the same label in one viewport is a design smell, not
+               redundancy. The count lives in the sub-line, so this slot is
+               genuinely empty and the head is a single column. -->
+        </div>
+
+        <!-- The list belongs to the signed-in user. While the session is being
+             checked nothing is shown, so the page never flashes a list it then
+             has to take away. -->
+        <div class="empty" id="projects-auth-gate" data-auth-gate
+             data-gate-title="Sign in to see your projects"
+             data-gate-note="Projects are stored on the BuildMind server for your account."
+             data-gate-error-title="The service is unavailable"
+             data-gate-error-note="BuildMind could not reach its server. Check the connection and try again.">
+          <span class="empty__mark" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="7" width="10" height="7" rx="1.6"/>
+              <path d="M5.6 7V5.2a2.4 2.4 0 0 1 4.8 0V7"/>
+            </svg>
+          </span>
+          <p class="empty__title">Sign in to see your projects</p>
+          <p class="empty__note">Projects are stored on the BuildMind server for your account.</p>
+          <a class="btn btn--primary empty__action" href="settings.html#account">Sign in</a>
+        </div>
+
+        <div class="empty" id="projects-loading" data-auth-only role="status" hidden>
+          <span class="empty__mark" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="8" cy="8" r="5.2" stroke-dasharray="9 7"/>
+            </svg>
+          </span>
+          <p class="empty__title">Loading projects…</p>
+          <p class="empty__note">Fetching your projects from the BuildMind server.</p>
+          <div class="loading-state" aria-hidden="true">
+            <span class="skeleton skeleton--line" style="inline-size: 62%"></span>
+            <span class="skeleton skeleton--line" style="inline-size: 44%"></span>
           </div>
         </div>
 
+        <div class="empty" id="projects-error" data-auth-only role="alert" hidden>
+          <p class="empty__title">Projects could not be loaded</p>
+          <p class="empty__note" id="projects-error-note">The service could not be reached.</p>
+          <button class="btn btn--ghost empty__action" type="button" id="projects-retry">
+            Try again
+          </button>
+        </div>
+
         <!-- Filter + search. Both are views over the list; neither mutates it. -->
-        <div class="project-toolbar" data-reveal="fade" id="project-toolbar">
+        <div class="project-toolbar" data-reveal="fade" id="project-toolbar" data-auth-only>
           <div class="filter-row">
             <!-- Filters are rendered from the project statuses that exist. -->
             <div class="segmented" role="group" aria-label="Filter projects" id="project-filters"></div>
@@ -107,9 +154,9 @@
         </div>
 
         <h2 class="sr-only" id="projects-list-title">Your projects</h2>
-        <div class="projects-grid" id="projects-grid" aria-labelledby="projects-list-title"></div>
+        <div class="projects-grid" id="projects-grid" aria-labelledby="projects-list-title" data-auth-only></div>
 
-        <div class="empty" id="projects-empty" hidden>
+        <div class="empty" id="projects-empty" data-auth-only role="status" hidden>
           <span class="empty__mark" aria-hidden="true">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
                  stroke-linecap="round" stroke-linejoin="round">
@@ -118,11 +165,11 @@
             </svg>
           </span>
           <p class="empty__title">No projects yet</p>
-          <p class="empty__note">Build a game and it is saved here, on this device.</p>
+          <p class="empty__note">Build a game and it is saved here, on your account.</p>
           <a class="btn btn--primary empty__action" href="build.html">Build a Game</a>
         </div>
 
-        <div class="empty" id="projects-no-match" hidden>
+        <div class="empty" id="projects-no-match" data-auth-only hidden>
           <p class="empty__title" id="projects-no-match-title">No projects in this filter</p>
           <p class="empty__note" id="projects-no-match-note">Nothing has that state right now.</p>
           <div class="empty__actions">
@@ -135,7 +182,7 @@
           </div>
         </div>
 
-        <div class="empty" id="projects-no-results" hidden>
+        <div class="empty" id="projects-no-results" data-auth-only hidden>
           <p class="empty__title" id="projects-no-results-title">No matching projects</p>
           <p class="empty__note">Search checks project names and descriptions.</p>
           <button class="btn btn--ghost empty__action" type="button" id="projects-reset-search">
@@ -154,7 +201,7 @@
             <h2 class="confirm__title" id="project-delete-title">Delete this project?</h2>
             <p class="confirm__note" id="project-delete-note">
               <span class="confirm__name" id="project-delete-name"></span>
-              is removed from this device for good. This cannot be undone.
+              is deleted from your account for good. This cannot be undone.
             </p>
             <div class="confirm__actions">
               <button class="btn btn--ghost btn--sm" type="button" id="project-delete-cancel">
@@ -180,7 +227,7 @@
           <a href="build.html">Build</a>
           <a href="settings.html">Settings</a>
         </nav>
-        <span class="site-footer__tag">Simulated builds</span>
+        <span class="site-footer__tag">Stored on your account</span>
       </div>
     </footer>
   </div>
@@ -197,10 +244,16 @@
   <script src="js/services/projects/projectModel.js"></script>
   <script src="js/services/projects/localProjectService.js"></script>
   <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/services/api/errors.js"></script>
   <script src="js/services/api/apiClient.js"></script>
+  <script src="js/services/api/sseClient.js"></script>
+  <script src="js/services/auth/authService.js"></script>
   <script src="js/services/projects/remoteProjectService.js"></script>
   <script src="js/services/ai/remoteAIService.js"></script>
+  <script src="js/services/connections/remoteRobloxService.js"></script>
+  <script src="js/services/connections/remoteStudioService.js"></script>
   <script src="js/services/mode.js"></script>
+  <script src="js/controllers/authController.js"></script>
   <script src="js/controllers/buildController.js"></script>
   <script src="js/controllers/connectionController.js"></script>
   <script src="js/controllers/projectController.js"></script>

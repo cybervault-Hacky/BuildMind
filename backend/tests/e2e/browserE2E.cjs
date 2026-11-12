@@ -17,7 +17,30 @@
    layout). Requires the backend on :3100 and PostgreSQL.
    ========================================================================== */
 
-const puppeteer = require('/tmp/browser/node_modules/puppeteer-core');
+/*
+  The browser is resolved from the environment so the suite can run on a
+  developer machine and in CI without editing the file. The defaults are the
+  locations the repository's own tooling provisions.
+*/
+const path = require('node:path');
+
+const CHROME = process.env.CHROMIUM_PATH || '/tmp/chromium/chromium';
+const PUPPETEER = process.env.PUPPETEER_CORE || '/tmp/browser/node_modules/puppeteer-core';
+
+/*
+  Chromium needs its own shared libraries on the loader path. The ones that
+  ship next to the binary (SwiftShader, EGL) are found through the binary's
+  own directory, so that is always included; the compatibility libraries from
+  the environment archive are appended when they exist.
+*/
+const LIBS = [
+  path.dirname(CHROME),
+  process.env.CHROMIUM_LIBS || '/tmp/al2023x/lib',
+]
+  .filter(Boolean)
+  .join(':');
+
+const puppeteer = require(PUPPETEER);
 
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8180';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -50,10 +73,10 @@ async function newPage(browser) {
 
 (async () => {
   const browser = await puppeteer.launch({
-    executablePath: '/tmp/chromium',
+    executablePath: CHROME,
     headless: 'shell',
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--single-process', '--disable-gpu'],
-    env: { ...process.env, LD_LIBRARY_PATH: '/tmp/al2023x/lib' },
+    env: { ...process.env, LD_LIBRARY_PATH: LIBS },
   });
 
   const email = `e2e-${Date.now()}@example.com`;
@@ -433,10 +456,10 @@ async function newPage(browser) {
         the wrong reason.
       */
       const isolated = await puppeteer.launch({
-        executablePath: '/tmp/chromium',
+        executablePath: CHROME,
         headless: 'shell',
         args: ['--no-sandbox', '--disable-dev-shm-usage', '--single-process', '--disable-gpu'],
-        env: { ...process.env, LD_LIBRARY_PATH: '/tmp/al2023x/lib' },
+        env: { ...process.env, LD_LIBRARY_PATH: LIBS },
       });
       const page = await isolated.newPage();
       await page.goto(`${BASE}/index.html?mode=remote`, { waitUntil: 'networkidle2' });

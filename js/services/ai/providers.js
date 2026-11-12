@@ -1,15 +1,17 @@
 /* ==========================================================================
    BuildMind — services/ai/providers.js
-   The single source of truth for AI providers and their models.
+   The provider catalogue.
 
-   Nothing else in the app may define a provider or model list. Build UI,
-   Settings UI and validation all read from here, which is why adding a
-   provider means editing this file only:
+   One catalogue for the whole app, so the Build UI, the Settings UI and the
+   validation rules can never disagree about which models exist.
 
-     { id, label, note, requiresKey, models: [{ id, label }] }
+   The list below is the *offline* catalogue: it is what the simulated mode
+   uses, and it is the starting value in every mode. In `remote` mode the
+   catalogue is replaced by the backend's own list (`setProviders`), because
+   the backend is the authority on which providers and models exist — a
+   client must not be able to offer a model the server does not have.
 
-   These are configuration records, not integrations. No provider below is
-   contacted in any way; Phase 4 ships a mock implementation behind them.
+   Shape: { id, label, note, requiresKey, models: [{ id, label }] }
    ========================================================================== */
 
 (function () {
@@ -17,11 +19,11 @@
 
   const BM = (window.BuildMind = window.BuildMind || {});
 
-  const PROVIDERS = [
+  const OFFLINE_PROVIDERS = [
     {
       id: "openai",
       label: "OpenAI",
-      note: "Simulated provider",
+      note: "Requires your own key",
       requiresKey: true,
       models: [
         { id: "gpt-4.1", label: "GPT-4.1" },
@@ -30,72 +32,99 @@
       ],
     },
     {
-      id: "anthropic",
-      label: "Anthropic",
-      note: "Simulated provider",
-      requiresKey: true,
-      models: [
-        { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-        { id: "claude-opus-4-1", label: "Claude Opus 4.1" },
-        { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-      ],
-    },
-    {
       id: "google",
       label: "Google",
-      note: "Simulated provider",
+      note: "Requires your own key",
       requiresKey: true,
       models: [
-        { id: "gemini-2-5-pro", label: "Gemini 2.5 Pro" },
-        { id: "gemini-2-5-flash", label: "Gemini 2.5 Flash" },
+        { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+        { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
       ],
-    },
-    {
-      id: "xai",
-      label: "xAI",
-      note: "Simulated provider",
-      requiresKey: true,
-      models: [{ id: "grok-4", label: "Grok 4" }],
     },
   ];
 
   const DEFAULT_PROVIDER_ID = "openai";
 
+  /** The live catalogue. Replaced wholesale when the backend answers. */
+  let providers = OFFLINE_PROVIDERS.map((provider) => ({
+    ...provider,
+    models: provider.models.map((model) => ({ ...model })),
+  }));
+
   function list() {
-    return PROVIDERS.map((provider) => ({
+    return providers.map((provider) => ({
       ...provider,
       models: provider.models.map((model) => ({ ...model })),
     }));
   }
 
   function find(id) {
-    return PROVIDERS.find((provider) => provider.id === id) || null;
+    return providers.find((provider) => provider.id === id) || null;
   }
 
   /** Never throws: an unknown id falls back to the default provider. */
   function resolve(id) {
-    return find(id) || find(DEFAULT_PROVIDER_ID) || PROVIDERS[0];
+    return find(id) || find(DEFAULT_PROVIDER_ID) || providers[0] || null;
   }
 
   function models(providerId) {
     const provider = resolve(providerId);
-    return provider.models.map((model) => ({ ...model }));
+    return provider ? provider.models.map((model) => ({ ...model })) : [];
   }
 
   function findModel(providerId, modelId) {
     const provider = resolve(providerId);
+    if (!provider) return null;
     return provider.models.find((model) => model.id === modelId) || null;
   }
 
   /** First model of a provider — the value a provider switch cascades to. */
   function defaultModel(providerId) {
     const provider = resolve(providerId);
-    return provider.models[0] ? provider.models[0].id : "";
+    return provider && provider.models[0] ? provider.models[0].id : "";
+  }
+
+  /**
+   * Replace the catalogue with the backend's list.
+   *
+   * Only records that carry an id and at least one model are accepted: a
+   * malformed entry must not empty the dropdown. The result is reported so
+   * the caller can tell whether anything was adopted.
+   */
+  function setProviders(records) {
+    if (!Array.isArray(records)) return { adopted: 0 };
+
+    const next = records
+      .filter((provider) => provider && typeof provider.id === "string" && provider.id)
+      .map((provider) => ({
+        id: provider.id,
+        label: provider.label || provider.displayName || provider.id,
+        note: provider.note || (provider.managedAvailable ? "BuildMind-managed" : "Your key"),
+        // A provider BuildMind pays for needs no key from the user.
+        requiresKey: provider.requiresKey !== false && !provider.managedAvailable,
+        models: (provider.models || [])
+          .filter((model) => model && typeof model.id === "string" && model.id)
+          .map((model) => ({ id: model.id, label: model.label || model.displayName || model.id })),
+      }))
+      .filter((provider) => provider.models.length > 0);
+
+    if (!next.length) return { adopted: 0 };
+    providers = next;
+    return { adopted: next.length };
+  }
+
+  /** Restore the offline catalogue. Used by the simulated mode and by tests. */
+  function reset() {
+    providers = OFFLINE_PROVIDERS.map((provider) => ({
+      ...provider,
+      models: provider.models.map((model) => ({ ...model })),
+    }));
+    return list();
   }
 
   Object.assign(BM, {
-    PROVIDERS,
+    PROVIDERS: OFFLINE_PROVIDERS,
     DEFAULT_PROVIDER_ID,
-    providerCatalog: { list, find, resolve, models, findModel, defaultModel },
+    providerCatalog: { list, find, resolve, models, findModel, defaultModel, setProviders, reset },
   });
 })();

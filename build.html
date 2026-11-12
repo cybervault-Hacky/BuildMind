@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Build a Game — BuildMind</title>
   <meta name="description" content="Describe the game you want to build and let BuildMind plan, build and test it.">
-  <meta name="theme-color" content="#060608">
+  <meta name="theme-color" content="#08090c">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="BuildMind">
   <meta property="og:title" content="Build a Game — BuildMind">
@@ -15,7 +15,9 @@
   <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
   <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
   <script src="js/boot-class.js"></script>
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/animations.css">
   <link rel="stylesheet" href="css/responsive.css">
   <noscript>
@@ -87,7 +89,27 @@
 
         <p class="sr-only" id="build-live" role="status" aria-live="polite"></p>
 
-        <div class="workspace">
+        <!-- The workspace needs a session. While the session is being checked
+             nothing is shown, so the page never flashes a signed-in layout it
+             then has to take away. -->
+        <div class="empty" id="build-auth-gate" data-auth-gate role="status"
+             data-gate-title="Sign in to build"
+             data-gate-note="A build runs on the BuildMind server and needs an account."
+             data-gate-error-title="The service is unavailable"
+             data-gate-error-note="BuildMind could not reach its server. Check the connection and try again.">
+          <span class="empty__mark" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="7" width="10" height="7" rx="1.6"/>
+              <path d="M5.6 7V5.2a2.4 2.4 0 0 1 4.8 0V7"/>
+            </svg>
+          </span>
+          <p class="empty__title">Sign in to build</p>
+          <p class="empty__note">A build runs on the BuildMind server and needs an account.</p>
+          <a class="btn btn--primary empty__action" href="settings.html#account">Sign in</a>
+        </div>
+
+        <div class="workspace" data-auth-only>
           <!-- ============ Composer ============ -->
           <div class="composer">
             <!-- Active project context. Hidden until a project is open, so a
@@ -114,25 +136,25 @@
                 <span class="group-hint group-hint--keys">⌘ + Enter to build</span>
               </div>
 
-              <div class="field-errors field" data-field="prompt">
-              <div class="prompt-block">
-                <label class="sr-only" for="game-prompt">Describe the game you want to build</label>
-                <textarea class="prompt-block__textarea" id="game-prompt" name="prompt"
-                          maxlength="600" spellcheck="true"
-                          placeholder="Describe the game you want to build..."></textarea>
+              <div class="field" data-field="prompt">
+                <div class="prompt-block">
+                  <label class="sr-only" for="game-prompt">Describe the game you want to build</label>
+                  <textarea class="prompt-block__textarea" id="game-prompt" name="prompt"
+                            maxlength="600" spellcheck="true"
+                            placeholder="Describe the game you want to build..."></textarea>
 
-                <div class="prompt-block__bar">
-                  <div class="prompt-block__bar-left">
-                    <span class="prompt-block__count"><span id="prompt-count">0</span> / 600</span>
-                  </div>
-                  <div class="prompt-block__bar-right">
-                    <button class="btn btn--quiet btn--sm" type="button" id="prompt-clear" hidden>Clear</button>
-                    <button class="btn btn--ghost btn--sm" type="button" id="prompt-idea">
-                      Use an example
-                    </button>
+                  <div class="prompt-block__bar">
+                    <div class="prompt-block__bar-left">
+                      <span class="prompt-block__count"><span id="prompt-count">0</span> / 600</span>
+                    </div>
+                    <div class="prompt-block__bar-right">
+                      <button class="btn btn--quiet btn--sm" type="button" id="prompt-clear" hidden>Clear</button>
+                      <button class="btn btn--ghost btn--sm" type="button" id="prompt-idea">
+                        Use an example
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
                 <p class="field__error" id="prompt-error" hidden></p>
               </div>
 
@@ -162,9 +184,7 @@
                   <label class="field__label" for="provider">Provider</label>
                   <select class="select" id="provider" name="provider">
                     <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
                     <option value="google">Google</option>
-                    <option value="xai">xAI</option>
                   </select>
                   <p class="field__error" id="provider-error" hidden></p>
                 </div>
@@ -208,7 +228,7 @@
             <section aria-labelledby="conn-label" data-reveal data-reveal-delay="120">
               <div class="group-head">
                 <h2 class="group-label" id="conn-label">Connections</h2>
-                <span class="group-hint">Simulated</span>
+                <span class="group-hint">Server-side</span>
               </div>
 
               <div class="panel">
@@ -265,7 +285,7 @@
             <div class="build-bar" data-reveal="fade" data-reveal-delay="160">
               <span class="build-bar__hint">
                 <strong id="build-hint-title">Ready to build</strong>
-                <span id="build-hint-note">Simulated — nothing leaves your browser</span>
+                <span id="build-hint-note">Runs on the BuildMind server</span>
               </span>
               <!-- Hidden until build.js wires it up: no dead primary action. -->
               <button class="btn btn--primary" type="button" id="build-button" hidden>
@@ -321,14 +341,14 @@
               </div>
             </div>
 
-            <!-- Agent activity feed — simulated log lines, newest first -->
+            <!-- Agent activity feed — live log lines from the running build, newest first -->
             <div class="panel" id="activity-feed-panel" data-reveal="fade" data-reveal-delay="180" hidden>
               <div class="panel__head">
                 <span class="panel__title">Log</span>
                 <span class="log__count" id="activity-count">0</span>
               </div>
               <div class="panel__body">
-                <ol class="log" id="activity-feed" aria-label="Simulated build log"
+                <ol class="log" id="activity-feed" aria-label="Build log"
                     aria-live="off"></ol>
                 <p class="log__empty" id="activity-empty">
                   Activity appears here while a build runs.
@@ -365,7 +385,7 @@
                     <dd id="result-created">Just now</dd>
                   </div>
                 </dl>
-                <p class="result__note">Simulated result — nothing was published.</p>
+                <p class="result__note">The build ran on the BuildMind server.</p>
                 <div class="result__actions">
                   <a class="btn btn--primary btn--sm" id="result-open" href="projects.html">
                     Open project
@@ -393,7 +413,7 @@
           <a href="projects.html">Projects</a>
           <a href="settings.html">Settings</a>
         </nav>
-        <span class="site-footer__tag">Simulated build</span>
+        <span class="site-footer__tag">Real builds</span>
       </div>
     </footer>
   </div>
@@ -410,10 +430,16 @@
   <script src="js/services/projects/projectModel.js"></script>
   <script src="js/services/projects/localProjectService.js"></script>
   <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/services/api/errors.js"></script>
   <script src="js/services/api/apiClient.js"></script>
+  <script src="js/services/api/sseClient.js"></script>
+  <script src="js/services/auth/authService.js"></script>
   <script src="js/services/projects/remoteProjectService.js"></script>
   <script src="js/services/ai/remoteAIService.js"></script>
+  <script src="js/services/connections/remoteRobloxService.js"></script>
+  <script src="js/services/connections/remoteStudioService.js"></script>
   <script src="js/services/mode.js"></script>
+  <script src="js/controllers/authController.js"></script>
   <script src="js/controllers/buildController.js"></script>
   <script src="js/controllers/connectionController.js"></script>
   <script src="js/controllers/projectController.js"></script>

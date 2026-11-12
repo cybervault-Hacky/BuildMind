@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings — BuildMind</title>
   <meta name="description" content="Configure your AI provider, Roblox connections and appearance.">
-  <meta name="theme-color" content="#060608">
+  <meta name="theme-color" content="#08090c">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="BuildMind">
   <meta property="og:title" content="Settings — BuildMind">
@@ -15,7 +15,9 @@
   <meta property="og:image" content="assets/game-scenes/scene-lattice.svg">
   <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
   <script src="js/boot-class.js"></script>
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/animations.css">
   <link rel="stylesheet" href="css/responsive.css">
 </head>
@@ -80,7 +82,7 @@
               <div class="settings-section__titles">
                 <h2 class="settings-section__title" id="ai-title" tabindex="-1">AI configuration</h2>
                 <p class="settings-section__note" id="ai-note">
-                  Simulated — no provider is contacted.
+                  Your key is checked against the provider when you test it.
                 </p>
               </div>
               <!-- Configuration status: derived from state, never colour-only. -->
@@ -120,7 +122,7 @@
                 </span>
               </span>
               <span class="setting-row__control setting-row__control--stack">
-                <span class="input-group">
+                <span class="input-group" style="display: flex">
                   <input class="input" id="settings-api-key" name="api-key" type="password"
                          autocomplete="off" spellcheck="false"
                          aria-describedby="settings-key-note settings-key-state">
@@ -140,6 +142,25 @@
                 <p class="field__error" id="settings-key-error" hidden></p>
               </span>
             </div>
+
+            <!-- Real validation. Only the backend can move this to "Valid". -->
+            <div class="setting-row setting-row--stacked">
+              <span class="setting-row__copy">
+                <span class="setting-row__title" id="settings-validate-title">Test the connection</span>
+                <span class="setting-row__note" id="settings-validate-note">
+                  Sends one request to the provider to check the key really works.
+                </span>
+              </span>
+              <span class="setting-row__control setting-row__control--stack">
+                <span class="status status--idle" id="settings-provider-status">
+                  <span class="status__dot" aria-hidden="true"></span>
+                  <span class="status__text">Not configured</span>
+                </span>
+                <button class="btn btn--ghost btn--sm" type="button" id="settings-validate-provider"
+                        aria-describedby="settings-validate-note">Test connection</button>
+                <p class="setting-row__state" id="settings-validate-detail"></p>
+              </span>
+            </div>
           </section>
 
           <!-- ================= Connections ================= -->
@@ -148,7 +169,8 @@
               <div class="settings-section__titles">
                 <h2 class="settings-section__title" id="roblox-title" tabindex="-1">Connections</h2>
                 <p class="settings-section__note">
-                  Simulated for this session — no account is signed in and no bridge is opened.
+                  The BuildMind server holds these connections. Roblox needs an account; Studio
+                  is connected from the plugin inside Roblox Studio.
                 </p>
               </div>
             </div>
@@ -260,11 +282,26 @@
               <div class="settings-section__titles">
                 <h2 class="settings-section__title" id="account-title" tabindex="-1">Account</h2>
                 <p class="settings-section__note" id="account-note">
-                  Sign in to store projects on the BuildMind server instead of this browser.
-                  Signed out, everything stays local and nothing is uploaded.
+                  Sign in to store your projects on the BuildMind server under your account.
                 </p>
               </div>
               <span class="status-pill" id="account-mode" data-mode="local">Local only</span>
+            </div>
+
+            <!-- Session check in flight. Nothing is claimed until it answers. -->
+            <div id="account-pending" role="status" hidden>
+              <div class="setting-row">
+                <span class="setting-row__copy">
+                  <span class="setting-row__title">Checking your session…</span>
+                  <span class="setting-row__note">
+                    Asking the BuildMind server whether you are signed in.
+                  </span>
+                </span>
+              </div>
+              <div class="loading-state" aria-hidden="true">
+                <span class="skeleton skeleton--line" style="inline-size: 46%"></span>
+                <span class="skeleton skeleton--line" style="inline-size: 32%"></span>
+              </div>
             </div>
 
             <!-- Signed out -->
@@ -349,7 +386,8 @@
               <div class="settings-section__titles">
                 <h2 class="settings-section__title" id="data-title" tabindex="-1">Stored in this browser</h2>
                 <p class="settings-section__note" id="data-note">
-                  Preferences save as you change them. Projects and prompts are not settings.
+                  Preferences save as you change them. Projects are stored on the server and are
+                  not affected by a settings reset.
                 </p>
               </div>
             </div>
@@ -358,8 +396,8 @@
               <span class="setting-row__copy">
                 <span class="setting-row__title">Reset settings</span>
                 <span class="setting-row__note" id="reset-note">
-                  Restores the default provider, model, motion and preferences, and disconnects both
-                  simulated connections. Your projects and prompt draft are kept.
+                  Restores the default provider, model, motion and preferences, and clears both
+                  connections. Your projects and prompt draft are kept.
                 </span>
               </span>
               <span class="setting-row__control">
@@ -379,7 +417,7 @@
             <h2 class="confirm__title" id="reset-dialog-title">Reset settings?</h2>
             <p class="confirm__note" id="reset-dialog-note">
               Restores the default provider and model, full motion and the default preferences, and
-              disconnects both simulated connections. Your projects and prompt draft are kept.
+              clears both connections. Your projects and prompt draft are kept.
             </p>
             <div class="confirm__actions">
               <button class="btn btn--ghost btn--sm" type="button" id="reset-cancel">Keep settings</button>
@@ -401,7 +439,7 @@
           <a href="build.html">Build</a>
           <a href="projects.html">Projects</a>
         </nav>
-        <span class="site-footer__tag">Stored in this browser</span>
+        <span class="site-footer__tag">Preferences stay local</span>
       </div>
     </footer>
   </div>
@@ -418,10 +456,16 @@
   <script src="js/services/projects/projectModel.js"></script>
   <script src="js/services/projects/localProjectService.js"></script>
   <script src="js/services/settings/localSettingsService.js"></script>
+  <script src="js/services/api/errors.js"></script>
   <script src="js/services/api/apiClient.js"></script>
+  <script src="js/services/api/sseClient.js"></script>
+  <script src="js/services/auth/authService.js"></script>
   <script src="js/services/projects/remoteProjectService.js"></script>
   <script src="js/services/ai/remoteAIService.js"></script>
+  <script src="js/services/connections/remoteRobloxService.js"></script>
+  <script src="js/services/connections/remoteStudioService.js"></script>
   <script src="js/services/mode.js"></script>
+  <script src="js/controllers/authController.js"></script>
   <script src="js/controllers/buildController.js"></script>
   <script src="js/controllers/connectionController.js"></script>
   <script src="js/controllers/projectController.js"></script>

@@ -14,6 +14,7 @@ backend/.env.*
 
 # --- local runtime state ---
 backend/.workspaces/
+backend/.workspaces-e2e/
 *.log
 
 # --- browser/test artifacts ---

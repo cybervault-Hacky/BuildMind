@@ -55,6 +55,8 @@
     restoring: false,
     clock: 0,
     resultKey: "",
+    /** True while a stop request is waiting for the backend to confirm it. */
+    stopping: false,
   };
 
   const LAST_INDEX = BUILD_STAGES.length - 1;
@@ -485,14 +487,14 @@
      Action bar
      ------------------------------------------------------------------------ */
   const HINTS = {
-    ready: ["Ready to build", "Simulated — nothing leaves your browser"],
-    building: ["Building", "Simulated run — stop any time"],
-    testing: ["Testing", "Simulated run — stop any time"],
+    ready: ["Ready to build", "Runs on the BuildMind server"],
+    building: ["Building", "Real run — stop any time"],
+    testing: ["Testing", "Real run — stop any time"],
     fixing: ["Fixing", "Resolving detected issues"],
-    validating: ["Validating", "Simulated run — stop any time"],
-    complete: ["Build complete", "Added to Projects — simulated, nothing published"],
+    validating: ["Validating", "Real run — stop any time"],
+    complete: ["Build complete", "Added to Projects"],
     stopped: ["Build stopped", "The build was stopped before completion"],
-    error: ["Build could not be completed", "Try again — nothing was published"],
+    error: ["Build could not be completed", "Try again"],
   };
 
   function paintAction(build) {
@@ -500,14 +502,19 @@
 
     const preparing = build.phase === "preparing";
     const running = RUNNING_STATUSES.includes(build.status) || preparing;
-    const hint = preparing
-      ? ["Preparing build", "Starting the simulated run"]
+    const stopping = local.stopping;
+    const hint = stopping
+      ? ["Stopping", "Waiting for the server to confirm"]
+      : preparing
+      ? ["Preparing build", "Starting the build on the server"]
       : HINTS[build.status] || HINTS.ready;
 
     // Primary action label follows the state machine.
     let label = "Build Game";
     let iconName = "";
-    if (running) {
+    if (stopping) {
+      label = "Stopping…";
+    } else if (running) {
       label = "Stop build";
       iconName = icon("stop");
     } else if (build.status === BUILD.COMPLETE) {
@@ -524,13 +531,13 @@
     // Never `aria-busy` here: the button stays operable (it is the Stop
     // control while running) and busy would also disable pointer events.
     el.buildButton.removeAttribute("aria-busy");
-    el.buildButton.disabled = false;
+    el.buildButton.disabled = stopping;
     // The markup ships the button hidden so there is never a dead action
     // before the renderer runs; this is the one place it is revealed.
     el.buildButton.hidden = false;
     el.buildButton.setAttribute(
       "aria-label",
-      running ? "Stop the running build" : `${label} — simulated`
+      running ? "Stop the running build" : label
     );
 
     if (el.hintTitle) el.hintTitle.textContent = hint[0];
@@ -562,11 +569,21 @@
      Connections
      ------------------------------------------------------------------------ */
   function connectionLabel(status) {
-    return { disconnected: "Not connected", connecting: "Connecting", connected: "Connected" }[status];
+    return {
+      disconnected: "Not connected",
+      connecting: "Connecting",
+      connected: "Connected",
+      unavailable: "External integration required",
+    }[status];
   }
 
   function connectionTone(status) {
-    return { disconnected: "idle", connecting: "active", connected: "ready" }[status];
+    return {
+      disconnected: "idle",
+      connecting: "active",
+      connected: "ready",
+      unavailable: "warn",
+    }[status];
   }
 
   function paintConnection(target) {
@@ -581,7 +598,12 @@
     setStatus(statusNode, connectionLabel(status), connectionTone(status));
 
     if (subNode) {
-      subNode.textContent = status === "connected" ? "Simulated · this session" : offSub;
+      subNode.textContent =
+        status === "connected"
+          ? "Connected to the BuildMind server"
+          : status === "unavailable"
+          ? "Not available on this server"
+          : offSub;
     }
 
     if (row) row.dataset.status = status;
@@ -614,11 +636,21 @@
     const label = target === "roblox" ? "Roblox connection" : "Studio bridge";
 
     if (!BM.isOk(result)) {
-      toast(result.error.message || "The connection was not available.");
+      toast(result.error.message || "The connection was not available.", "error");
       return;
     }
 
-    toast(status === "connected" ? `${BM.connectionController.label(target)} disconnected` : `${label} simulated`);
+    // A real OAuth hand-off: the browser leaves for the provider, and the
+    // provider sends the user back with a code.
+    if (result.data && result.data.authorizeUrl) {
+      window.location.assign(result.data.authorizeUrl);
+      return;
+    }
+
+    const next = result.data && result.data.status;
+    if (next === "connected") toast(`${BM.connectionController.label(target)} connected`);
+    else if (next === "unavailable") toast(result.error ? result.error.message : `${label} is not available`, "error");
+    else toast(`${label} disconnected`);
   }
 
   /* ------------------------------------------------------------------------
@@ -731,14 +763,44 @@
     // Covers the `preparing` beat as well as a live run: the second click is
     // always a Stop, never a second build.
     if (RUNNING_STATUSES.includes(build.status) || build.phase === "preparing") {
-      BM.buildController.stop().then(() => toast("Build stopped"));
+      if (local.stopping) return;
+      local.stopping = true;
+      paintAction(build);
+
+      // The stop is a server operation: the UI settles only once the server
+      // has confirmed it.
+      BM.buildController.stop().then((result) => {
+        local.stopping = false;
+        paintAction(getState().build);
+        if (!BM.isOk(result)) {
+          announce(result.error ? result.error.message : "The build could not be stopped.");
+          toast(result.error ? result.error.message : "The build could not be stopped.", "error");
+          return;
+        }
+        toast(result.data && result.data.stopped ? "Build stopped" : "The build already finished", "info");
+      });
       return;
     }
 
-    if (build.status === BUILD.ERROR) {
+    const promptNow = el.prompt ? el.prompt.value.trim() : "";
+    const samePrompt = promptNow && promptNow === String(build.prompt || "").trim();
+
+    if (build.status === BUILD.ERROR || (build.status === BUILD.STOPPED && samePrompt)) {
       clearErrors();
-      BM.buildController.retry().then((result) => {
-        if (!BM.isOk(result)) announce("Build not started. Check the highlighted fields.");
+      const key = el.apiKey ? el.apiKey.value.trim() : "";
+      if (key) {
+        setApiKeyPresent(true);
+        clearKeyField();
+      }
+      // A retry is a new execution on the server: a new build and a new run.
+      BM.buildController.retry(key ? { apiKey: key } : {}).then((result) => {
+        if (BM.isOk(result)) return;
+        if (result.error && result.error.fields) {
+          Object.keys(result.error.fields).forEach((field) =>
+            setFieldError(field, result.error.fields[field])
+          );
+        }
+        announce((result.error && result.error.message) || "Build not started. Check the highlighted fields.");
       });
       return;
     }
@@ -772,16 +834,17 @@
       }
 
       // The key is handed to the controller in memory only — never stored,
-      // never logged, never put in a URL. The field is cleared immediately and
-      // only a presence flag remains for this session.
+      // never logged, never put in a URL. It travels in the request body to
+      // the server, which keeps it for the session; the field is cleared
+      // immediately and only a presence flag remains here.
       setApiKeyPresent(hasKey);
       if (key.trim()) clearKeyField();
       setFieldError("apiKey", "");
       $("#api-key-hint")?.replaceChildren(
-        document.createTextNode("Key entered for this session · not saved")
+        document.createTextNode("Key sent to the server · never stored in this browser")
       );
 
-      BM.buildController.start({ prompt, hasKey }).then((started) => {
+      BM.buildController.start({ prompt, hasKey, apiKey: key.trim() }).then((started) => {
         if (BM.isOk(started)) return;
         if (started.error && started.error.type === "validation") {
           Object.keys(started.error.fields || {}).forEach((field) =>
@@ -1014,7 +1077,7 @@
         paintProviderOptions();
         paintModelOptions();
         paintConfigStatus();
-        if (!BM.isOk(result)) return toast(result.error.message);
+        if (!BM.isOk(result)) return toast(result.error.message, "error");
         setFieldError("provider", "");
         toast("Provider updated");
       });
@@ -1025,7 +1088,7 @@
       BM.settingsController.setModel(el.model.value).then((result) => {
         paintModelOptions();
         paintConfigStatus();
-        if (!BM.isOk(result)) return toast(result.error.message);
+        if (!BM.isOk(result)) return toast(result.error.message, "error");
         setFieldError("model", "");
       });
     });
@@ -1087,16 +1150,34 @@
     const preset = params.get("prompt");
 
     if (projectId) {
-      local.deepLinked = projectId;
-      return BM.projectController.open(projectId).then((result) => {
-        if (!BM.isOk(result)) {
-          toast("That project could not be opened.");
-          return restoreDraft();
+      const openProject = () => {
+        if (BM.serviceMode === BM.SERVICE_MODES.REMOTE && !BM.isAuthenticated()) {
+          return Promise.resolve();
         }
-        applyProjectContext(result.data.project, true);
-        announce("Project loaded. The prompt is editable.");
-        return result;
-      });
+        local.deepLinked = projectId;
+        return BM.projectController.open(projectId).then((result) => {
+          if (!BM.isOk(result)) {
+            toast("That project could not be opened.", "error");
+            return restoreDraft();
+          }
+          applyProjectContext(result.data.project, true);
+          announce("Project loaded. The prompt is editable.");
+          return result;
+        });
+      };
+
+      if (BM.serviceMode === BM.SERVICE_MODES.REMOTE && getState().auth.status === "loading") {
+        return new Promise((resolve) => {
+          const off = subscribe((view, changed) => {
+            if (changed.includes("auth") && view.auth.status !== "loading") {
+              off();
+              resolve(openProject());
+            }
+          });
+        });
+      }
+
+      return openProject();
     }
 
     if (preset) {

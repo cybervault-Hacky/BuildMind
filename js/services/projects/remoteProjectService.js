@@ -12,8 +12,9 @@
      remote (ISO strings, snake-derived camelCase) → the frontend project shape
      documented in localProjectService.js (epoch-ms timestamps, art/scene).
 
-   Methods the backend cannot answer from storage alone (recordBuild,
-   markRun) are implemented against the build API, not invented.
+   There is no sample data here and no fallback to it. An empty list means the
+   authenticated user really has no projects; an unreachable API is reported
+   as a failure, never as an empty list.
    ========================================================================== */
 
 (function () {
@@ -56,6 +57,7 @@
 
   /** remote project → frontend project */
   function toProject(remote) {
+    if (!remote || !remote.id) return null;
     const art = pickArt(remote.id);
     return {
       id: remote.id,
@@ -100,49 +102,66 @@
   const implementation = {
     mode: "remote",
 
-    listProjects() {
-      return BM.api.listProjects({ limit: 100 }).then((result) => {
-        if (!BM.isOk(result)) return result;
-        const projects = (result.data.projects || []).map(toProject);
-        emit(projects);
-        return ok({ projects });
-      });
-    },
-
-    getProject(id) {
-      return BM.api.getProject(id).then((result) => {
-        if (!BM.isOk(result)) return result;
-        return ok({ project: toProject(result.data.project) });
-      });
-    },
-
-    createProject(data) {
-      const input = data || {};
+    listProjects(query, options) {
+      const params = query || {};
       return BM.api
-        .createProject({
-          name: String(input.name || "Untitled game").slice(0, 60),
-          description: String(input.description || "").slice(0, 280),
-          ...(input.prompt ? { prompt: String(input.prompt) } : {}),
-        })
+        .listProjects({ limit: params.limit || 100 }, options)
+        .then((result) => {
+          if (!BM.isOk(result)) return result;
+          const projects = (result.data.projects || []).map(toProject).filter(Boolean);
+          emit(projects);
+          return ok({ projects, nextCursor: result.data.nextCursor || null });
+        });
+    },
+
+    getProject(id, options) {
+      return BM.api.getProject(id, options).then((result) => {
+        if (!BM.isOk(result)) return result;
+        const project = toProject(result.data.project);
+        return ok({ project });
+      });
+    },
+
+    createProject(data, options) {
+      const input = data || {};
+      const name = String(input.name || "Untitled game").trim().slice(0, 60) || "Untitled game";
+      return BM.api
+        .createProject(
+          {
+            name,
+            description: String(input.description || "").slice(0, 280),
+            ...(input.prompt ? { prompt: String(input.prompt) } : {}),
+          },
+          options
+        )
         .then((result) => {
           if (!BM.isOk(result)) return result;
           return ok({ project: toProject(result.data.project) });
         });
     },
 
-    updateProject(id, patch) {
+    updateProject(id, patch, options) {
       const remotePatch = toRemotePatch(patch);
       if (Object.keys(remotePatch).length === 0) {
+        // Transient live-build status mirroring is owned by the backend's
+        // orchestrator rather than PATCH /projects/:id; reflect it locally in
+        // state without firing an empty HTTP PATCH.
+        if (patch && typeof patch.status === "string" && STATUS_MAP[patch.status]) {
+          const existing = BM.getState().projects.find((p) => p.id === id);
+          if (existing) {
+            return Promise.resolve(ok({ project: { ...existing, status: STATUS_MAP[patch.status] } }));
+          }
+        }
         return Promise.resolve(fail(ERROR_TYPES.VALIDATION, "Nothing to update."));
       }
-      return BM.api.updateProject(id, remotePatch).then((result) => {
+      return BM.api.updateProject(id, remotePatch, options).then((result) => {
         if (!BM.isOk(result)) return result;
         return ok({ project: toProject(result.data.project) });
       });
     },
 
-    deleteProject(id) {
-      return BM.api.deleteProject(id).then((result) => {
+    deleteProject(id, options) {
+      return BM.api.deleteProject(id, options).then((result) => {
         if (!BM.isOk(result)) return result;
         return ok({ id });
       });
@@ -152,23 +171,24 @@
      * Record a completed build against its project.
      *
      * On the remote path the backend already owns this relationship: a build
-     * row carries its project id. So this is a refresh, not a write — calling
-     * it must not create a second project, which is exactly the bug the local
+     * row carries its project id and the orchestrator writes the project's
+     * terminal status. So this is a refresh, not a write — calling it must
+     * not create a second project, which is exactly the bug the local
      * service's `recordBuild` guards against.
      */
-    recordBuild(input) {
+    recordBuild(input, options) {
       const projectId = input && input.projectId;
       if (!projectId) return Promise.resolve(fail(ERROR_TYPES.VALIDATION, "No project to record."));
 
-      return BM.api.getProject(projectId).then((result) => {
+      return BM.api.getProject(projectId, options).then((result) => {
         if (!BM.isOk(result)) return result;
         return ok({ project: toProject(result.data.project), created: false, duplicate: false });
       });
     },
 
     /** A stopped or failed run is recorded by the backend, not here. */
-    markRun(id) {
-      return BM.api.getProject(id).then((result) => {
+    markRun(id, outcome, runId, options) {
+      return BM.api.getProject(id, options).then((result) => {
         if (!BM.isOk(result)) return result;
         return ok({ project: toProject(result.data.project) });
       });
@@ -185,6 +205,6 @@
     },
   };
 
-  BM.remoteProjectService = createService("projects", implementation);
+  BM.remoteProjectService = createService("remoteProjectService", implementation);
   BM.toRemoteProject = toProject;
 })();

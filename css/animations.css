@@ -1,7 +1,16 @@
 /* ==========================================================================
    BuildMind — animations.css
-   Keyframes, entrance choreography, page-transition layer and the
-   reduced-motion contract. Everything animates via opacity/transform.
+   The motion system: keyframes, reusable entrance utilities, the page
+   transition layer, scroll-reveal choreography, dialog and toast
+   choreography, and the reduced-motion contract.
+
+   Rules for this file:
+     * only transform / opacity / clip-path / filter animate — with two
+       documented exceptions (progress fill width, timeline description
+       max-height) that carry state rather than decoration;
+     * every perpetual animation is registered in the reduced-motion block at
+       the bottom, so "reduce" genuinely stops motion;
+     * entrance classes are opt-in, not applied by default.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -27,10 +36,8 @@
   }
 }
 
-/* A pulsing halo that only animates transform + opacity, so the compositor
-   owns it and the dot never triggers a repaint. Animating box-shadow (the
-   previous implementation) repaints the element on every frame — measured at
-   0.145s of task time over 3s of a running build with 7 such dots on screen. */
+/* A pulsing halo that animates transform + opacity only, so the compositor
+   owns it and the dot never triggers a repaint. */
 @keyframes pulse-dot {
   0%,
   100% {
@@ -38,7 +45,7 @@
     opacity: 1;
   }
   50% {
-    transform: scale(1.9);
+    transform: scale(1.85);
     opacity: 0.55;
   }
 }
@@ -50,8 +57,8 @@
     opacity: 1;
   }
   50% {
-    transform: scale(1.34);
-    opacity: 0.72;
+    transform: scale(1.32);
+    opacity: 0.74;
   }
 }
 
@@ -65,13 +72,23 @@
   }
 }
 
-@keyframes glow-drift {
+@keyframes skeleton-sweep {
   0% {
-    transform: translate3d(-2%, 0, 0) scale(1);
-    opacity: 0.9;
+    transform: translateX(-100%);
   }
   100% {
-    transform: translate3d(3%, 4%, 0) scale(1.08);
+    transform: translateX(100%);
+  }
+}
+
+/* Ambient light fields drift on a minutes-long loop at a few pixels of travel */
+@keyframes ambient-drift {
+  0% {
+    transform: translate3d(-1.5%, 0, 0) scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(2.5%, 3%, 0) scale(1.06);
     opacity: 1;
   }
 }
@@ -79,7 +96,7 @@
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -96,6 +113,15 @@
   }
 }
 
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes scale-in {
   from {
     opacity: 0;
@@ -107,7 +133,39 @@
   }
 }
 
-/* SVG world construction motion */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dialog-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes log-in {
   from {
     opacity: 0;
@@ -161,118 +219,221 @@
   }
 }
 
+/* ---- Construction field ------------------------------------------------
+   The assembly is a six-beat sequence. Each beat is its own keyframe so a
+   rule can point at the beat it needs, and the whole thing runs once —
+   nothing loops except the two ambient beats at the end, which are registered
+   in the reduced-motion block below.
+
+   Every beat animates opacity and a transform. Nothing animates a path, a
+   `d` attribute or a layout property. */
+
+/* A corner-to-corner wipe that reads as a structure being drawn into place. */
+@keyframes field-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* A block rising out of the slab: it starts low and squashed, and grows to its
+   real height by scaling on Y from its base edge. */
+@keyframes field-rise {
+  from {
+    transform: translateY(9px) scaleY(0.6);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A node arriving: it lands slightly under-size and settles, which reads as
+   "placed" rather than "faded in". */
+@keyframes field-node-in {
+  from {
+    transform: scale(0.45);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* A guide line travelling from the plan down to the built corner. */
+@keyframes field-guide-in {
+  from {
+    stroke-dashoffset: 190;
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* The plan tier settles down onto the axis; the world settles up to meet it. */
+@keyframes field-plan-in {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes field-world-in {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Ambient: link dashes crawl along their path. */
+@keyframes field-dash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+/* Ambient: the marker on the tallest block breathes outward. */
+@keyframes field-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  60% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
 /* --------------------------------------------------------------------------
-   2. Page transition overlay
+   2. Entrance utilities
+
+   Opt-in classes for markup that should arrive rather than simply exist. The
+   delay is set by the `--enter-delay` custom property, so one class covers
+   every stagger without a rule per child.
+
+       .fade-in     opacity only
+       .fade-up     opacity + 12px rise
+       .fade-scale  opacity + 0.985 scale
+       .slide-in    opacity + 16px from the left
+       .reveal      the scroll-triggered variant (see section 5)
+   -------------------------------------------------------------------------- */
+.fade-in,
+.fade-up,
+.fade-scale,
+.slide-in,
+.reveal {
+  animation-fill-mode: both;
+  animation-timing-function: var(--ease-out);
+  animation-duration: 620ms;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.fade-up {
+  animation-name: rise-in;
+}
+
+.fade-scale {
+  animation-name: scale-in;
+  animation-duration: 520ms;
+}
+
+.slide-in {
+  animation-name: rise-in;
+  animation-duration: 560ms;
+}
+
+/* Stagger helper: set once on a group, honoured by the children */
+.stagger > * {
+  animation-delay: calc(var(--enter-stagger, 55ms) * var(--i, 0));
+}
+
+/* --------------------------------------------------------------------------
+   3. Page transitions
+
+   Navigation is a real page load, so links keep working without JavaScript.
+   The shell fades the outgoing document and the veil, and the incoming
+   document fades in from a short upward offset. Total perceived time is under
+   300ms; nothing is ever blocked for longer than the leave timer.
    -------------------------------------------------------------------------- */
 .page-veil {
   position: fixed;
   inset: 0;
-  z-index: 300;
-  background: var(--bg);
+  z-index: var(--layer-veil);
+  background: var(--bm-bg);
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--dur-3) var(--ease-out);
+  transition: opacity var(--motion-page) var(--ease-standard);
   will-change: opacity;
 }
 
 .page-veil.is-active {
-  opacity: 0.92;
+  opacity: 0.94;
 }
 
 body.is-leaving main,
-body.is-leaving .site-header {
-  transition: opacity var(--dur-2) var(--ease-soft), transform var(--dur-2) var(--ease-soft);
+body.is-leaving .site-header,
+body.is-leaving .site-footer {
+  transition: opacity var(--motion-normal) var(--ease-standard),
+    transform var(--motion-normal) var(--ease-standard);
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-6px);
 }
 
-/* Entrance for whole-document load */
-body.is-entering main,
-body.is-entering .site-header {
-  animation: fade-in var(--dur-4) var(--ease-out) both;
+/* Whole-document entrance */
+body.is-entering main {
+  animation: page-enter var(--motion-slow) var(--ease-out) both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* --------------------------------------------------------------------------
-   3. Choreographed entrances
-   Elements marked [data-reveal] start hidden and animate in when mounted
-   or when scrolled into view (app.js toggles .is-revealed).
-   -------------------------------------------------------------------------- */
-[data-reveal] {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out);
-  transition-delay: var(--reveal-delay, 0ms);
-  will-change: opacity, transform;
-}
-
-[data-reveal].is-revealed {
-  opacity: 1;
-  transform: none;
-}
-
-[data-reveal="fade"] {
-  transform: none;
-}
-
-[data-reveal="scale"] {
-  transform: scale(0.975);
-}
-
-[data-reveal="scale"].is-revealed {
-  transform: none;
-}
-
-/* Staggered children */
-[data-stagger] > * {
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out);
-}
-
-[data-stagger].is-revealed > * {
-  opacity: 1;
-  transform: none;
-}
-
-[data-stagger].is-revealed > *:nth-child(1) {
-  transition-delay: 0ms;
-}
-[data-stagger].is-revealed > *:nth-child(2) {
-  transition-delay: 55ms;
-}
-[data-stagger].is-revealed > *:nth-child(3) {
-  transition-delay: 110ms;
-}
-[data-stagger].is-revealed > *:nth-child(4) {
-  transition-delay: 165ms;
-}
-[data-stagger].is-revealed > *:nth-child(5) {
-  transition-delay: 220ms;
-}
-[data-stagger].is-revealed > *:nth-child(6) {
-  transition-delay: 275ms;
-}
-[data-stagger].is-revealed > *:nth-child(7) {
-  transition-delay: 330ms;
-}
-[data-stagger].is-revealed > *:nth-child(8) {
-  transition-delay: 385ms;
-}
-[data-stagger].is-revealed > *:nth-child(9) {
-  transition-delay: 440ms;
-}
-
-/* --------------------------------------------------------------------------
-   4. Component-level animation hooks
+   4. Component choreography
    -------------------------------------------------------------------------- */
 
-/* Mobile nav open */
+/* Mobile sheet */
 .mobile-nav.is-open {
-  animation: fade-in var(--dur-2) var(--ease-out) both;
+  animation: fade-in var(--motion-normal) var(--ease-out) both;
 }
 
 .mobile-nav.is-open .mobile-nav__link {
-  animation: rise-in var(--dur-3) var(--ease-out) both;
+  animation: rise-in var(--motion-slow) var(--ease-out) both;
 }
 
 .mobile-nav.is-open .mobile-nav__link:nth-child(1) {
@@ -288,37 +449,99 @@ body.is-entering .site-header {
   animation-delay: 120ms;
 }
 
-/* Timeline step states animate their internals */
-.timeline__step {
-  transition: opacity var(--dur-3) var(--ease-out);
+/* Project card entrance.
+   Only a node JS created carries `is-entering`, so a card updated in place
+   never replays the animation when its status or build time changes. */
+.project-card.is-entering {
+  animation: card-in 480ms var(--ease-out) both;
 }
 
-.timeline__step.is-pending {
-  opacity: 0.82;
+.projects-grid .project-card.is-entering:nth-child(1) {
+  animation-delay: 0ms;
+}
+.projects-grid .project-card.is-entering:nth-child(2) {
+  animation-delay: 45ms;
+}
+.projects-grid .project-card.is-entering:nth-child(3) {
+  animation-delay: 90ms;
+}
+.projects-grid .project-card.is-entering:nth-child(4) {
+  animation-delay: 135ms;
+}
+.projects-grid .project-card.is-entering:nth-child(5) {
+  animation-delay: 180ms;
+}
+.projects-grid .project-card.is-entering:nth-child(6) {
+  animation-delay: 225ms;
+}
+.projects-grid .project-card.is-entering:nth-child(7) {
+  animation-delay: 270ms;
+}
+.projects-grid .project-card.is-entering:nth-child(8) {
+  animation-delay: 315ms;
 }
 
-/* Progress fill glow while running */
+/* Reaching a project from Build: one calm ring, then gone */
+.project-card.is-highlight {
+  animation: card-highlight 1.6s var(--ease-out);
+}
+
+@keyframes card-highlight {
+  0% {
+    border-color: var(--bm-accent-line);
+  }
+  45% {
+    border-color: var(--bm-accent-line-strong);
+  }
+  100% {
+    border-color: var(--bm-accent-line);
+  }
+}
+
+/* Status change settles rather than flashing */
+.status.is-changing {
+  animation: scale-in var(--motion-slow) var(--ease-out);
+}
+
+/* Empty states and the toolbar fade in when they become the visible surface */
+.empty:not([hidden]),
+.project-toolbar:not([hidden]) {
+  animation: fade-in var(--motion-slow) var(--ease-out) both;
+}
+
+/* Dialog entrance (the exit is a class the owner adds — see components.css) */
+.confirm[open] {
+  animation: dialog-in var(--motion-slow) var(--ease-out) both;
+}
+
+.confirm[open]::backdrop {
+  animation: fade-in var(--motion-slow) var(--ease-out) both;
+}
+
+/* Progress fill: the only width transition in the system. It communicates
+   progress, runs on a 200ms state clock, and the value is also printed as text
+   and exposed via aria-valuenow, so reduced motion costs nothing. */
 .progress.is-running .progress__fill {
-  box-shadow: 0 0 18px -3px rgba(139, 147, 255, 0.45);
+  filter: drop-shadow(0 0 10px rgba(109, 139, 255, 0.28));
 }
 
-/* World visualizer motion */
+/* World visualizer breathing */
 .worldviz__orbit {
   transform-origin: center;
-  animation: wv-orbit 44s linear infinite;
+  animation: wv-orbit 46s linear infinite;
 }
 
 .worldviz__orbit--slow {
-  animation-duration: 76s;
+  animation-duration: 78s;
   animation-direction: reverse;
 }
 
 .wv-edge--flow {
-  animation: wv-dash 3.2s linear infinite;
+  animation: wv-dash 3.4s linear infinite;
 }
 
 .worldviz__float {
-  animation: wv-float 7s var(--ease-in-out) infinite;
+  animation: wv-float 7.5s var(--ease-in-out) infinite;
 }
 
 .worldviz__scan {
@@ -331,138 +554,225 @@ body.is-entering .site-header {
   opacity: 0;
 }
 
-/* Build page: states on the worldviz */
-.worldviz[data-state="idle"] .worldviz__orbit,
-.worldviz[data-state="idle"] .worldviz__float {
-  animation-play-state: running;
+/* --------------------------------------------------------------------------
+   4b. Construction field — the home hero reveal
+
+   One calm reveal, not a theatre piece: the plan tier settles down, the world
+   settles up, and the blocks arrive underneath. It is over in ~1.3s and the
+   field never looks half-built on the way — the whole composition is present
+   from the first beat, it just hasn't finished settling.
+
+   The scene is complete in the markup, so if this class is never added the
+   field is simply finished. That is what keeps the hero correct with JS off.
+   -------------------------------------------------------------------------- */
+.planviz__backdrop-line,
+.planviz__plan,
+.planviz__graph,
+.planviz__world,
+.planviz__markers {
+  transform-box: fill-box;
+  transform-origin: center;
 }
+
+.planviz__block {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* ---- the reveal ---- */
+.planviz.is-assembling .planviz__backdrop {
+  animation: field-fade 700ms var(--ease-out) both;
+}
+
+.planviz.is-assembling .planviz__plan {
+  animation: field-plan-in 800ms var(--ease-out) both;
+  animation-delay: 70ms;
+}
+
+.planviz.is-assembling .planviz__guide {
+  stroke-dasharray: 190;
+  animation: field-guide-in 560ms cubic-bezier(0.3, 0, 0.2, 1) both;
+  animation-delay: calc(280ms + var(--g) * 55ms);
+}
+
+.planviz.is-assembling .planviz__graph {
+  animation: field-fade 460ms var(--ease-out) both;
+  animation-delay: 200ms;
+}
+
+.planviz.is-assembling .planviz__link {
+  animation: field-fade 500ms var(--ease-out) both;
+  animation-delay: calc(260ms + var(--l) * 55ms);
+}
+
+.planviz.is-assembling .planviz__node {
+  animation: field-node-in 480ms var(--ease-out) both;
+  animation-delay: calc(300ms + var(--n) * 55ms);
+}
+
+.planviz.is-assembling .planviz__world {
+  animation: field-world-in 820ms var(--ease-out) both;
+  animation-delay: 150ms;
+}
+
+.planviz.is-assembling .planviz__block {
+  animation: field-rise 620ms var(--ease-out) both;
+  animation-delay: calc(360ms + var(--b) * 55ms);
+}
+
+.planviz.is-assembling .planviz__markers {
+  animation: field-fade 520ms var(--ease-out) both;
+  animation-delay: 900ms;
+}
+
+/* ---- ambient beats, starting only once the reveal has finished ---- */
+
+.planviz.is-settled .planviz__link {
+  animation: field-dash 6s linear infinite;
+}
+
+.planviz.is-settled .planviz__marker-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: field-pulse 3.8s var(--ease-in-out) infinite;
+}
+
+/* js/home.js marks the field off-screen once it leaves the viewport, and both
+   ambient beats pause until it returns. It must come after the shorthand
+   above: `animation` resets the play state. */
+.planviz[data-onscreen="false"] .planviz__link,
+.planviz[data-onscreen="false"] .planviz__marker-pulse {
+  animation-play-state: paused;
+}
+
+/* ---- CTA-linked emphasis, and a local response on hover ---- */
+.hero:has([data-hero-cta]:hover) .planviz__plan-plane,
+.hero:has([data-hero-cta]:focus-visible) .planviz__plan-plane {
+  stroke: rgba(139, 168, 255, 0.55);
+}
+
+.hero:has([data-hero-cta]:hover) .planviz__guide,
+.hero:has([data-hero-cta]:focus-visible) .planviz__guide {
+  stroke: rgba(139, 168, 255, 0.34);
+}
+
+.planviz__guide,
+.planviz__plan-plane,
+.planviz__link,
+.planviz__face {
+  transition: stroke var(--motion-slow) var(--ease-standard),
+    fill var(--motion-slow) var(--ease-standard);
+}
+
+/* Hovering the field lifts the intention tier a hair and brightens the one
+   accent block. Two properties, no movement of the composition. */
+@media (hover: hover) and (pointer: fine) {
+  .planviz:hover .planviz__plan-plane {
+    fill: rgba(109, 139, 255, 0.06);
+    stroke: rgba(139, 168, 255, 0.5);
+  }
+
+  .planviz:hover .planviz__plan-cell.is-planned {
+    fill: rgba(109, 139, 255, 0.17);
+  }
+
+  .planviz:hover .planviz__block--accent .planviz__face--top {
+    fill: rgba(162, 181, 242, 0.36);
+  }
+
+  .planviz:hover .planviz__hud-val {
+    color: var(--bm-text-secondary);
+  }
+}
+
+/* The pointer-linked state: js/home.js writes --field-x/--field-y from the
+   eased pointer position, and only the two upper tiers read them. The travel
+   is capped at 4px in the script, so no clamp is needed here. */
+.planviz[data-pointer="true"] .planviz__plan,
+.planviz[data-pointer="true"] .planviz__graph {
+  transform: translate3d(var(--field-x, 0), var(--field-y, 0), 0);
+  transition: transform 700ms var(--ease-out);
+}
+
+/* Reduced motion: the assembly still completes (the beats collapse to a
+   single frame), the ambient loops stop, and the pointer offset is ignored. */
 
 .worldviz[data-state="building"] .wv-cell {
-  animation: fade-in var(--dur-4) var(--ease-out) both;
-}
-
-/* Project card entrance.
-   Only a node JS created carries `is-entering`, so a card updated in place
-   never replays the animation when its status or build time changes. */
-.project-card.is-entering {
-  animation: card-in var(--dur-4) var(--ease-out) both;
-}
-
-/* Removal — the card fades and shrinks before the node is dropped */
-.project-card.is-leaving {
-  animation: none;
-  opacity: 0;
-  transform: scale(0.985);
-}
-
-@keyframes card-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Reaching a project from Build: a single calm ring, then gone */
-.project-card.is-highlight {
-  animation: card-highlight 1.6s var(--ease-out);
-}
-
-@keyframes card-highlight {
-  0% {
-    box-shadow: 0 0 0 0 rgba(139, 147, 255, 0.32);
-  }
-  40% {
-    box-shadow: 0 0 0 3px rgba(139, 147, 255, 0.18);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(139, 147, 255, 0);
-  }
-}
-
-/* The list itself settles when the filter or search result set changes */
-.projects-grid {
-  transition: opacity var(--dur-2) var(--ease-out);
-}
-
-/* Empty states and the toolbar fade in when they become the visible surface */
-.empty:not([hidden]),
-.project-toolbar:not([hidden]) {
-  animation: fade-in var(--dur-3) var(--ease-out) both;
-}
-
-/* Dialog entrance */
-.confirm[open] {
-  animation: dialog-in var(--dur-3) var(--ease-out) both;
-}
-
-.confirm[open]::backdrop {
-  animation: fade-in var(--dur-3) var(--ease-out) both;
-}
-
-@keyframes dialog-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.projects-grid .project-card.is-entering:nth-child(1) {
-  animation-delay: 40ms;
-}
-.projects-grid .project-card.is-entering:nth-child(2) {
-  animation-delay: 90ms;
-}
-.projects-grid .project-card.is-entering:nth-child(3) {
-  animation-delay: 140ms;
-}
-.projects-grid .project-card.is-entering:nth-child(4) {
-  animation-delay: 190ms;
-}
-.projects-grid .project-card.is-entering:nth-child(5) {
-  animation-delay: 240ms;
-}
-.projects-grid .project-card.is-entering:nth-child(6) {
-  animation-delay: 290ms;
-}
-.projects-grid .project-card.is-entering:nth-child(7) {
-  animation-delay: 340ms;
-}
-.projects-grid .project-card.is-entering:nth-child(8) {
-  animation-delay: 390ms;
-}
-
-/* Status change flash — a calm tint, never a flash */
-.status.is-changing {
-  animation: scale-in var(--dur-3) var(--ease-out);
+  animation: fade-in 480ms var(--ease-out) both;
 }
 
 /* --------------------------------------------------------------------------
-   5. Reduced motion contract
-  Reveals are only hidden once JS confirms it will animate them, so the page
-  is fully readable with JavaScript disabled.
+   5. Scroll reveals
+
+   Markup carries `data-reveal` (optionally `data-reveal="fade" | "scale"` and
+   `data-reveal-delay="120"`). app.js runs ONE IntersectionObserver for the
+   whole document and adds `.is-revealed`, then unobserves the element. The
+   hidden state only applies once JS has marked the document, so a reader with
+   JavaScript disabled always sees the content.
    -------------------------------------------------------------------------- */
 .js [data-reveal] {
   opacity: 0;
-  transform: translateY(14px);
+  transform: translateY(16px);
 }
 
-.js [data-stagger] > * {
-  opacity: 0;
-  transform: translateY(10px);
+[data-reveal] {
+  transition: opacity 620ms var(--ease-out), transform 620ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.js [data-reveal="fade"] {
+  transform: none;
+}
+
+.js [data-reveal="scale"] {
+  transform: translateY(8px) scale(0.985);
 }
 
 .js [data-reveal].is-revealed,
+.js [data-reveal="fade"].is-revealed,
+.js [data-reveal="scale"].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* Grouped children */
+.js [data-stagger] > * {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 560ms var(--ease-out), transform 560ms var(--ease-out);
+}
+
 .js [data-stagger].is-revealed > * {
   opacity: 1;
   transform: none;
+}
+
+[data-stagger].is-revealed > *:nth-child(1) {
+  transition-delay: 0ms;
+}
+[data-stagger].is-revealed > *:nth-child(2) {
+  transition-delay: 50ms;
+}
+[data-stagger].is-revealed > *:nth-child(3) {
+  transition-delay: 100ms;
+}
+[data-stagger].is-revealed > *:nth-child(4) {
+  transition-delay: 150ms;
+}
+[data-stagger].is-revealed > *:nth-child(5) {
+  transition-delay: 200ms;
+}
+[data-stagger].is-revealed > *:nth-child(6) {
+  transition-delay: 250ms;
+}
+[data-stagger].is-revealed > *:nth-child(7) {
+  transition-delay: 300ms;
+}
+[data-stagger].is-revealed > *:nth-child(8) {
+  transition-delay: 350ms;
+}
+[data-stagger].is-revealed > *:nth-child(9) {
+  transition-delay: 400ms;
 }
 
 /* Print and forced-colours must never drop content, whatever the JS did. */
@@ -474,6 +784,17 @@ body.is-entering .site-header {
   }
 }
 
+/* --------------------------------------------------------------------------
+   6. Reduced motion contract
+
+   Three inputs collapse to the same behaviour:
+     * the OS setting (`prefers-reduced-motion: reduce`)
+     * the in-app preference (html[data-motion-mode="reduced"])
+     * a coarse pointer (mobile) gets lighter ambient motion regardless
+
+   Reduced motion removes decoration, never information: state changes stay
+   instantaneous rather than disappearing.
+   -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -500,24 +821,42 @@ body.is-entering .site-header {
   .worldviz__float,
   .worldviz__scan,
   .wv-edge--flow,
-  .progress__fill::after {
+  .progress__fill::after,
+  .skeleton::after,
+  .ambient__grid,
+  .planviz.is-settled .planviz__link,
+  .planviz.is-settled .planviz__marker-pulse {
     animation: none !important;
   }
 
-  .btn:hover {
+  /* The field's pointer offset is decoration; drop it entirely. */
+  .planviz[data-pointer="true"] .planviz__plan,
+  .planviz[data-pointer="true"] .planviz__graph {
+    transform: none !important;
+  }
+
+  .btn:hover,
+  .project-card:hover,
+  .start-card:hover {
     transform: none;
   }
 
-  .project-card:hover {
-    transform: none;
+  .page-veil {
+    display: none;
   }
 
-  .project-card {
+  body.is-leaving main,
+  body.is-leaving .site-header,
+  body.is-leaving .site-footer,
+  body.is-entering main {
     animation: none !important;
+    transition: none !important;
+    opacity: 1;
+    transform: none;
   }
 }
 
-/* Users who prefer reduced data / no motion on the settings page */
+/* The in-app preference mirrors the media query exactly */
 html[data-motion-mode="reduced"] *,
 html[data-motion-mode="reduced"] *::before,
 html[data-motion-mode="reduced"] *::after {
@@ -532,11 +871,47 @@ html[data-motion-mode="reduced"] [data-stagger] > * {
   transform: none !important;
 }
 
-/* Phase 5 components: the state is carried by text, so motion is optional */
-html[data-motion-mode="reduced"] .log__item {
+html[data-motion-mode="reduced"] .log__item,
+html[data-motion-mode="reduced"] .timeline__desc {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* The field's ambient loops are infinite, so zeroing their duration would
+   leave them flickering on a 1ms cycle — they are removed by name instead. */
+html[data-motion-mode="reduced"] .planviz.is-settled .planviz__link,
+html[data-motion-mode="reduced"] .planviz.is-settled .planviz__marker-pulse {
   animation: none !important;
 }
 
-html[data-motion-mode="reduced"] .timeline__desc {
-  transition: none !important;
+html[data-motion-mode="reduced"] .planviz[data-pointer="true"] .planviz__plan,
+html[data-motion-mode="reduced"] .planviz[data-pointer="true"] .planviz__graph {
+  transform: none !important;
+}
+
+html[data-motion-mode="reduced"] .ambient__grid,
+html[data-motion-mode="reduced"] .ambient__noise {
+  animation: none !important;
+}
+
+/* Coarse pointers get a calmer ambient layer: the drift and the cursor light
+   are desktop affordances, and on a phone they cost battery for no gain. */
+@media (hover: none), (pointer: coarse) {
+  .ambient__glow {
+    animation: none;
+    filter: blur(72px);
+  }
+
+  .ambient__noise {
+    display: none;
+  }
+
+  .worldviz__orbit,
+  .worldviz__orbit--slow {
+    animation-duration: 120s;
+  }
+
+  /* A touch device is not automatically a small screen, and the field's two
+     ambient beats are a 6s dash crawl and a 3.8s ring: both are removed only
+     where the composition is a single column anyway (see responsive.css). */
 }

@@ -1,7 +1,11 @@
 /* ==========================================================================
    BuildMind — navigation.js
-   Keeps the active page visually identifiable and animates the sliding
-   indicator that sits behind the current nav item.
+   Marks the current page for assistive technology and the CSS active
+   treatment, and publishes that fact to the mobile sheet toggle.
+
+   The visual indicator itself is pure CSS (`.nav__link[aria-current="page"]`),
+   so it needs no measurement, survives a font swap without re-measuring, and
+   cannot leave a floating pill behind if a link is added or removed.
    ========================================================================== */
 
 (function () {
@@ -27,7 +31,8 @@
       }
     });
 
-    // The mobile sheet is mounted at boot; mirror the state onto its toggle.
+    // The sheet toggle names the current page, so a screen-reader user hears
+    // where they are before opening the menu.
     const active = document.querySelector('.nav__link[aria-current="page"]');
     document.querySelectorAll(".menu-toggle").forEach((toggle) => {
       const expanded = toggle.getAttribute("aria-expanded") === "true";
@@ -42,62 +47,8 @@
     });
   }
 
-  function initIndicator() {
-    const nav = document.querySelector(".nav");
-    if (!nav) return;
-
-    let indicator = nav.querySelector(".nav__indicator");
-    if (!indicator) {
-      indicator = document.createElement("span");
-      indicator.className = "nav__indicator";
-      indicator.setAttribute("aria-hidden", "true");
-      nav.prepend(indicator);
-    }
-
-    const active = nav.querySelector('.nav__link[aria-current="page"]');
-
-    const place = (animate) => {
-      const target = nav.querySelector('.nav__link[aria-current="page"]') || active;
-      if (!target) return;
-
-      const navRect = nav.getBoundingClientRect();
-      const rect = target.getBoundingClientRect();
-
-      if (!animate) indicator.style.transition = "none";
-      indicator.style.width = `${rect.width}px`;
-      indicator.style.transform = `translateX(${rect.left - navRect.left}px)`;
-
-      if (!animate) {
-        // Force a reflow so the next transition is animated again.
-        void indicator.offsetWidth;
-        indicator.style.transition = "";
-      }
-      indicator.classList.add("is-ready");
-    };
-
-    // First placement happens without animation.
-    requestAnimationFrame(() => place(false));
-
-    let raf = 0;
-    window.addEventListener(
-      "resize",
-      () => {
-        cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(() => place(false));
-      },
-      { passive: true }
-    );
-
-    // Re-measure once webfonts settle, so the pill never sits off-centre.
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => place(false)).catch(() => {});
-    }
-  }
-
   // Every page module boots once. The DOMContentLoaded guard means a second
-  // dispatch (or any future re-entrant call) cannot double-register the
-  // listeners and interval below — measured before this guard: a repeated
-  // init on build.html took the live listener count from 36 to 69.
+  // dispatch (or any future re-entrant call) cannot double-register work.
   let booted = false;
 
   function init() {
@@ -105,12 +56,11 @@
     booted = true;
 
     initActiveState();
-    initIndicator();
-    // The sheet opens/closes with layout changes; re-measure after it settles.
+
+    // The sheet opens/closes with layout changes; re-publish after it settles
+    // so the toggle label never describes a stale page.
     const sheet = document.querySelector(".mobile-nav");
-    if (sheet) {
-      sheet.addEventListener("transitionend", () => initActiveState());
-    }
+    if (sheet) sheet.addEventListener("transitionend", initActiveState);
   }
 
   if (document.readyState === "loading") {
@@ -120,4 +70,5 @@
   }
 
   BM.updateActiveNav = initActiveState;
+  window.BuildMind = BM;
 })();

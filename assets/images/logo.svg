@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 32" width="128" height="32" role="img" aria-label="BuildMind">
   <defs>
     <linearGradient id="lg" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#a8aeff"/>
-      <stop offset="1" stop-color="#737cf2"/>
+      <stop offset="0" stop-color="#9db2ff"/>
+      <stop offset="1" stop-color="#5d78ee"/>
     </linearGradient>
   </defs>
   <g>
@@ -10,5 +10,5 @@
     <path d="M16 10.1 22 13.5v7L16 23.9l-6-3.4v-7L16 10.1Z" fill="url(#lg)" fill-opacity="0.34" stroke="url(#lg)" stroke-width="1.2" stroke-linejoin="round"/>
     <path d="M16 17v6.9M16 17l6-3.5M16 17l-6-3.5" stroke="url(#lg)" stroke-width="1.2" stroke-linecap="round"/>
   </g>
-  <text x="38" y="21" font-family="Inter, system-ui, sans-serif" font-size="15" font-weight="580" letter-spacing="-0.4" fill="#f2f3f6">Build<tspan fill="#83879a" font-weight="460">Mind</tspan></text>
+  <text x="38" y="21" font-family="Inter, system-ui, sans-serif" font-size="15" font-weight="580" letter-spacing="-0.4" fill="#eceef4">Build<tspan fill="#8b91a3" font-weight="460">Mind</tspan></text>
 </svg>

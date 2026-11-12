@@ -8,9 +8,13 @@
    element used here already exists in css/main.css (`.setting-row`, `.field`,
    `.input`, `.btn`, `.status-pill`).
 
-   The one behaviour worth reading closely: sign-in is the ONLY thing that
-   switches the app from local storage to the server. Signing out switches it
-   back. Nothing is uploaded without an explicit action.
+   The session itself belongs to the auth controller: this file renders the
+   state the controller publishes and forwards intent to it. There is no
+   second copy of "who is signed in" here.
+
+   Three states are rendered, never two: while the session is being checked
+   the section says so, so the page never flashes a signed-in layout that it
+   then has to hide — or a signed-out one that it has to replace.
    ========================================================================== */
 
 (function () {
@@ -26,6 +30,7 @@
     mode: $("#account-mode"),
     signedOut: $("#account-signed-out"),
     signedIn: $("#account-signed-in"),
+    pending: $("#account-pending"),
     identity: $("#account-identity"),
     storageNote: $("#account-storage-note"),
     openAuth: $("#account-open-auth"),
@@ -66,24 +71,41 @@
     setError(el.formError, "");
   }
 
-  /** Paint the whole section from a session state. */
+  /** Paint the whole section from the authoritative auth state. */
   function render(authState) {
-    const authenticated = Boolean(authState && authState.authenticated);
-    const user = authenticated ? authState.user : null;
+    const state = authState || BM.getState().auth;
+    const status = state.status || "loading";
+    const authenticated = status === "authenticated";
+    const user = authenticated ? state.user : null;
     const remote = BM.serviceMode === BM.SERVICE_MODES.REMOTE;
 
     if (el.mode) {
       el.mode.textContent = remote ? "Server storage" : "Local only";
       el.mode.dataset.mode = remote ? "remote" : "local";
     }
+    if (el.note) {
+      el.note.textContent = remote
+        ? "Sign in to access and store your projects on the BuildMind server."
+        : "Projects stay in this browser while simulated mode is active.";
+    }
 
-    if (el.signedOut) el.signedOut.hidden = authenticated;
+    // The three states are exclusive: pending, signed out, signed in.
+    if (el.pending) el.pending.hidden = status !== "loading";
+    if (el.signedOut) el.signedOut.hidden = status !== "unauthenticated" && status !== "error";
     if (el.signedIn) el.signedIn.hidden = !authenticated;
 
     if (authenticated && user) {
       if (el.identity) el.identity.textContent = `${user.displayName || "Signed in"} · ${user.email}`;
-      if (el.storageNote) el.storageNote.textContent = "Projects are stored on the BuildMind server.";
+      if (el.storageNote) {
+        el.storageNote.textContent = remote
+          ? "Projects are stored on the BuildMind server."
+          : "Projects stay in this browser.";
+      }
     }
+
+    // The sign-in form only exists in the signed-out state.
+    if (el.form) el.form.hidden = status !== "unauthenticated" && status !== "error";
+    if (el.openAuth) el.openAuth.hidden = status !== "unauthenticated" && status !== "error";
 
     // Migration is only offered when there is something local to move AND the
     // account is live. Offering it otherwise would be a dead button.
@@ -98,7 +120,7 @@
   function localProjectCount() {
     try {
       const storage = BM.storage;
-      const raw = storage ? storage.read(BM.STORAGE_KEYS.projects) : null;
+      const raw = storage ? storage.readJSON(BM.STORAGE_KEYS.projects) : null;
       const list = raw && Array.isArray(raw.projects) ? raw.projects : Array.isArray(raw) ? raw : [];
       return list.length;
     } catch {
@@ -109,30 +131,17 @@
   /* ------------------------------------------------------------------------
      Session
      ------------------------------------------------------------------------ */
-  let authState = { authenticated: false, user: null };
-
   function refresh() {
-    return BM.api.me().then((result) => {
-      if (BM.isOk(result)) {
-        authState = result.data;
-      } else {
-        // The API is unreachable. That is not a sign-in failure and must not
-        // read as one; the account section simply stays signed out.
-        authState = { authenticated: false, user: null, unreachable: true };
-      }
-      render(authState);
-
-      /*
-        The service mode is chosen once, by configuration, and this module never
-        changes it. A signed-out visitor on a remote deployment must still be
-        talking to the real API — it answers 401, which is the honest answer,
-        and the account section shows the sign-in form. Swapping in the
-        simulation here would be a silent fallback from production behaviour,
-        which is exactly what this phase forbids.
-      */
-      BM.projectController?.load();
-      return authState;
-    });
+    // The controller owns the session; this file only asks for the state.
+    if (BM.authController && typeof BM.authController.bootstrap === "function") {
+      return BM.authController.bootstrap().then((result) => {
+        render(BM.getState().auth);
+        if (BM.isOk(result) && BM.isAuthenticated()) BM.projectController?.load();
+        return result;
+      });
+    }
+    render(BM.getState().auth);
+    return Promise.resolve(BM.serviceOk(null));
   }
 
   function submitAuth(event) {
@@ -153,7 +162,7 @@
     if (!password || (formMode === "register" && password.length < 12)) {
       setError(
         el.passwordError,
-        formMode === "register" ? "Use at least 12 characters." : "Enter your password.",
+        formMode === "register" ? "Use at least 12 characters." : "Enter your password."
       );
       invalid = true;
     }
@@ -165,8 +174,11 @@
       el.submit.textContent = formMode === "register" ? "Creating…" : "Signing in…";
     }
 
+    const controller = BM.authController;
     const call =
-      formMode === "register" ? BM.api.register({ email, password }) : BM.api.login({ email, password });
+      formMode === "register"
+        ? controller.register({ email, password })
+        : controller.login({ email, password });
 
     call.then((result) => {
       busy = false;
@@ -181,6 +193,7 @@
         setError(el.passwordError, fields.password || "");
         setError(el.formError, fields.form || (result.error && result.error.message) || "");
         announce("Sign-in did not complete.");
+        render(BM.getState().auth);
         return;
       }
 
@@ -191,28 +204,24 @@
 
       // The session token never reached script (HttpOnly cookie); only the
       // CSRF token and the public user came back.
-      authState = { authenticated: true, user: result.data.user };
-      applySession(result.data.user);
+      render(BM.getState().auth);
       announce(formMode === "register" ? "Account created." : "Signed in.");
       BM.toast?.(formMode === "register" ? "Account created" : "Signed in");
-      return refresh();
+
+      // The projects, provider catalogue and connection state that required a
+      // session can now be loaded.
+      BM.settingsController?.load?.();
+      BM.connectionController?.restore?.();
+      BM.projectController?.load();
     });
   }
 
-  /** Called after a successful auth: repaint and switch to server storage. */
-  function applySession(user) {
-    authState = { authenticated: true, user };
-    render(authState);
-  }
-
   function signOut() {
-    return BM.api.logout().then(() => {
-      authState = { authenticated: false, user: null };
+    return BM.authController.logout().then(() => {
       // The mode is unchanged: signing out ends the session, it does not
       // change which backend the deployment talks to.
-      BM.projectController?.load();
-      render(authState);
-      announce("Signed out. Projects stay in this browser.");
+      render(BM.getState().auth);
+      announce("Signed out.");
       BM.toast?.("Signed out");
     });
   }
@@ -239,12 +248,12 @@
     }
 
     const storage = BM.storage;
-    const raw = storage ? storage.read(BM.STORAGE_KEYS.projects) : null;
+    const raw = storage ? storage.readJSON(BM.STORAGE_KEYS.projects) : null;
     const local = raw && Array.isArray(raw.projects) ? raw.projects : Array.isArray(raw) ? raw : [];
 
     return BM.api.listProjects({ limit: 100 }).then((existing) => {
       const names = new Set(
-        (BM.isOk(existing) ? existing.data.projects : []).map((p) => String(p.name).toLowerCase()),
+        (BM.isOk(existing) ? existing.data.projects : []).map((p) => String(p.name).toLowerCase())
       );
 
       const pending = local.filter((project) => {
@@ -262,9 +271,9 @@
                 name: String(project.name).slice(0, 60),
                 description: String(project.description || "").slice(0, 280),
                 ...(project.prompt ? { prompt: String(project.prompt) } : {}),
-              }),
+              })
             ),
-          Promise.resolve(),
+          Promise.resolve()
         )
         .then(() => {
           busy = false;
@@ -277,11 +286,40 @@
           if (el.migration) el.migration.hidden = true;
           announce(
             `${moved} project${moved === 1 ? "" : "s"} moved to your account` +
-              (skipped ? `; ${skipped} already existed.` : "."),
+              (skipped ? `; ${skipped} already existed.` : ".")
           );
           BM.toast?.(moved ? `Moved ${moved} project${moved === 1 ? "" : "s"}` : "Nothing to move");
           return BM.projectController?.load();
         });
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+     Roblox OAuth callback
+
+     The provider sends the user back with a code and the state it was given.
+     Both are read from the URL and posted straight back to the backend: the
+     state is never stored in the browser.
+     ------------------------------------------------------------------------ */
+  function completeRobloxCallback() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state");
+    if (!code || !state) return Promise.resolve(null);
+
+    const service = BM.robloxService;
+    if (!service || typeof service.complete !== "function") return Promise.resolve(null);
+
+    return service.complete(code, state).then((result) => {
+      if (!BM.isOk(result)) {
+        announce("Roblox could not be connected.");
+        BM.toast?.("Roblox could not be connected.");
+        return result;
+      }
+      BM.setConnectionStatus("roblox", result.data.status || "disconnected");
+      announce("Roblox account connected.");
+      BM.toast?.("Roblox account connected");
+      return result;
     });
   }
 
@@ -322,19 +360,16 @@
     el.signOut?.addEventListener("click", signOut);
     el.migrate?.addEventListener("click", migrate);
 
-    /*
-      Only probe the session when the app is actually running against a
-      backend. In the default static deployment there is no API and the CSP
-      does not permit a connection, so probing would produce a guaranteed
-      console error on every visit. The account section then simply reports
-      the local-only state, which is the truth.
-    */
-    const remote = BM.requestedServiceMode && BM.requestedServiceMode() === BM.SERVICE_MODES.REMOTE;
-    if (remote && BM.api) {
-      refresh();
-    } else {
-      render({ authenticated: false, user: null });
-    }
+    // The auth state is the single source of truth: this section renders it
+    // whenever it changes, whoever changed it.
+    BM.subscribe((view, changed) => {
+      if (!changed.length || changed.includes("auth")) render(view.auth);
+    });
+
+    render(BM.getState().auth);
+
+    // The OAuth callback, when the provider sent the user back.
+    completeRobloxCallback();
   }
 
   if (document.readyState === "loading") {

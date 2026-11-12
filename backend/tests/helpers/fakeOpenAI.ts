@@ -102,6 +102,15 @@ export class FakeOpenAI {
         }
 
         if (req.url?.endsWith('/chat/completions')) {
+          const pattern = this.options.acceptKeyPattern;
+          if (pattern) {
+            const token = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+            if (!pattern.test(token)) {
+              respond(401, { error: { message: 'Incorrect API key provided' } });
+              return;
+            }
+          }
+
           this.chatCalls += 1;
           const callIndex = this.chatCalls;
 
