@@ -445,6 +445,13 @@
     display: none;
   }
 
+  /* Two lingering marquees on a phone are battery spent on decoration. The
+     field still reads as alive thanks to the plan tier's hover response. */
+  .planviz.is-settled .planviz__link,
+  .planviz.is-settled .planviz__marker-pulse {
+    animation: none;
+  }
+
   .hero__meta {
     margin-top: var(--space-5);
     padding-top: var(--space-4);

@@ -109,18 +109,27 @@
     };
 
     // The effect is only meaningful while the hero is on screen.
+    // One observer does both jobs: the pointer offset only applies while the
+    // field is on screen, and the ambient loop is paused when it is not — an
+    // off-screen infinite animation is battery spent on nothing.
     const observer =
       typeof IntersectionObserver === "function"
         ? new IntersectionObserver(
             (entries) => {
               visible = entries.some((entry) => entry.isIntersecting);
               field.dataset.pointer = visible ? "true" : "false";
+              field.dataset.onscreen = visible ? "true" : "false";
+              if (!visible) {
+                pendingX = 0;
+                pendingY = 0;
+              }
             },
             { rootMargin: "0px" }
           )
         : null;
     if (observer) observer.observe(stage);
     field.dataset.pointer = "true";
+    field.dataset.onscreen = "true";
 
     stage.addEventListener("pointermove", onMove, { passive: true });
     stage.addEventListener("pointerleave", onLeave, { passive: true });

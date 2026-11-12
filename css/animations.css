@@ -626,6 +626,7 @@ body.is-entering main {
 }
 
 /* ---- ambient beats, starting only once the reveal has finished ---- */
+
 .planviz.is-settled .planviz__link {
   animation: field-dash 6s linear infinite;
 }
@@ -634,6 +635,14 @@ body.is-entering main {
   transform-box: fill-box;
   transform-origin: center;
   animation: field-pulse 3.8s var(--ease-in-out) infinite;
+}
+
+/* js/home.js marks the field off-screen once it leaves the viewport, and both
+   ambient beats pause until it returns. It must come after the shorthand
+   above: `animation` resets the play state. */
+.planviz[data-onscreen="false"] .planviz__link,
+.planviz[data-onscreen="false"] .planviz__marker-pulse {
+  animation-play-state: paused;
 }
 
 /* ---- CTA-linked emphasis, and a local response on hover ---- */
@@ -902,10 +911,7 @@ html[data-motion-mode="reduced"] .ambient__noise {
     animation-duration: 120s;
   }
 
-  /* On a phone the field keeps one slow ambient beat and nothing else: two
-     more marquees are battery spent on decoration. */
-  .planviz.is-settled .planviz__link,
-  .planviz.is-settled .planviz__marker-pulse {
-    animation: none;
-  }
+  /* A touch device is not automatically a small screen, and the field's two
+     ambient beats are a 6s dash crawl and a 3.8s ring: both are removed only
+     where the composition is a single column anyway (see responsive.css). */
 }
